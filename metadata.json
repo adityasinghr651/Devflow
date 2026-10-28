@@ -1,6 +1,6 @@
 {
-  "name": "PulseBench — Open-Source Server Performance & Load Engineering",
-  "description": "Open-source server performance testing, real-time telemetry monitoring, bottleneck analysis, and load engineering platform built on the Lab_Engineering architecture.",
-  "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+  "name": "ServerTest",
+  "description": "Local-first server performance engineering and bounded HTTP load-testing MVP.",
+  "capabilities": ["target registry", "bounded HTTP load tests", "latency and throughput summaries", "run history", "JSON export"],
+  "limitations": ["single local worker", "no authentication or multi-tenancy", "no distributed load generation", "no target resource metrics"]
 }

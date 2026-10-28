@@ -1,33 +1,19 @@
 <!doctype html>
-<html lang="en" class="dark">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>PulseBench — Open-Source Server Performance & Load Engineering</title>
-    <meta name="description" content="Open-source server performance testing, real-time telemetry monitoring, bottleneck analysis, and load engineering platform built on the Lab_Engineering architecture." />
-    <meta property="og:title" content="PulseBench — Open-Source Server Performance & Load Engineering" />
-    <meta property="og:description" content="Open-source server performance testing, real-time telemetry monitoring, bottleneck analysis, and load engineering platform built on the Lab_Engineering architecture." />
+    <title>ServerTest — Performance Engineering</title>
+    <meta name="description" content="An open-source workspace for controlled server performance testing, measurement, and analysis." />
+    <meta property="og:title" content="ServerTest — Performance Engineering" />
+    <meta property="og:description" content="An open-source workspace for controlled server performance testing, measurement, and analysis." />
     <meta property="og:type" content="website" />
     <meta name="twitter:card" content="summary_large_image" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400..700;1,9..40,400..700&family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet" />
-    <script>
-      (function () {
-        try {
-          var saved = localStorage.getItem('pulsebench-theme') || 'dark';
-          var resolved = saved;
-          if (saved === 'system') {
-            resolved = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-          }
-          document.documentElement.classList.remove('light', 'dark');
-          document.documentElement.classList.add(resolved);
-          document.documentElement.style.colorScheme = resolved;
-        } catch (e) {}
-      })();
-    </script>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
   </head>
-  <body class="bg-[var(--bg-canvas)] text-[var(--text-primary)] antialiased selection:bg-[#2563EB] selection:text-white">
+  <body class="bg-[#05070C] text-[#dfe2ef] antialiased selection:bg-[#2563EB]/30 selection:text-[#BEF264]">
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

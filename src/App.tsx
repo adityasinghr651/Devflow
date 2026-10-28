@@ -1,102 +1,67 @@
-import React from 'react';
-import { X } from 'lucide-react';
-import { AppProvider, useApp } from './context/AppContext';
-import {
-  AuthPages,
-  CommunityPage,
-  DocsPage,
-  HomePage,
-  LegalAndStatusPages,
-  ProductPage,
-} from './features/public/PublicPages';
-import { AuthenticatedAppShell } from './features/dashboard/AppShell';
-import {
-  CreateTestWizardScreen,
-  LiveMonitoringScreen,
-  OverviewDashboardScreen,
-  TargetsScreen,
-} from './features/dashboard/DashboardScreens';
-import {
-  ComparisonsScreen,
-  IntegrationsAndAuditScreen,
-  PerformanceAnalysisScreen,
-  ReportsScreen,
-  SettingsScreen,
-  TestRunsScreen,
-} from './features/dashboard/AnalysisAndAdminScreens';
+import { useEffect, useMemo, useState } from 'react';
+import { Activity, ArrowDownRight, ArrowUpRight, BarChart3, BookOpen, CheckCircle2, ChevronDown, CircleHelp, Clock3, Code2, Gauge, GitBranch, Globe2, LayoutDashboard, Menu, Moon, Plus, Radio, Server, Settings, ShieldCheck, Sun, Terminal, Trash2, X, Play, Square, RefreshCw, Download, Search, Zap } from 'lucide-react';
+import './index.css';
 
-import { DeveloperToolsConsole } from './components/ui/Primitives';
+type Target = { id:string; name:string; url:string; environment:string; createdAt:string };
+type Run = { id:string; targetId:string; targetName:string; url:string; method:string; concurrency:number; durationSec:number; status:string; startedAt:string; finishedAt?:string; totalRequests:number; successCount:number; failedCount:number; rps:number; p50:number; p95:number; p99:number; errorRate:number; statusCodes:Record<string,number>; error?:string };
+const API = import.meta.env.VITE_API_URL || 'http://localhost:4000/api';
+const fmt=(n:number)=>new Intl.NumberFormat('en-US').format(n||0);
 
-const ToastStack: React.FC = () => {
-  const { toasts, dismissToast } = useApp();
-  if (toasts.length === 0) return null;
-
-  return (
-    <div
-      aria-live="polite"
-      className="fixed bottom-4 right-4 z-50 flex flex-col gap-2 max-w-sm w-full px-4 pointer-events-none no-print"
-    >
-      {toasts.map((t) => (
-        <div
-          key={t.id}
-          className="pointer-events-auto rounded-xl border border-[var(--border-strong)] bg-[var(--bg-surface)] p-3.5 shadow-lg flex items-start justify-between gap-3"
-        >
-          <div className="space-y-0.5">
-            <div className="text-xs font-bold text-[var(--text-primary)]">{t.title}</div>
-            {t.detail && (
-              <div className="text-[11px] font-mono text-[var(--text-secondary)]">{t.detail}</div>
-            )}
-          </div>
-          <button
-            type="button"
-            onClick={() => dismissToast(t.id)}
-            className="text-[var(--text-muted)] hover:text-[var(--text-primary)] cursor-pointer"
-            aria-label="Dismiss notification"
-          >
-            <X className="w-3.5 h-3.5" />
-          </button>
-        </div>
-      ))}
-    </div>
-  );
-};
-
-const RouterView: React.FC = () => {
-  const { route } = useApp();
-
-  // Public Routes
-  if (route === 'home') return <HomePage />;
-  if (route === 'product') return <ProductPage />;
-  if (route === 'docs') return <DocsPage />;
-  if (route === 'community') return <CommunityPage />;
-  if (route.startsWith('auth-')) return <AuthPages mode={route} />;
-  if (route.startsWith('legal-') || route.startsWith('status-')) {
-    return <LegalAndStatusPages mode={route} />;
-  }
-
-  // Authenticated Application Routes
-  return (
-    <AuthenticatedAppShell>
-      {route === 'app-overview' && <OverviewDashboardScreen />}
-      {route === 'app-targets' && <TargetsScreen />}
-      {route === 'app-create-test' && <CreateTestWizardScreen />}
-      {route === 'app-runs' && <TestRunsScreen />}
-      {route === 'app-live' && <LiveMonitoringScreen />}
-      {route === 'app-analysis' && <PerformanceAnalysisScreen />}
-      {route === 'app-reports' && <ReportsScreen />}
-      {route === 'app-comparisons' && <ComparisonsScreen />}
-      {route === 'app-integrations' && <IntegrationsAndAuditScreen />}
-      {route === 'app-settings' && <SettingsScreen />}
-    </AuthenticatedAppShell>
-  );
-};
-
-export default function App() {
-  return (
-    <AppProvider>
-      <RouterView />
-      <DeveloperToolsConsole />
-      <ToastStack />
-    </AppProvider>
-  );
+export default function App(){
+ const [page,setPage]=useState('Overview'); const [theme,setTheme]=useState<'dark'|'light'|'system'>(()=>(localStorage.getItem('servertest-theme') as 'dark'|'light'|'system')||'system'); const [targets,setTargets]=useState<Target[]>([]); const [runs,setRuns]=useState<Run[]>([]); const [loading,setLoading]=useState(true); const [notice,setNotice]=useState(''); const [showTarget,setShowTarget]=useState(false); const [showTest,setShowTest]=useState(false); const [selectedRun,setSelectedRun]=useState<Run|null>(null); const [query,setQuery]=useState('');
+ const [targetName,setTargetName]=useState('Local API'); const [targetUrl,setTargetUrl]=useState('http://localhost:3001'); const [environment,setEnvironment]=useState('Development');
+ const [testTarget,setTestTarget]=useState(''); const [path,setPath]=useState('/'); const [method,setMethod]=useState('GET'); const [concurrency,setConcurrency]=useState(5); const [duration,setDuration]=useState(10); const [authorized,setAuthorized]=useState(false); const [starting,setStarting]=useState(false);
+ const [mobileNav,setMobileNav]=useState(false);
+ useEffect(()=>{localStorage.setItem('servertest-theme',theme);const apply=()=>{const resolved=theme==='system'?(window.matchMedia('(prefers-color-scheme: light)').matches?'light':'dark'):theme;document.documentElement.dataset.theme=resolved};apply();const media=window.matchMedia('(prefers-color-scheme: light)');media.addEventListener('change',apply);return()=>media.removeEventListener('change',apply)},[theme]);
+ async function request<T>(route:string,options?:RequestInit):Promise<T>{const r=await fetch(`${API}${route}`,{...options,headers:{'Content-Type':'application/json',...(options?.headers||{})}}); const body=await r.json().catch(()=>({error:'Invalid server response'})); if(!r.ok) throw new Error(body.error||`Request failed (${r.status})`); return body;}
+ async function refresh(){try{const [t,r]=await Promise.all([request<Target[]>('/targets'),request<Run[]>('/runs')]);setTargets(t);setRuns(r);}catch(e){setNotice(`API unavailable: ${e instanceof Error?e.message:'Could not connect'}. Start the backend with npm run server.`)}finally{setLoading(false)}}
+ useEffect(()=>{refresh();const timer=setInterval(()=>{request<Run[]>('/runs').then(setRuns).catch(()=>{});},2000);return()=>clearInterval(timer)},[]);
+ const activeRuns=runs.filter(r=>r.status==='running'||r.status==='queued'); const completed=runs.filter(r=>r.status==='completed'); const latest=completed[0];
+ async function addTarget(e:React.FormEvent){e.preventDefault();try{const t=await request<Target>('/targets',{method:'POST',body:JSON.stringify({name:targetName,url:targetUrl,environment})});setTargets(p=>[t,...p]);setShowTarget(false);setNotice('Target saved. Verify you own or have permission to test it.');setTargetName('Local API');setTargetUrl('http://localhost:3001');}catch(e){setNotice(e instanceof Error?e.message:'Could not save target')}}
+ async function launchTest(e:React.FormEvent){e.preventDefault();if(!authorized){setNotice('Confirm that you own or are authorized to test this target.');return}setStarting(true);try{const t=targets.find(x=>x.id===testTarget);if(!t)throw new Error('Select a target first');const run=await request<Run>('/runs',{method:'POST',body:JSON.stringify({targetId:t.id,path,method,concurrency,durationSec:duration,authorized})});setRuns(p=>[run,...p]);setShowTest(false);setPage('Test Runs');setSelectedRun(run);setNotice('Test queued. You can monitor the run in Test Runs.');setAuthorized(false);}catch(e){setNotice(e instanceof Error?e.message:'Could not start test')}finally{setStarting(false)}}
+ async function stopRun(id:string){try{await request(`/runs/${id}/cancel`,{method:'POST'});await refresh();setNotice('Cancellation requested.')}catch(e){setNotice(e instanceof Error?e.message:'Could not cancel run')}}
+ async function deleteTarget(id:string){try{await request(`/targets/${id}`,{method:'DELETE'});setTargets(p=>p.filter(t=>t.id!==id));setNotice('Target deleted.')}catch(e){setNotice(e instanceof Error?e.message:'Could not delete target')}}
+ function exportRun(run:Run){const blob=new Blob([JSON.stringify(run,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`servertest-${run.id}.json`;a.click();URL.revokeObjectURL(a.href)}
+ const nav=[{name:'Overview',icon:LayoutDashboard},{name:'Servers & Targets',icon:Server},{name:'Create Test',icon:Plus},{name:'Test Runs',icon:Activity},{name:'Performance Analysis',icon:Gauge},{name:'Reports',icon:BarChart3},{name:'Comparisons',icon:GitBranch},{name:'Documentation',icon:BookOpen},{name:'Settings',icon:Settings}];
+ const visibleRuns=useMemo(()=>runs.filter(r=>`${r.targetName} ${r.status} ${r.id}`.toLowerCase().includes(query.toLowerCase())),[runs,query]);
+ return <div className="app-shell">
+  <aside className={`sidebar ${mobileNav?'mobile-open':''}`}><div className="brand"><div className="brand-mark"><Activity size={21}/></div><div><strong>ServerTest</strong><small>PERFORMANCE ENGINEERING</small></div><button className="icon-button mobile-close" onClick={()=>setMobileNav(false)}><X size={17}/></button></div>
+   <div className="workspace"><div className="workspace-icon"><Terminal size={16}/></div><div><b>Local workspace</b><span>Community edition</span></div><ChevronDown size={15}/></div>
+   <div className="nav-label">WORKSPACE</div><nav>{nav.slice(0,7).map(item=><button key={item.name} className={`nav-item ${page===item.name?'active':''}`} onClick={()=>{setPage(item.name);setMobileNav(false);if(item.name==='Create Test'){setTestTarget(targets[0]?.id||'');setShowTest(true)}}}><item.icon size={17}/><span>{item.name}</span>{item.name==='Test Runs'&&activeRuns.length>0&&<em>{activeRuns.length}</em>}</button>)}</nav>
+   <div className="nav-label secondary-label">RESOURCES</div><nav>{nav.slice(7).map(item=><button key={item.name} className={`nav-item ${page===item.name?'active':''}`} onClick={()=>{setPage(item.name);setMobileNav(false)}}><item.icon size={17}/><span>{item.name}</span></button>)}</nav>
+   <div className="sidebar-bottom"><div className="status-line"><span className="status-dot"/><span>Local API</span><span className="status-ok">Connected*</span></div><div className="sidebar-note">*Connection is verified when data loads successfully.</div><a href="https://github.com/adityasinghr651/Devflow" target="_blank" rel="noreferrer"><Code2 size={15}/> Open-source project <ArrowUpRight size={14}/></a></div>
+  </aside>
+  {mobileNav&&<div className="mobile-scrim" onClick={()=>setMobileNav(false)}/>}
+  <main className="main-area"><header className="topbar"><button className="icon-button menu-button" onClick={()=>setMobileNav(true)}><Menu size={19}/></button><div className="breadcrumbs"><span>Workspace</span><span className="crumb-slash">/</span><b>{page}</b></div><div className="top-actions"><div className="api-indicator"><span className="status-dot"/> API <span className="api-host">localhost:4000</span></div><div className="theme-switch" title="Theme"><button className={theme==='light'?'chosen':''} onClick={()=>setTheme('light')} aria-label="Light theme"><Sun size={15}/></button><button className={theme==='dark'?'chosen':''} onClick={()=>setTheme('dark')} aria-label="Dark theme"><Moon size={15}/></button><button className={theme==='system'?'chosen':''} onClick={()=>setTheme('system')} aria-label="System theme"><Settings size={15}/></button></div><button className="avatar">AS</button></div></header>
+   <div className="content"><div className="page-heading"><div><div className="eyebrow"><span className="eyebrow-line"/> SERVER PERFORMANCE WORKSPACE</div><h1>{page==='Overview'?'Measure what matters.':page}</h1><p>{page==='Overview'?'Run controlled tests against systems you own. Understand latency, throughput, and failure behavior.':page==='Servers & Targets'?'Manage the endpoints you are authorized to test.':page==='Test Runs'?'Track test lifecycle, inspect results, and export raw summaries.':page==='Performance Analysis'?'Evidence-led observations from completed test runs.':'A practical workspace for repeatable performance experiments.'}</p></div><div className="heading-actions"><button className="button secondary" onClick={refresh}><RefreshCw size={15}/> Refresh</button><button className="button primary" onClick={()=>{if(!targets.length){setShowTarget(true);setNotice('Add a target before configuring a test.')}else{setTestTarget(targets[0].id);setShowTest(true)}}}><Plus size={16}/> New test</button></div></div>
+   {notice&&<div className="notice"><CircleHelp size={16}/><span>{notice}</span><button onClick={()=>setNotice('')}><X size={15}/></button></div>}
+   {page==='Overview'&&<>
+    <div className="callout"><div className="callout-icon"><ShieldCheck size={19}/></div><div><b>Test responsibly. Measure honestly.</b><p>Only run tests against systems you own or have explicit permission to assess. This local MVP runs bounded HTTP requests; it does not yet provide distributed load generation or target resource monitoring.</p></div><span className="callout-tag">LOCAL MVP</span></div>
+    <div className="metric-grid"><Metric label="Registered targets" value={targets.length.toString()} sub="Authorized endpoints" icon={Server}/><Metric label="Tests completed" value={fmt(completed.length)} sub="Stored in local backend" icon={CheckCircle2}/><Metric label="Active test runs" value={activeRuns.length.toString()} sub="Queued or running" icon={Radio}/><Metric label="Latest throughput" value={latest?`${latest.rps.toFixed(1)}`:'—'} unit={latest?'req/s':''} sub={latest?'From most recent completed run':'Run a test to collect measurements'} icon={Gauge}/></div>
+    <div className="dashboard-grid"><section className="panel activity-panel"><PanelTitle title="Recent test runs" detail="Latest activity" action={<button className="text-button" onClick={()=>setPage('Test Runs')}>View all <ArrowUpRight size={14}/></button>}/>{runs.length===0?<Empty icon={Activity} title="No test runs yet" body="Add an authorized target, then run your first bounded HTTP test." action={<button className="button primary" onClick={()=>targets.length?(setTestTarget(targets[0].id),setShowTest(true)):setShowTarget(true)}>{targets.length?'Configure a test':'Add your first target'}</button>}/>:<div className="run-list">{runs.slice(0,5).map(r=><RunRow key={r.id} run={r} onClick={()=>setSelectedRun(r)}/>)}</div>}</section>
+    <section className="panel target-panel"><PanelTitle title="Your targets" detail={`${targets.length} registered`} action={<button className="icon-button small" onClick={()=>setShowTarget(true)}><Plus size={16}/></button>}/>{targets.length===0?<Empty icon={Globe2} title="No targets configured" body="Register a development API or service URL you are authorized to test." action={<button className="button secondary" onClick={()=>setShowTarget(true)}>Add target</button>}/>:<div className="target-list">{targets.slice(0,4).map(t=><div className="target-row" key={t.id}><div className="target-symbol"><Server size={17}/></div><div className="target-info"><b>{t.name}</b><span>{t.url}</span></div><span className="env-pill">{t.environment}</span></div>)}</div>}<div className="panel-footer"><button className="text-button" onClick={()=>setPage('Servers & Targets')}>Manage targets <ArrowUpRight size={14}/></button></div></section></div>
+    <section className="panel getting-started"><PanelTitle title="Your first performance experiment" detail="Getting started"/><div className="steps"><Step n="01" title="Register a target" body="Add an API you own or have permission to test." done={targets.length>0}/><Step n="02" title="Configure workload" body="Choose method, concurrency, and duration." done={runs.length>0}/><Step n="03" title="Run and inspect" body="Review real request counts, latency percentiles, and errors." done={completed.length>0}/></div></section>
+   </>}
+   {page==='Servers & Targets'&&<section className="panel full-panel"><PanelTitle title="Registered targets" detail="Only add services you are authorized to test." action={<button className="button primary" onClick={()=>setShowTarget(true)}><Plus size={15}/> Add target</button>}/>{targets.length===0?<Empty icon={Server} title="No targets registered" body="Targets are stored by the local backend. Add a development or staging endpoint to begin." action={<button className="button primary" onClick={()=>setShowTarget(true)}>Register target</button>}/>:<div className="table-wrap"><table><thead><tr><th>TARGET</th><th>BASE URL</th><th>ENVIRONMENT</th><th>ADDED</th><th/></tr></thead><tbody>{targets.map(t=><tr key={t.id}><td><div className="table-name"><div className="target-symbol"><Server size={15}/></div><b>{t.name}</b></div></td><td className="mono">{t.url}</td><td><span className="env-pill">{t.environment}</span></td><td>{new Date(t.createdAt).toLocaleDateString()}</td><td><button className="icon-button danger" title="Delete target" onClick={()=>deleteTarget(t.id)}><Trash2 size={15}/></button></td></tr>)}</tbody></table></div>}</section>}
+   {page==='Test Runs'&&<section className="panel full-panel"><PanelTitle title="Test run history" detail={`${runs.length} runs recorded`} action={<div className="search-box"><Search size={15}/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search runs…"/></div>}/>{visibleRuns.length===0?<Empty icon={Activity} title="No matching test runs" body="Your test runs and their measured summaries will appear here." action={<button className="button primary" onClick={()=>targets.length?(setTestTarget(targets[0].id),setShowTest(true)):setShowTarget(true)}>Create a test</button>}/>:<div className="table-wrap"><table><thead><tr><th>RUN / TARGET</th><th>STATUS</th><th>REQUESTS</th><th>THROUGHPUT</th><th>P95 LATENCY</th><th>ERROR RATE</th><th>ACTIONS</th></tr></thead><tbody>{visibleRuns.map(r=><tr key={r.id}><td><button className="run-link" onClick={()=>setSelectedRun(r)}><b>{r.targetName}</b><span className="mono">{r.id.slice(0,8)} · {new Date(r.startedAt).toLocaleString()}</span></button></td><td><Status status={r.status}/></td><td>{fmt(r.totalRequests)}</td><td>{r.status==='completed'?`${r.rps.toFixed(1)} req/s`:'—'}</td><td>{r.status==='completed'?`${r.p95.toFixed(1)} ms`:'—'}</td><td>{r.status==='completed'?`${r.errorRate.toFixed(2)}%`:'—'}</td><td><div className="inline-actions"><button className="text-button" onClick={()=>setSelectedRun(r)}>Details</button>{['running','queued'].includes(r.status)&&<button className="text-button danger-text" onClick={()=>stopRun(r.id)}><Square size={12}/> Stop</button>}</div></td></tr>)}</tbody></table></div>}</section>}
+   {page==='Performance Analysis'&&<section className="panel full-panel"><PanelTitle title="Performance findings" detail="Deterministic observations · no AI-generated root-cause claims"/>{!completed.length?<Empty icon={Gauge} title="No measurements to analyze" body="Complete a test run first. Analysis will use measured throughput, latency, and error rates."/>:<div className="findings">{completed.slice(0,10).map(r=><div className="finding" key={r.id}><div className={`finding-icon ${r.errorRate>1||r.p95>500?'warning':''}`}><Activity size={17}/></div><div><b>{r.targetName} · {r.id.slice(0,8)}</b><p>{r.errorRate>1?`Observed ${r.errorRate.toFixed(2)}% request errors. Inspect response codes and server logs during this run.`:r.p95>500?`p95 latency reached ${r.p95.toFixed(1)} ms. Check downstream dependencies and server saturation before inferring a cause.`:`Observed p95 latency of ${r.p95.toFixed(1)} ms and ${r.errorRate.toFixed(2)}% errors. Compare with a repeat run under the same conditions.`}</p><span className="finding-evidence">Evidence: {fmt(r.totalRequests)} requests · {r.rps.toFixed(1)} req/s · p99 {r.p99.toFixed(1)} ms</span></div><Status status={r.errorRate>1||r.p95>500?'warning':'completed'}/></div>)}</div>}</section>}
+   {page==='Reports'&&<section className="panel full-panel"><PanelTitle title="Exportable reports" detail="Download a JSON snapshot of measured results."/>{completed.length===0?<Empty icon={BarChart3} title="Reports will appear here" body="Complete a test to export its measurements and configuration as JSON."/>:<div className="report-grid">{completed.map(r=><div className="report-card" key={r.id}><div className="report-card-top"><div className="target-symbol"><BarChart3 size={17}/></div><Status status={r.status}/></div><b>{r.targetName}</b><span className="mono">{r.id}</span><div className="report-stats"><span><small>Requests</small><b>{fmt(r.totalRequests)}</b></span><span><small>p95 latency</small><b>{r.p95.toFixed(1)} ms</b></span><span><small>Error rate</small><b>{r.errorRate.toFixed(2)}%</b></span></div><button className="button secondary full-button" onClick={()=>exportRun(r)}><Download size={15}/> Export JSON</button></div>)}</div>}</section>}
+   {page==='Comparisons'&&<section className="panel full-panel"><PanelTitle title="Compare completed runs" detail="Use equivalent workloads for meaningful comparisons."/>{completed.length<2?<Empty icon={GitBranch} title="Two completed runs required" body="Run the same workload more than once to compare throughput, latency, and error rate."/>:<Compare runs={completed}/>}</section>}
+   {page==='Documentation'&&<section className="docs-grid"><div className="panel doc-card"><BookOpen size={20}/><h3>Quick start</h3><p>Start the local API, register a target you control, and launch a bounded test. The backend stores target and run metadata in local JSON storage by default.</p><code>npm install<br/>npm run dev</code></div><div className="panel doc-card"><ShieldCheck size={20}/><h3>Safety limits</h3><p>Initial local runner limits concurrency to 20 and duration to 30 seconds. Do not use it against third-party services without written authorization.</p></div><div className="panel doc-card"><Gauge size={20}/><h3>Metrics</h3><p>Throughput is completed requests divided by elapsed time. Latency percentiles are derived from observed request durations. Target CPU and memory are not collected.</p></div><div className="panel doc-card"><Code2 size={20}/><h3>API reference</h3><p><code>GET /api/health</code><br/><code>GET/POST /api/targets</code><br/><code>GET/POST /api/runs</code><br/><code>POST /api/runs/:id/cancel</code></p></div></section>}
+   {page==='Settings'&&<section className="panel full-panel settings-panel"><PanelTitle title="Preferences" detail="Local application preferences"/><div className="setting-row"><div><b>Appearance</b><p>Choose a theme for this browser session.</p></div><div className="theme-switch larger"><button className={theme==='light'?'chosen':''} onClick={()=>setTheme('light')}><Sun size={15}/> Light</button><button className={theme==='dark'?'chosen':''} onClick={()=>setTheme('dark')}><Moon size={15}/> Dark</button><button className={theme==='system'?'chosen':''} onClick={()=>setTheme('system')}><Settings size={15}/> System</button></div></div><div className="setting-row"><div><b>Backend endpoint</b><p>Configured with VITE_API_URL.</p></div><code>{API}</code></div><div className="setting-row"><div><b>Data storage</b><p>Local JSON file managed by the Express backend.</p></div><span className="env-pill">Local development</span></div></section>}
+   {![ 'Overview','Servers & Targets','Test Runs','Performance Analysis','Reports','Comparisons','Documentation','Settings'].includes(page)&&<section className="panel full-panel"><Empty icon={Clock3} title="Not implemented in this MVP" body="This navigation area is reserved for a future iteration. No unsupported integrations or distributed-worker features are represented as working."/></section>}
+   <footer className="footer"><span>ServerTest <span className="footer-sep">/</span> Local performance engineering</span><span><span className="footer-dot"/> Built for measured experiments</span></footer>
+   </div></main>
+  {showTarget&&<Modal title="Register a target" subtitle="Add an API you own or are explicitly authorized to test." onClose={()=>setShowTarget(false)}><form onSubmit={addTarget} className="form-stack"><label>Target name<input required maxLength={80} value={targetName} onChange={e=>setTargetName(e.target.value)} placeholder="Development API"/></label><label>Base URL<input required type="url" value={targetUrl} onChange={e=>setTargetUrl(e.target.value)} placeholder="http://localhost:3001"/></label><label>Environment<select value={environment} onChange={e=>setEnvironment(e.target.value)}><option>Development</option><option>Staging</option><option>Production</option><option>Local</option></select></label><div className="form-hint"><ShieldCheck size={16}/> The local runner applies request limits. Use only authorized targets.</div><div className="modal-actions"><button type="button" className="button secondary" onClick={()=>setShowTarget(false)}>Cancel</button><button type="submit" className="button primary">Save target</button></div></form></Modal>}
+  {showTest&&<Modal title="Configure performance test" subtitle="This MVP sends real HTTP requests from your local machine." onClose={()=>setShowTest(false)}><form onSubmit={launchTest} className="form-stack"><label>Target<select required value={testTarget} onChange={e=>setTestTarget(e.target.value)}><option value="">Select a registered target</option>{targets.map(t=><option value={t.id} key={t.id}>{t.name} — {t.url}</option>)}</select></label><div className="form-row"><label>HTTP method<select value={method} onChange={e=>setMethod(e.target.value)}>{['GET','POST','PUT','DELETE','HEAD'].map(m=><option key={m}>{m}</option>)}</select></label><label>Endpoint path<input required value={path} onChange={e=>setPath(e.target.value)} placeholder="/health" pattern="/.*"/></label></div><div className="form-row"><label>Concurrency <span className="field-value">{concurrency}</span><input type="range" min="1" max="20" value={concurrency} onChange={e=>setConcurrency(Number(e.target.value))}/><small>Max 20 concurrent requests</small></label><label>Duration <span className="field-value">{duration}s</span><input type="range" min="1" max="30" value={duration} onChange={e=>setDuration(Number(e.target.value))}/><small>Max 30 seconds</small></label></div><label className="checkbox-label"><input type="checkbox" checked={authorized} onChange={e=>setAuthorized(e.target.checked)}/><span>I own this target or have explicit authorization to test it.</span></label><div className="warning-box"><Zap size={16}/><span>Even bounded tests can affect service availability. Avoid production targets unless the test is approved and scheduled.</span></div><div className="modal-actions"><button type="button" className="button secondary" onClick={()=>setShowTest(false)}>Cancel</button><button type="submit" disabled={starting||!authorized||!testTarget} className="button primary"><Play size={15}/>{starting?'Starting…':'Run test'}</button></div></form></Modal>}
+  {selectedRun&&<Modal title="Test run details" subtitle={`${selectedRun.id} · ${selectedRun.targetName}`} onClose={()=>setSelectedRun(null)} wide><div className="run-detail-top"><Status status={selectedRun.status}/><span className="mono">{selectedRun.method} {selectedRun.url}</span></div>{selectedRun.status==='running'||selectedRun.status==='queued'?<div className="running-state"><div className="spinner"/><div><b>Test {selectedRun.status}</b><p>Results update automatically. Stop the run if the target becomes unhealthy.</p></div><button className="button secondary" onClick={()=>stopRun(selectedRun.id)}><Square size={14}/> Stop</button></div>:selectedRun.status==='failed'?<div className="warning-box"><CircleHelp size={16}/>{selectedRun.error||'The test failed. Review backend logs and target reachability.'}</div>:<><div className="detail-metrics"><Metric label="Total requests" value={fmt(selectedRun.totalRequests)} icon={Activity}/><Metric label="Throughput" value={selectedRun.rps.toFixed(1)} unit="req/s" icon={Gauge}/><Metric label="p95 latency" value={selectedRun.p95.toFixed(1)} unit="ms" icon={Clock3}/><Metric label="Error rate" value={selectedRun.errorRate.toFixed(2)} unit="%" icon={ArrowDownRight}/></div><div className="percentile-row"><span>p50 <b>{selectedRun.p50.toFixed(1)} ms</b></span><span>p95 <b>{selectedRun.p95.toFixed(1)} ms</b></span><span>p99 <b>{selectedRun.p99.toFixed(1)} ms</b></span><span>Successful <b>{fmt(selectedRun.successCount)}</b></span><span>Failed <b>{fmt(selectedRun.failedCount)}</b></span></div><h4 className="subheading">HTTP status codes</h4><div className="status-codes">{Object.entries(selectedRun.statusCodes||{}).length?Object.entries(selectedRun.statusCodes).map(([code,count])=><span key={code}><b>{code}</b>{fmt(count)}</span>):<span>No status responses recorded</span>}</div><div className="modal-actions"><button className="button secondary" onClick={()=>exportRun(selectedRun)}><Download size={15}/> Export JSON</button><button className="button primary" onClick={()=>setSelectedRun(null)}>Done</button></div></>}</Modal>}
+ </div>
 }
+function Metric({label,value,unit,sub,icon:Icon}:{label:string;value:string;unit?:string;sub?:string;icon:any}){return <div className="metric-card"><div className="metric-top"><span>{label}</span><Icon size={16}/></div><div className="metric-value">{value}<small>{unit}</small></div>{sub&&<div className="metric-sub">{sub}</div>}</div>}
+function PanelTitle({title,detail,action}:{title:string;detail?:string;action?:React.ReactNode}){return <div className="panel-title"><div><h2>{title}</h2>{detail&&<p>{detail}</p>}</div>{action}</div>}
+function Empty({icon:Icon,title,body,action}:{icon:any;title:string;body:string;action?:React.ReactNode}){return <div className="empty-state"><div className="empty-icon"><Icon size={21}/></div><b>{title}</b><p>{body}</p>{action}</div>}
+function RunRow({run,onClick}:{run:Run;onClick:()=>void}){return <button className="run-row" onClick={onClick}><div className="run-symbol"><Activity size={16}/></div><div className="run-main"><b>{run.targetName}</b><span>{new Date(run.startedAt).toLocaleString()} · {run.method}</span></div><Status status={run.status}/><div className="run-result"><b>{run.status==='completed'?`${run.rps.toFixed(1)} req/s`:'—'}</b><span>{run.status==='completed'?`p95 ${run.p95.toFixed(1)} ms`:run.status}</span></div></button>}
+function Status({status}:{status:string}){const s=status.toLowerCase();const label=s==='completed'?'Completed':s==='running'?'Running':s==='queued'?'Queued':s==='cancelled'?'Cancelled':s==='failed'?'Failed':s==='warning'?'Review':'Timed out';return <span className={`status-pill ${s}`}><i/>{label}</span>}
+function Step({n,title,body,done}:{n:string;title:string;body:string;done:boolean}){return <div className="step"><div className={`step-number ${done?'done':''}`}>{done?<CheckCircle2 size={17}/>:n}</div><div><b>{title}</b><p>{body}</p></div><span className={`step-state ${done?'complete':''}`}>{done?'Complete':'Next step'}</span></div>}
+function Modal({title,subtitle,children,onClose,wide}:{title:string;subtitle:string;children:React.ReactNode;onClose:()=>void;wide?:boolean}){return <div className="modal-backdrop" onMouseDown={e=>{if(e.target===e.currentTarget)onClose()}}><div className={`modal ${wide?'modal-wide':''}`} role="dialog" aria-modal="true"><div className="modal-header"><div><h2>{title}</h2><p>{subtitle}</p></div><button className="icon-button" onClick={onClose}><X size={17}/></button></div>{children}</div></div>}
+function Compare({runs}:{runs:Run[]}){const a=runs[0],b=runs[1];const delta=(x:number,y:number)=>`${x>=y?'+':''}${(x-y).toFixed(1)}`;return <div className="compare-grid">{[{label:'Throughput',a:a.rps,b:b.rps,unit:'req/s'},{label:'p95 latency',a:a.p95,b:b.p95,unit:'ms'},{label:'Error rate',a:a.errorRate,b:b.errorRate,unit:'%' }].map(m=><div className="compare-card" key={m.label}><span>{m.label}</span><div><b>{m.a.toFixed(1)} {m.unit}</b><ArrowDownRight size={15}/><b>{m.b.toFixed(1)} {m.unit}</b></div><small>Latest vs previous: {delta(m.a,m.b)} {m.unit}</small></div>)}<p className="compare-note">Comparisons are ordered by most recently completed run. Confirm that target, hardware, endpoint, concurrency, and duration are equivalent before interpreting changes.</p></div>}
