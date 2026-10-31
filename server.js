@@ -1,37 +1,39 @@
-import express from 'express';
-import dotenv from 'dotenv';
-import fs from 'node:fs/promises';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { randomUUID } from 'node:crypto';
-import dns from 'node:dns/promises';
-import net from 'node:net';
+import { createApp } from './server/app.js';
+import { config } from './server/config.js';
+import { getStorage } from './server/storage/index.js';
+import { getRunnerManager } from './server/runner/manager.js';
 
-dotenv.config();
-const __dirname=path.dirname(fileURLToPath(import.meta.url));
-const PORT=Number(process.env.API_PORT||4000);
-const DATA_DIR=process.env.DATA_DIR||path.join(__dirname,'data');
-const DATA_FILE=path.join(DATA_DIR,'store.json');
-const app=express();
-app.disable('x-powered-by');
-app.use(express.json({limit:'64kb'}));
-app.use((req,res,next)=>{res.setHeader('X-Content-Type-Options','nosniff');res.setHeader('Cache-Control','no-store');res.setHeader('Access-Control-Allow-Origin',process.env.CORS_ORIGIN||'http://localhost:3000');res.setHeader('Access-Control-Allow-Headers','Content-Type');res.setHeader('Access-Control-Allow-Methods','GET,POST,DELETE,OPTIONS');if(req.method==='OPTIONS')return res.sendStatus(204);next()});
-let store={targets:[],runs:[]};
-async function persist(){await fs.mkdir(DATA_DIR,{recursive:true});const tmp=`${DATA_FILE}.tmp`;await fs.writeFile(tmp,JSON.stringify(store,null,2));await fs.rename(tmp,DATA_FILE)}
-async function load(){try{store=JSON.parse(await fs.readFile(DATA_FILE,'utf8'))}catch(e){if(e.code!=='ENOENT')throw e;await persist()}}
-const bad=(res,status,error)=>res.status(status).json({error});
-function isPrivateIPv4(ip){const p=ip.split('.').map(Number);return p.length===4&&(p[0]===10||p[0]===127||p[0]===0||(p[0]===169&&p[1]===254)||(p[0]===172&&p[1]>=16&&p[1]<=31)||(p[0]===192&&p[1]===168)||(p[0]===100&&p[1]>=64&&p[1]<=127)||p[0]>=224)}
-function isPrivateIPv6(ip){const x=ip.toLowerCase();return x==='::1'||x==='::'||x.startsWith('fc')||x.startsWith('fd')||/^fe[89ab]/.test(x)||x.startsWith('::ffff:127.')||x.startsWith('::ffff:10.')||x.startsWith('::ffff:192.168.')}
-async function validateTarget(raw){let u;try{u=new URL(raw)}catch{return 'Enter a valid target URL.'}if(!['http:','https:'].includes(u.protocol))return 'Only HTTP and HTTPS targets are supported.';if(u.username||u.password)return 'URLs containing credentials are not allowed.';if(u.hostname==='localhost'||u.hostname.endsWith('.localhost')){if(process.env.ALLOW_LOCAL_TARGETS==='false')return 'Localhost targets are disabled by configuration.';return null}if(u.hostname==='metadata.google.internal'||u.hostname==='metadata'||u.hostname.endsWith('.internal'))return 'This hostname is not allowed.';const ipType=net.isIP(u.hostname);if(ipType===4&&isPrivateIPv4(u.hostname))return 'Private and link-local IP targets are blocked by default. Use localhost for local development.';if(ipType===6&&isPrivateIPv6(u.hostname))return 'Private and link-local IP targets are blocked by default.';if(!ipType){let records;try{records=await dns.lookup(u.hostname,{all:true,verbatim:true})}catch{return 'Target hostname could not be resolved.'}if(records.some(r=>r.family===4?isPrivateIPv4(r.address):isPrivateIPv6(r.address)))return 'Target resolves to a private or link-local address and is blocked.'}return null}
-app.get('/api/health',(_req,res)=>res.json({status:'ok',service:'ServerTest API',storage:'local-json',timestamp:new Date().toISOString()}));
-app.get('/api/targets',(_req,res)=>res.json(store.targets));
-app.post('/api/targets',async(req,res)=>{const {name,url,environment='Development'}=req.body||{};if(typeof name!=='string'||name.trim().length<1||name.length>80)return bad(res,400,'Target name must be between 1 and 80 characters.');if(typeof url!=='string'||url.length>2048)return bad(res,400,'A valid target URL is required.');const problem=await validateTarget(url);if(problem)return bad(res,400,problem);const target={id:randomUUID(),name:name.trim(),url:new URL(url).origin,environment:['Development','Staging','Production','Local'].includes(environment)?environment:'Development',createdAt:new Date().toISOString()};store.targets.unshift(target);await persist();res.status(201).json(target)});
-app.delete('/api/targets/:id',async(req,res)=>{if(store.runs.some(r=>r.targetId===req.params.id&&['queued','running'].includes(r.status)))return bad(res,409,'Cannot delete a target with an active test run.');const before=store.targets.length;store.targets=store.targets.filter(t=>t.id!==req.params.id);if(before===store.targets.length)return bad(res,404,'Target not found.');await persist();res.json({deleted:true})});
-app.get('/api/runs',(_req,res)=>res.json(store.runs));
-const active=new Map();
-app.post('/api/runs',async(req,res)=>{const {targetId,path='/',method='GET',concurrency=5,durationSec=10,authorized}=req.body||{};if(authorized!==true)return bad(res,403,'Explicit target authorization confirmation is required.');const target=store.targets.find(t=>t.id===targetId);if(!target)return bad(res,404,'Target not found.');const c=Number(concurrency),d=Number(durationSec);if(!Number.isInteger(c)||c<1||c>20)return bad(res,400,'Concurrency must be an integer from 1 to 20.');if(!Number.isInteger(d)||d<1||d>30)return bad(res,400,'Duration must be an integer from 1 to 30 seconds.');if(typeof path!=='string'||!path.startsWith('/')||path.startsWith('//')||path.length>1024)return bad(res,400,'Endpoint path must start with a single slash and be at most 1024 characters.');if(!['GET','POST','PUT','DELETE','HEAD'].includes(method))return bad(res,400,'Unsupported HTTP method.');const targetUrl=new URL(path,target.url);if(targetUrl.origin!==target.url)return bad(res,400,'Endpoint path must remain on the registered target origin.');const run={id:randomUUID(),targetId,targetName:target.name,url:targetUrl.toString(),method,concurrency:c,durationSec:d,status:'queued',startedAt:new Date().toISOString(),totalRequests:0,successCount:0,failedCount:0,rps:0,p50:0,p95:0,p99:0,errorRate:0,statusCodes:{}};store.runs.unshift(run);await persist();const controller=new AbortController();active.set(run.id,{controller,cancelled:false});res.status(202).json(run);executeRun(run.id,targetUrl.toString(),method,c,d).catch(async err=>{const r=store.runs.find(x=>x.id===run.id);if(r&&['queued','running'].includes(r.status)){r.status='failed';r.error=String(err.message||err).slice(0,300);r.finishedAt=new Date().toISOString();await persist().catch(()=>{})}active.delete(run.id)})});
-async function executeRun(id,url,method,concurrency,durationSec){const run=store.runs.find(r=>r.id===id);const task=active.get(id);if(!run||!task)return;run.status='running';run.startedAt=new Date().toISOString();await persist();const deadline=Date.now()+durationSec*1000;const latencies=[];const statusCodes={};let total=0,success=0,failed=0;async function worker(){while(Date.now()<deadline&&!task.cancelled){const start=performance.now();let code='network_error';try{const response=await fetch(url,{method,signal:AbortSignal.any([task.controller.signal,AbortSignal.timeout(5000)]),redirect:'error',headers:{'User-Agent':'ServerTest-Local/0.1'}});code=String(response.status);await response.body?.cancel().catch(()=>{});if(response.ok)success++;else failed++;}catch{failed++;}const elapsed=Math.max(0,performance.now()-start);latencies.push(elapsed);statusCodes[code]=(statusCodes[code]||0)+1;total++;run.totalRequests=total;run.successCount=success;run.failedCount=failed;run.statusCodes={...statusCodes};if(total%20===0){run.rps=Number((total/Math.max((Date.now()-new Date(run.startedAt).getTime())/1000,.001)).toFixed(2));run.errorRate=Number((failed/total*100).toFixed(2));persist().catch(()=>{})}}}
- await Promise.all(Array.from({length:concurrency},()=>worker()));const elapsed=Math.max((Date.now()-new Date(run.startedAt).getTime())/1000,.001);latencies.sort((a,b)=>a-b);const pct=p=>latencies.length?Number(latencies[Math.min(latencies.length-1,Math.ceil(p*latencies.length)-1)].toFixed(2)):0;run.totalRequests=total;run.successCount=success;run.failedCount=failed;run.statusCodes=statusCodes;run.rps=Number((total/elapsed).toFixed(2));run.p50=pct(.5);run.p95=pct(.95);run.p99=pct(.99);run.errorRate=total?Number((failed/total*100).toFixed(2)):0;run.status=task.cancelled?'cancelled':'completed';run.finishedAt=new Date().toISOString();active.delete(id);await persist()}
-app.post('/api/runs/:id/cancel',async(req,res)=>{const run=store.runs.find(r=>r.id===req.params.id);if(!run)return bad(res,404,'Run not found.');if(!['queued','running'].includes(run.status))return bad(res,409,'Run is already finished.');const task=active.get(run.id);if(task){task.cancelled=true;task.controller.abort()}else{run.status='cancelled';run.finishedAt=new Date().toISOString()}await persist();res.json({requested:true,status:'cancelling'})});
-app.use((err,_req,res,_next)=>{if(err instanceof SyntaxError)return bad(res,400,'Invalid JSON body.');console.error('[ServerTest API]',err);return bad(res,500,'Internal server error.')});
-await load();app.listen(PORT,'127.0.0.1',()=>console.log(`ServerTest API listening on http://127.0.0.1:${PORT}`));
+async function bootstrap() {
+  const storage = getStorage();
+  await storage.init();
+
+  const runner = getRunnerManager(storage);
+  await runner.startupRecovery();
+
+  const app = createApp();
+
+  const server = app.listen(config.port, config.host, () => {
+    console.log(`ServerTest API listening on http://${config.host}:${config.port}`);
+    console.log(`Storage engine: ${storage.getHealthInfo().storage}`);
+  });
+
+  const shutdown = async (signal) => {
+    console.log(`[ServerTest] Received ${signal}, shutting down gracefully...`);
+    server.close(async () => {
+      console.log('[ServerTest] HTTP server closed.');
+      if (typeof storage.close === 'function') {
+        await storage.close();
+        console.log('[ServerTest] Database connections closed.');
+      }
+      process.exit(0);
+    });
+  };
+
+  process.on('SIGINT', () => shutdown('SIGINT'));
+  process.on('SIGTERM', () => shutdown('SIGTERM'));
+}
+
+bootstrap().catch(err => {
+  console.error('[ServerTest] Fatal startup error:', err);
+  process.exit(1);
+});
