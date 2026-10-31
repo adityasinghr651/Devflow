@@ -10,15 +10,6 @@ import { LatencyHistogram } from './latency-histogram.js';
 let isCancelled = false;
 const abortController = new AbortController();
 
-function calculatePercentile(sortedValues, percentile) {
-  if (!sortedValues.length) return 0;
-  const index = Math.min(
-    sortedValues.length - 1,
-    Math.max(0, Math.ceil(percentile * sortedValues.length) - 1)
-  );
-  return Number(sortedValues[index].toFixed(2));
-}
-
 function getStagedConcurrency(elapsedSec, stages) {
   let accumSec = 0;
   let prevTarget = 1;

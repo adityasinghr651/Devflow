@@ -33,6 +33,7 @@ export class LatencyHistogram {
     this.totalCount = 0;
     this.minLatency = Infinity;
     this.maxLatency = 0;
+    this.minOverflowLatency = Infinity;
     this.sumLatency = 0;
   }
 
@@ -53,9 +54,9 @@ export class LatencyHistogram {
       return 3000 + Math.floor((x - 1000) / 5); // (x - 1000) / 5
     }
     if (x <= 60000) {
-      return 4800 + Math.floor((x - 10000) / 25); // (x - 10000) / 25
+      return Math.min(6799, 4800 + Math.floor((x - 10000) / 25)); // (x - 10000) / 25 capped at tier 5 max bucket
     }
-    return 6800; // overflow bucket
+    return 6800; // overflow bucket (> 60000ms)
   }
 
   /**
@@ -82,7 +83,9 @@ export class LatencyHistogram {
       const min = 10000 + (index - 4800) * 25;
       return [min, min + 25];
     }
-    return [60000, 60000];
+    const min = Number.isFinite(this.minOverflowLatency) ? this.minOverflowLatency : 60000;
+    const max = Math.max(min, this.maxLatency);
+    return [min, max];
   }
 
   /**
@@ -99,6 +102,9 @@ export class LatencyHistogram {
 
     if (val < this.minLatency) this.minLatency = val;
     if (val > this.maxLatency) this.maxLatency = val;
+    if (val > 60000 && val < this.minOverflowLatency) {
+      this.minOverflowLatency = val;
+    }
     this.sumLatency += val;
     this.totalCount++;
   }
@@ -177,6 +183,7 @@ export class LatencyHistogram {
     this.totalCount = 0;
     this.minLatency = Infinity;
     this.maxLatency = 0;
+    this.minOverflowLatency = Infinity;
     this.sumLatency = 0;
   }
 }
