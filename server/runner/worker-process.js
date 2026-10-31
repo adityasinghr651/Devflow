@@ -5,6 +5,7 @@
  * Supports fixed concurrency and staged ramp-up / steady / ramp-down workloads.
  */
 import { validateTargetUrl } from '../security/ssrf.js';
+import { LatencyHistogram } from './latency-histogram.js';
 
 let isCancelled = false;
 const abortController = new AbortController();
@@ -81,7 +82,7 @@ async function runWorker({
 
   const deadline = Date.now() + totalDurationSec * 1000;
   const startTime = Date.now();
-  const latencies = [];
+  const latencyHistogram = new LatencyHistogram();
   const statusCodes = {};
   let totalRequests = 0;
   let successCount = 0;
@@ -183,7 +184,7 @@ async function runWorker({
       }
 
       const elapsed = Math.max(0, performance.now() - reqStart);
-      latencies.push(elapsed);
+      latencyHistogram.record(elapsed);
       statusCodes[code] = (statusCodes[code] || 0) + 1;
       totalRequests++;
 
@@ -199,7 +200,6 @@ async function runWorker({
   );
 
   const totalElapsedSec = Math.max((Date.now() - startTime) / 1000, 0.001);
-  latencies.sort((a, b) => a - b);
 
   const finalSummary = {
     totalRequests,
@@ -207,9 +207,9 @@ async function runWorker({
     failedCount,
     statusCodes,
     rps: Number((totalRequests / totalElapsedSec).toFixed(2)),
-    p50: calculatePercentile(latencies, 0.50),
-    p95: calculatePercentile(latencies, 0.95),
-    p99: calculatePercentile(latencies, 0.99),
+    p50: latencyHistogram.getPercentile(0.50),
+    p95: latencyHistogram.getPercentile(0.95),
+    p99: latencyHistogram.getPercentile(0.99),
     errorRate: totalRequests ? Number(((failedCount / totalRequests) * 100).toFixed(2)) : 0,
     status: isCancelled ? 'cancelled' : 'completed',
     finishedAt: new Date().toISOString(),
