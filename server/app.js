@@ -36,6 +36,9 @@ export function createApp() {
     if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
       return res.status(400).json({ error: 'Invalid JSON body.' });
     }
+    if (err.type === 'entity.too.large' || err.status === 413) {
+      return res.status(413).json({ error: 'Request body exceeds allowable maximum size limit (64KB).' });
+    }
     console.error('[ServerTest API Error]:', err);
     res.status(500).json({ error: 'Internal server error.' });
   });
