@@ -1,0 +1,56 @@
+name: Performance Benchmark & Regression Check
+
+on:
+  push:
+    branches:
+      - main
+      - phase-6-bounded-metrics
+  pull_request:
+    branches:
+      - main
+      - phase-6-bounded-metrics
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  benchmark-regression:
+    name: Automated Benchmark & Performance Regression Gate
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Run Test Suite
+        run: npm test
+
+      - name: Run Controlled Benchmark (CI Profile)
+        run: npm run bench:ci
+
+      - name: Compare Benchmark Against Baseline
+        id: compare
+        run: npm run bench:compare
+
+      - name: Upload Benchmark Artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-regression-report
+          path: |
+            data/ci-benchmark.json
+            data/benchmark-report.md
+            benchmarks/baseline.json
+          retention-days: 14
+

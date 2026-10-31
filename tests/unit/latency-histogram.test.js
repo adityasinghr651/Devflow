@@ -205,37 +205,73 @@ test('LatencyHistogram: Bounded-Memory Latency Metrics Unit Suite', async (t) =>
     assert.deepEqual(rangeOverflow, [60000.01, 60000.01]);
   });
 
-  // 9. Regression: Overflow bucket percentile does not incorrectly clamp to 60,000ms
-  await t.test('9. Regression: Overflow percentiles reflect actual values >60,000ms with monotonicity', () => {
-    // 9A: Mixed samples below and above 60,000ms in pure bucket mode
-    const hMixed = new LatencyHistogram({ exactCapacity: 0 });
-    hMixed.record(10);
-    hMixed.record(75000);
+  // 9. Regression: Overflow bucket percentile behavior across single, two, and multiple overflow samples
+  await t.test('9. Regression: Overflow percentiles across single, two, and multiple overflow samples', () => {
+    // 9A: Single overflow sample ([10, 75000])
+    const rawSingle = [10, 75000];
+    const hSingleDef = new LatencyHistogram();
+    const hSinglePure = new LatencyHistogram({ exactCapacity: 0 });
+    rawSingle.forEach(v => { hSingleDef.record(v); hSinglePure.record(v); });
 
-    const p50 = hMixed.getPercentile(0.50);
-    const p95 = hMixed.getPercentile(0.95);
-    const p99 = hMixed.getPercentile(0.99);
+    const nrSingleP50 = calculatePercentile(rawSingle, 0.50); // 10
+    const nrSingleP99 = calculatePercentile(rawSingle, 0.99); // 75000
 
-    assert.ok(p99 > 60000, `p99 must be >60,000ms, got ${p99}`);
-    assert.equal(p99, 75000, `p99 must equal single overflow sample 75,000ms, got ${p99}`);
-    assert.ok(p50 <= p95, `Monotonicity check: p50 (${p50}) <= p95 (${p95})`);
-    assert.ok(p95 <= p99, `Monotonicity check: p95 (${p95}) <= p99 (${p99})`);
+    // Hybrid mode matches Nearest-Rank exactly
+    assert.equal(hSingleDef.getPercentile(0.50), nrSingleP50);
+    assert.equal(hSingleDef.getPercentile(0.99), nrSingleP99);
 
-    // 9B: Multiple overflow samples interpolate smoothly within [minOverflow, maxLatency]
-    const hMulti = new LatencyHistogram({ exactCapacity: 0 });
-    hMulti.record(10);
-    hMulti.record(70000);
-    hMulti.record(90000);
+    // Pure bucket mode: single overflow sample has bMin == bMax == 75000, so it is also exact
+    assert.equal(hSinglePure.getPercentile(0.99), 75000);
+    assert.ok(hSinglePure.getPercentile(0.50) <= hSinglePure.getPercentile(0.99));
 
-    const p33 = hMulti.getPercentile(0.33);
-    const p66 = hMulti.getPercentile(0.66);
-    const p99Multi = hMulti.getPercentile(0.99);
+    // 9B: Two overflow samples ([10, 70000, 90000])
+    const rawTwo = [10, 70000, 90000];
+    const hTwoDef = new LatencyHistogram();
+    const hTwoPure = new LatencyHistogram({ exactCapacity: 0 });
+    rawTwo.forEach(v => { hTwoDef.record(v); hTwoPure.record(v); });
 
-    assert.ok(p33 <= p66 && p66 <= p99Multi, `Monotonicity: ${p33} <= ${p66} <= ${p99Multi}`);
-    assert.equal(p66, 75000, `p66 should interpolate to 75000ms, got ${p66}`);
-    assert.equal(p99Multi, 85000, `p99 should interpolate to 85000ms, got ${p99Multi}`);
+    const nrTwoP33 = calculatePercentile(rawTwo, 0.33); // 10
+    const nrTwoP66 = calculatePercentile(rawTwo, 0.66); // 70000
+    const nrTwoP99 = calculatePercentile(rawTwo, 0.99); // 90000
 
-    // 9C: Large request volume with an extreme tail sample (>60,000ms)
+    // Default hybrid mode (N <= 1024) computes exact Nearest-Rank
+    assert.equal(hTwoDef.getPercentile(0.33), nrTwoP33, 'Hybrid p33 must equal exact Nearest-Rank (10)');
+    assert.equal(hTwoDef.getPercentile(0.66), nrTwoP66, 'Hybrid p66 must equal exact Nearest-Rank (70000)');
+    assert.equal(hTwoDef.getPercentile(0.99), nrTwoP99, 'Hybrid p99 must equal exact Nearest-Rank (90000)');
+
+    // Pure bucket mode (exactCapacity = 0) uses midpoint linear rank interpolation within [70000, 90000]
+    // Rank 1 in overflow -> 70000 + 0.25 * 20000 = 75000
+    // Rank 2 in overflow -> 70000 + 0.75 * 20000 = 85000
+    const pureTwoP33 = hTwoPure.getPercentile(0.33);
+    const pureTwoP66 = hTwoPure.getPercentile(0.66);
+    const pureTwoP99 = hTwoPure.getPercentile(0.99);
+
+    assert.ok(pureTwoP33 <= pureTwoP66 && pureTwoP66 <= pureTwoP99, 'Pure bucket monotonicity preserved');
+    assert.equal(pureTwoP66, 75000, 'Pure bucket p66 reflects linear midpoint interpolation (75000ms)');
+    assert.equal(pureTwoP99, 85000, 'Pure bucket p99 reflects linear midpoint interpolation (85000ms)');
+    assert.ok(Math.abs(pureTwoP66 - nrTwoP66) <= 5000, 'Pure bucket p66 is within 5000ms (+25% span) of Nearest-Rank');
+    assert.ok(Math.abs(pureTwoP99 - nrTwoP99) <= 5000, 'Pure bucket p99 is within 5000ms (-25% span) of Nearest-Rank');
+
+    // 9C: Multiple overflow samples ([10, 65000, 70000, 75000, 85000, 95000])
+    const rawMulti = [10, 65000, 70000, 75000, 85000, 95000];
+    const hMultiDef = new LatencyHistogram();
+    const hMultiPure = new LatencyHistogram({ exactCapacity: 0 });
+    rawMulti.forEach(v => { hMultiDef.record(v); hMultiPure.record(v); });
+
+    for (const p of [0.17, 0.33, 0.50, 0.67, 0.83, 0.99]) {
+      const nr = calculatePercentile(rawMulti, p);
+      const def = hMultiDef.getPercentile(p);
+      assert.equal(def, nr, `Hybrid mode at p=${p} must match exact Nearest-Rank (${nr})`);
+    }
+
+    let prevPure = 0;
+    for (const p of [0.17, 0.33, 0.50, 0.67, 0.83, 0.99]) {
+      const pureVal = hMultiPure.getPercentile(p);
+      assert.ok(pureVal >= prevPure, `Pure bucket monotonicity at p=${p}: ${pureVal} >= ${prevPure}`);
+      prevPure = pureVal;
+    }
+
+    // 9D: High request volume with an extreme tail sample (>60,000ms) beyond exactCapacity
     const hLarge = new LatencyHistogram({ exactCapacity: 0 });
     for (let i = 0; i < 2000; i++) {
       hLarge.record(25.0); // 2000 normal fast requests
