@@ -1,12 +1,14 @@
 {
   "version": "1.0",
+  "profile": "ci",
   "timestamp": "2026-10-31T18:48:29.293Z",
   "environment": {
     "node": "v22.14.0",
     "platform": "win32",
     "arch": "x64",
     "cpus": 12,
-    "memoryMB": 7518
+    "memoryMB": 7518,
+    "isCi": false
   },
   "warmup": {
     "testId": "warmup-1793472481834",

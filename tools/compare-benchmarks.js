@@ -3,6 +3,7 @@
  *
  * Compares current benchmark results against an established baseline,
  * evaluates configurable performance regression thresholds (RPS, latency percentiles, error rate),
+ * performs environment and workload profile compatibility checks,
  * and generates human-readable Markdown reports suitable for GitHub Actions step summaries.
  */
 import fs from 'node:fs/promises';
@@ -50,12 +51,80 @@ export function validateBenchmarkData(data, label = 'Benchmark') {
 }
 
 /**
+ * Resolves the appropriate baseline file for the current platform and context.
+ */
+export async function resolveBaselinePath(customPath = null) {
+  if (customPath) {
+    try {
+      await fs.access(path.resolve(customPath));
+      return customPath;
+    } catch {
+      throw new Error(`Specified baseline file not found: ${customPath}`);
+    }
+  }
+
+  // Check platform-specific baseline first (e.g. baseline-linux.json or baseline-win32.json)
+  const platformBaseline = `benchmarks/baseline-${process.platform}.json`;
+  try {
+    await fs.access(path.resolve(platformBaseline));
+    return platformBaseline;
+  } catch {}
+
+  // Check CI-specific baseline if running in GitHub Actions / CI
+  if (process.env.CI || process.env.GITHUB_ACTIONS) {
+    const ciBaseline = 'benchmarks/baseline-ci.json';
+    try {
+      await fs.access(path.resolve(ciBaseline));
+      return ciBaseline;
+    } catch {}
+  }
+
+  // Fallback to canonical baseline.json
+  const defaultBaseline = 'benchmarks/baseline.json';
+  try {
+    await fs.access(path.resolve(defaultBaseline));
+    return defaultBaseline;
+  } catch {}
+
+  throw new Error(
+    `No baseline benchmark found. Checked '${platformBaseline}', 'benchmarks/baseline-ci.json', and '${defaultBaseline}'. Run 'npm run bench:baseline' to generate one.`
+  );
+}
+
+/**
  * Compares current benchmark measurements against baseline metrics.
  */
-export function compareMetrics(baselineData, currentData, customThresholds = {}) {
+export function compareMetrics(baselineData, currentData, options = {}) {
+  const customThresholds = options.thresholds || (options.maxRpsDropPercent !== undefined ? options : {});
   const thresholds = { ...DEFAULT_THRESHOLDS, ...customThresholds };
+  const allowCrossEnv = options.allowCrossEnvironment ?? false;
+  const allowCrossProfile = options.allowCrossProfile ?? false;
+
   const baselineItems = validateBenchmarkData(baselineData, 'Baseline');
   const currentItems = validateBenchmarkData(currentData, 'Current');
+
+  // 1. Profile Compatibility Verification
+  const baseProfile = baselineData.profile || 'ci';
+  const currProfile = currentData.profile || 'ci';
+  if (baseProfile !== currProfile && !allowCrossProfile) {
+    throw new Error(
+      `Incompatible benchmark profile: baseline profile '${baseProfile}' does not match current run profile '${currProfile}'. Cannot compare disparate workload configurations.`
+    );
+  }
+
+  // 2. Environment Compatibility Verification
+  const baseEnv = baselineData.environment || {};
+  const currEnv = currentData.environment || {};
+  let compatibilityStatus = 'COMPATIBLE';
+
+  if (baseEnv.platform && currEnv.platform && baseEnv.platform !== currEnv.platform) {
+    if (!allowCrossEnv) {
+      throw new Error(
+        `Incompatible environment: baseline was recorded on '${baseEnv.platform}' (${baseEnv.cpus || '?'} CPUs), but current benchmark was executed on '${currEnv.platform}' (${currEnv.cpus || '?'} CPUs). Cross-environment comparisons are disallowed to prevent false regression alerts. Use a matching environment baseline (e.g. baseline-${currEnv.platform}.json) or pass --allow-cross-env.`
+      );
+    }
+    compatibilityStatus = 'CROSS-ENVIRONMENT OVERRIDE';
+  }
 
   const comparisons = [];
   const failures = [];
@@ -161,9 +230,36 @@ export function compareMetrics(baselineData, currentData, customThresholds = {})
     });
   }
 
+  // If no matching configurations could be compared, fail explicitly
+  if (comparisons.length === 0 || comparisons.every(c => c.status === 'unmatched')) {
+    failures.push({
+      concurrency: 0,
+      reasons: ['No matching benchmark levels found between baseline and current dataset.'],
+    });
+  }
+
   return {
     passed: failures.length === 0,
     timestamp: new Date().toISOString(),
+    profile: {
+      baseline: baseProfile,
+      current: currProfile,
+    },
+    environment: {
+      compatibility: compatibilityStatus,
+      baseline: {
+        platform: baseEnv.platform || 'unknown',
+        arch: baseEnv.arch || 'unknown',
+        cpus: baseEnv.cpus || 0,
+        node: baseEnv.node || 'unknown',
+      },
+      current: {
+        platform: currEnv.platform || 'unknown',
+        arch: currEnv.arch || 'unknown',
+        cpus: currEnv.cpus || 0,
+        node: currEnv.node || 'unknown',
+      },
+    },
     thresholds,
     comparisons,
     failures,
@@ -184,7 +280,8 @@ export function generateMarkdownReport(result) {
     lines.push(`> [!WARNING]`);
     lines.push(`> **Performance Regression Detected!** One or more metrics violated configured thresholds.`);
     for (const f of result.failures) {
-      lines.push(`> - **${f.concurrency} VU:** ${f.reasons.join('; ')}`);
+      const label = f.concurrency ? `**${f.concurrency} VU:** ` : '';
+      lines.push(`> - ${label}${f.reasons.join('; ')}`);
     }
     lines.push('');
   } else {
@@ -193,6 +290,15 @@ export function generateMarkdownReport(result) {
     lines.push('');
   }
 
+  // Environment & Profile Metadata Section
+  lines.push(`### Benchmark Configuration & Environment`);
+  lines.push(`- **Workload Profile:** Current: \`${result.profile?.current || 'ci'}\` | Baseline: \`${result.profile?.baseline || 'ci'}\``);
+  const curEnv = result.environment?.current || {};
+  const basEnv = result.environment?.baseline || {};
+  lines.push(`- **Current Environment:** \`${curEnv.platform || 'unknown'}\` (\`${curEnv.arch || 'unknown'}\`, ${curEnv.cpus || '?'} CPUs, Node ${curEnv.node || 'unknown'})`);
+  lines.push(`- **Baseline Environment:** \`${basEnv.platform || 'unknown'}\` (\`${basEnv.arch || 'unknown'}\`, ${basEnv.cpus || '?'} CPUs, Node ${basEnv.node || 'unknown'})`);
+  lines.push(`- **Environment Compatibility:** **${result.environment?.compatibility || 'COMPATIBLE'}**\n`);
+
   // Summary Table
   lines.push(`### Metrics Comparison`);
   lines.push(`| Concurrency | Metric | Baseline | Current | Delta | Delta % | Threshold Limit | Status |`);
@@ -200,7 +306,7 @@ export function generateMarkdownReport(result) {
 
   for (const c of result.comparisons) {
     if (c.status === 'unmatched') {
-      lines.push(`| ${c.concurrency} VU | N/A | Missing | Present | N/A | N/A | N/A | UNMATCHED |`);
+      lines.push(`| **${c.concurrency} VU** | N/A | Missing | Present | N/A | N/A | N/A | **UNMATCHED** |`);
       continue;
     }
 
@@ -250,18 +356,30 @@ export function generateMarkdownReport(result) {
  */
 async function main() {
   const args = process.argv.slice(2);
-  let baselinePath = 'benchmarks/baseline.json';
+  let customBaselinePath = null;
   let currentPath = 'data/ci-benchmark.json';
   let reportPath = 'data/benchmark-report.md';
+  let allowCrossEnv = false;
+  let allowCrossProfile = false;
 
   for (let i = 0; i < args.length; i++) {
-    if (args[i] === '--baseline' && args[i + 1]) baselinePath = args[++i];
+    if (args[i] === '--baseline' && args[i + 1]) customBaselinePath = args[++i];
     else if (args[i] === '--current' && args[i + 1]) currentPath = args[++i];
     else if (args[i] === '--report' && args[i + 1]) reportPath = args[++i];
+    else if (args[i] === '--allow-cross-env') allowCrossEnv = true;
+    else if (args[i] === '--allow-cross-profile') allowCrossProfile = true;
   }
 
-  console.log(`[Comparator] Loading baseline: ${baselinePath}`);
-  console.log(`[Comparator] Loading current:  ${currentPath}`);
+  let baselinePath;
+  try {
+    baselinePath = await resolveBaselinePath(customBaselinePath);
+  } catch (err) {
+    console.error(`[Comparator Error] Baseline resolution failed: ${err.message}`);
+    process.exit(1);
+  }
+
+  console.log(`[Comparator] Resolved baseline: ${baselinePath}`);
+  console.log(`[Comparator] Loading current:   ${currentPath}`);
 
   let baselineData;
   let currentData;
@@ -270,7 +388,7 @@ async function main() {
     const rawBaseline = await fs.readFile(path.resolve(baselinePath), 'utf8');
     baselineData = JSON.parse(rawBaseline);
   } catch (err) {
-    console.error(`[Comparator Error] Failed to read baseline from ${baselinePath}:`, err.message);
+    console.error(`[Comparator Error] Failed to read/parse baseline from ${baselinePath}:`, err.message);
     process.exit(1);
   }
 
@@ -278,15 +396,18 @@ async function main() {
     const rawCurrent = await fs.readFile(path.resolve(currentPath), 'utf8');
     currentData = JSON.parse(rawCurrent);
   } catch (err) {
-    console.error(`[Comparator Error] Failed to read current benchmark from ${currentPath}:`, err.message);
+    console.error(`[Comparator Error] Failed to read/parse current benchmark from ${currentPath}:`, err.message);
     process.exit(1);
   }
 
   let result;
   try {
-    result = compareMetrics(baselineData, currentData);
+    result = compareMetrics(baselineData, currentData, {
+      allowCrossEnvironment: allowCrossEnv,
+      allowCrossProfile,
+    });
   } catch (err) {
-    console.error(`[Comparator Error] Validation failed:`, err.message);
+    console.error(`[Comparator Error] Validation / Compatibility check failed:`, err.message);
     process.exit(1);
   }
 
@@ -311,9 +432,13 @@ async function main() {
   console.log('\n' + '='.repeat(80));
   console.log(` BENCHMARK COMPARISON RESULT: ${result.passed ? 'PASSED' : 'FAILED'}`);
   console.log('='.repeat(80));
+  console.log(`Environment: ${result.environment.current.platform} (${result.environment.current.cpus} CPUs) vs Baseline: ${result.environment.baseline.platform} (${result.environment.baseline.cpus} CPUs) [${result.environment.compatibility}]`);
+  console.log(`Profile:     Current: ${result.profile.current} | Baseline: ${result.profile.baseline}`);
+  console.log('-'.repeat(80));
+
   for (const c of result.comparisons) {
     if (c.status === 'unmatched') {
-      console.log(`- ${c.concurrency} VU: UNMATCHED (No baseline found)`);
+      console.log(`- ${c.concurrency} VU: UNMATCHED (${c.message})`);
       continue;
     }
     const rpsStr = `RPS: ${c.baseline.rps} -> ${c.current.rps} (${c.deltas.rpsDeltaPct >= 0 ? '+' : ''}${c.deltas.rpsDeltaPct}%)`;

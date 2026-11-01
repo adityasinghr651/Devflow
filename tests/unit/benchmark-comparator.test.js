@@ -4,6 +4,7 @@ import {
   compareMetrics,
   generateMarkdownReport,
   validateBenchmarkData,
+  resolveBaselinePath,
   DEFAULT_THRESHOLDS,
 } from '../../tools/compare-benchmarks.js';
 
@@ -287,5 +288,77 @@ test('Benchmark Comparator & Regression Suite', async (t) => {
     assert.ok(md.includes('Throughput (RPS)'));
     assert.ok(md.includes('Configured Thresholds'));
     assert.ok(md.includes('Max Throughput Drop:** `-15%`'));
+    assert.ok(md.includes('Benchmark Configuration & Environment'));
+    assert.ok(md.includes('Workload Profile:'));
+  });
+
+  // 11. Environment compatibility check
+  await t.test('11. Environment compatibility: prevents blind cross-platform comparisons unless permitted', () => {
+    const linuxBaseline = {
+      profile: 'ci',
+      environment: { platform: 'linux', cpus: 2, node: 'v22.14.0' },
+      benchmarks: [{ concurrency: 1, achievedRps: 2000, p50: 1, p95: 2, p99: 3, errorRate: 0 }],
+    };
+    const winCurrent = {
+      profile: 'ci',
+      environment: { platform: 'win32', cpus: 12, node: 'v22.14.0' },
+      benchmarks: [{ concurrency: 1, achievedRps: 2000, p50: 1, p95: 2, p99: 3, errorRate: 0 }],
+    };
+
+    // By default, cross-environment comparison is disallowed
+    assert.throws(
+      () => compareMetrics(linuxBaseline, winCurrent),
+      /Incompatible environment: baseline was recorded on 'linux'/
+    );
+
+    // With allowCrossEnvironment: true, it proceeds and notes the override
+    const overrideResult = compareMetrics(linuxBaseline, winCurrent, { allowCrossEnvironment: true });
+    assert.equal(overrideResult.passed, true);
+    assert.equal(overrideResult.environment.compatibility, 'CROSS-ENVIRONMENT OVERRIDE');
+  });
+
+  // 12. Workload profile compatibility check
+  await t.test('12. Profile compatibility: prevents comparing disparate workload profiles', () => {
+    const matrixBaseline = {
+      profile: 'matrix',
+      benchmarks: [{ concurrency: 1, achievedRps: 2000, p50: 1, p95: 2, p99: 3, errorRate: 0 }],
+    };
+    const ciCurrent = {
+      profile: 'ci',
+      benchmarks: [{ concurrency: 1, achievedRps: 2000, p50: 1, p95: 2, p99: 3, errorRate: 0 }],
+    };
+
+    assert.throws(
+      () => compareMetrics(matrixBaseline, ciCurrent),
+      /Incompatible benchmark profile: baseline profile 'matrix' does not match current run profile 'ci'/
+    );
+
+    const overrideResult = compareMetrics(matrixBaseline, ciCurrent, { allowCrossProfile: true });
+    assert.equal(overrideResult.passed, true);
+  });
+
+  // 13. Dynamic baseline path resolution
+  await t.test('13. Baseline path resolution: locates baseline or fails clearly if missing', async () => {
+    await assert.rejects(
+      async () => resolveBaselinePath('non-existent-dir/fake-baseline.json'),
+      /Specified baseline file not found/
+    );
+
+    const resolved = await resolveBaselinePath();
+    assert.ok(resolved.endsWith('.json'), `Must resolve to a valid .json baseline, got: ${resolved}`);
+  });
+
+  // 14. All unmatched levels fail rather than silently passing
+  await t.test('14. Completely unmatched levels fail regression gate', () => {
+    const baseline = {
+      benchmarks: [{ concurrency: 1, achievedRps: 2000, p50: 1, p95: 2, p99: 3, errorRate: 0 }],
+    };
+    const current = {
+      benchmarks: [{ concurrency: 99, achievedRps: 2000, p50: 1, p95: 2, p99: 3, errorRate: 0 }],
+    };
+
+    const result = compareMetrics(baseline, current);
+    assert.equal(result.passed, false, 'Completely unmatched comparison must fail');
+    assert.match(result.failures[0].reasons[0], /No matching benchmark levels found/);
   });
 });

@@ -187,12 +187,14 @@ export async function runControlledBenchmark(options = {}) {
     const payload = {
       version: '1.0',
       timestamp: new Date().toISOString(),
+      profile: isCi ? 'ci' : 'matrix',
       environment: {
         node: process.version,
         platform: process.platform,
         arch: process.arch,
         cpus: os.cpus().length,
         memoryMB: Math.round(os.totalmem() / (1024 * 1024)),
+        isCi: Boolean(process.env.CI || process.env.GITHUB_ACTIONS),
       },
       warmup: warmupResult,
       benchmarks: measuredResults,
