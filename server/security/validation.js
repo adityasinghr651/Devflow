@@ -59,12 +59,26 @@ export function validateRunPayload(payload, target, limits = {}) {
     headers = {},
     body,
     timeoutMs = 5000,
+    workerCount = 1,
     authorized,
   } = payload || {};
 
   const maxConcurrency = limits.maxConcurrency || 20;
   const maxDurationSec = limits.maxDurationSec || 30;
   const maxTotalStageDuration = limits.maxTotalStageDuration || 60;
+
+  let safeWorkerCount = 1;
+  if (workerCount !== undefined && workerCount !== null) {
+    const parsedWorkers = Number(workerCount);
+    if (!Number.isInteger(parsedWorkers) || ![1, 2, 4].includes(parsedWorkers)) {
+      return {
+        valid: false,
+        statusCode: 400,
+        error: 'Worker count must be an integer of 1, 2, or 4.',
+      };
+    }
+    safeWorkerCount = parsedWorkers;
+  }
 
   if (authorized !== true) {
     return {
@@ -278,6 +292,7 @@ export function validateRunPayload(payload, target, limits = {}) {
       headers: safeHeaders,
       body: safeBody,
       timeoutMs: finalTimeout,
+      workerCount: safeWorkerCount,
     },
   };
 }

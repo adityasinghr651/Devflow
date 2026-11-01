@@ -179,12 +179,172 @@ export class LatencyHistogram {
    */
   reset() {
     this.buckets.fill(0);
-    if (this.exactBuffer) this.exactBuffer.fill(0);
+    if (this.exactCapacity > 0 && !this.exactBuffer) {
+      this.exactBuffer = new Float64Array(this.exactCapacity);
+    } else if (this.exactBuffer) {
+      this.exactBuffer.fill(0);
+    }
     this.totalCount = 0;
     this.minLatency = Infinity;
     this.maxLatency = 0;
     this.minOverflowLatency = Infinity;
     this.sumLatency = 0;
+  }
+
+  /**
+   * Merges another compatible LatencyHistogram or supported serialized representation additively.
+   *
+   * @param {LatencyHistogram|object} other - Histogram instance or serialized histogram object.
+   * @returns {LatencyHistogram} this instance for method chaining.
+   * @throws {TypeError|Error} if other is null, undefined, or structurally incompatible.
+   */
+  merge(other) {
+    if (!other || typeof other !== 'object') {
+      throw new TypeError('Invalid input: expected a LatencyHistogram instance or compatible serialized object.');
+    }
+
+    const otherBuckets = other.buckets;
+    if (!otherBuckets || (!Array.isArray(otherBuckets) && !ArrayBuffer.isView(otherBuckets))) {
+      throw new Error('Incompatible histogram: missing or invalid buckets array.');
+    }
+
+    if (otherBuckets.length !== BUCKET_COUNT) {
+      throw new Error(`Incompatible histogram: expected ${BUCKET_COUNT} buckets, got ${otherBuckets.length}.`);
+    }
+
+    if (other.bucketCount !== undefined && other.bucketCount !== BUCKET_COUNT) {
+      throw new Error(`Incompatible histogram bucketCount: expected ${BUCKET_COUNT}, got ${other.bucketCount}.`);
+    }
+
+    const otherCount = other.totalCount;
+    if (typeof otherCount !== 'number' || Number.isNaN(otherCount) || otherCount < 0) {
+      throw new Error('Incompatible histogram: totalCount must be a non-negative number.');
+    }
+
+    const otherSum = other.sumLatency !== undefined ? other.sumLatency : 0;
+    if (typeof otherSum !== 'number' || Number.isNaN(otherSum) || otherSum < 0) {
+      throw new Error('Incompatible histogram: sumLatency must be a non-negative number.');
+    }
+
+    if (other.minLatency !== undefined && other.minLatency !== null) {
+      if (typeof other.minLatency !== 'number' || Number.isNaN(other.minLatency)) {
+        throw new Error('Incompatible histogram: minLatency must be a valid number.');
+      }
+    }
+
+    if (other.maxLatency !== undefined && other.maxLatency !== null) {
+      if (typeof other.maxLatency !== 'number' || Number.isNaN(other.maxLatency) || other.maxLatency < 0) {
+        throw new Error('Incompatible histogram: maxLatency must be a non-negative number.');
+      }
+    }
+
+    // Merging an empty histogram is a safe no-op
+    if (otherCount === 0) {
+      return this;
+    }
+
+    const prevCount = this.totalCount;
+    const newTotal = prevCount + otherCount;
+
+    // Merge buckets additively
+    for (let i = 0; i < BUCKET_COUNT; i++) {
+      this.buckets[i] += otherBuckets[i];
+    }
+
+    // Exact sample preservation for hybrid Nearest-Rank mode
+    const thisHasExact = this.exactBuffer !== null && prevCount <= this.exactCapacity;
+    let otherExact = null;
+    if (other.exactBuffer && otherCount <= (other.exactCapacity !== undefined ? other.exactCapacity : this.exactCapacity)) {
+      otherExact = other.exactBuffer.subarray(0, otherCount);
+    } else if (Array.isArray(other.exactSamples) && other.exactSamples.length === otherCount) {
+      otherExact = other.exactSamples;
+    } else if (ArrayBuffer.isView(other.exactSamples) && other.exactSamples.length === otherCount) {
+      otherExact = other.exactSamples;
+    }
+
+    const canPreserveExact = thisHasExact && (otherExact !== null || otherCount === 0) && (newTotal <= this.exactCapacity);
+
+    if (canPreserveExact && otherExact && otherCount > 0) {
+      this.exactBuffer.set(otherExact, prevCount);
+    } else if (!canPreserveExact && this.exactBuffer && newTotal <= this.exactCapacity) {
+      // If exact samples cannot be fully combined for a small count, nullify exactBuffer
+      // so getPercentile falls back to linear interpolation across merged buckets.
+      this.exactBuffer = null;
+    }
+
+    // Combine summary statistics
+    const otherMin = other.minLatency !== undefined && other.minLatency !== null && Number.isFinite(other.minLatency)
+      ? other.minLatency
+      : Infinity;
+    const otherMax = other.maxLatency !== undefined && other.maxLatency !== null
+      ? other.maxLatency
+      : 0;
+    const otherMinOverflow = other.minOverflowLatency !== undefined && other.minOverflowLatency !== null && Number.isFinite(other.minOverflowLatency)
+      ? other.minOverflowLatency
+      : Infinity;
+
+    if (prevCount === 0) {
+      this.minLatency = otherMin;
+      this.maxLatency = otherMax;
+      this.minOverflowLatency = otherMinOverflow;
+      this.sumLatency = otherSum;
+      this.totalCount = otherCount;
+    } else {
+      this.minLatency = Math.min(this.minLatency, otherMin);
+      this.maxLatency = Math.max(this.maxLatency, otherMax);
+      this.minOverflowLatency = Math.min(this.minOverflowLatency, otherMinOverflow);
+      this.sumLatency += otherSum;
+      this.totalCount = newTotal;
+    }
+
+    return this;
+  }
+
+  /**
+   * Serializes the histogram into a plain JSON-compatible object.
+   * Suitable for IPC transmission across child processes or networks.
+   */
+  toJSON() {
+    return {
+      bucketCount: BUCKET_COUNT,
+      buckets: Array.from(this.buckets),
+      totalCount: this.totalCount,
+      minLatency: Number.isFinite(this.minLatency) ? this.minLatency : null,
+      maxLatency: this.maxLatency,
+      minOverflowLatency: Number.isFinite(this.minOverflowLatency) ? this.minOverflowLatency : null,
+      sumLatency: this.sumLatency,
+      exactSamples: this.exactBuffer && this.totalCount <= this.exactCapacity
+        ? Array.from(this.exactBuffer.subarray(0, this.totalCount))
+        : null,
+    };
+  }
+
+  /**
+   * Serializes the histogram into an object preserving typed arrays for zero-copy
+   * or fast in-process transfer.
+   */
+  serialize() {
+    return {
+      bucketCount: BUCKET_COUNT,
+      buckets: new Uint32Array(this.buckets),
+      totalCount: this.totalCount,
+      minLatency: this.minLatency,
+      maxLatency: this.maxLatency,
+      minOverflowLatency: this.minOverflowLatency,
+      sumLatency: this.sumLatency,
+      exactSamples: this.exactBuffer && this.totalCount <= this.exactCapacity
+        ? new Float64Array(this.exactBuffer.subarray(0, this.totalCount))
+        : null,
+    };
+  }
+
+  /**
+   * Static helper to construct a new LatencyHistogram from serialized data.
+   */
+  static fromJSON(data, options = {}) {
+    const h = new LatencyHistogram(options);
+    h.merge(data);
+    return h;
   }
 }
 

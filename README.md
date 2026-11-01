@@ -108,8 +108,74 @@ npm run build
 ### Test Runs (Authenticated)
 * `GET /api/runs` — lists runs owned by the authenticated user
 * `GET /api/runs/:id` — retrieves run details and latency percentiles
-* `POST /api/runs` — `{ "targetId": "...", "path": "/health", "method": "GET", "concurrency": 5, "durationSec": 10, "authorized": true }`
+* `POST /api/runs` — `{ "targetId": "...", "path": "/health", "method": "GET", "concurrency": 10, "durationSec": 10, "workerCount": 2, "authorized": true }`
 * `POST /api/runs/:id/cancel` — requests cancellation of an active run
+
+---
+
+## Phase 7: Distributed Load Testing Architecture
+
+DevFlow evolves from single-process load testing to coordinated local multi-process load testing via the **TestCoordinator**:
+
+```
+RunnerManager
+  └─► TestCoordinator
+        ├─► Workload Partitioner (Exact integer remainder VU distribution)
+        ├─► Worker Process 1 (Child Process 1) ──┐
+        ├─► Worker Process 2 (Child Process 2) ──┼─► Progress Aggregator (Cumulative snapshot deduplication)
+        ├─► Worker Process 4 (Child Process 4) ──┘   │
+        └─► Master LatencyHistogram (Additive bucket merging) ──► Unified Percentiles (p50, p95, p99)
+```
+
+### 1. Workload Partitioning
+The pure helper function `partitionWorkload(runConfig, workerCount)` splits total concurrency and stage targets across workers:
+* **Fixed Profile**: Total concurrency $C$ divided among $W$ workers via remainder distribution ($\sum \text{concurrency}_i = C$). Total load is never multiplied.
+* **Staged Profile**: For each stage, the target VUs are partitioned across $W$ workers preserving identical stage durations and linear interpolation curves.
+
+### 2. Progress Aggregation
+Workers report progress via asynchronous cumulative snapshots over IPC. The `ProgressAggregator` maintains a per-worker state map (`Map<number, snapshot>`) to derive unified cluster metrics without double-counting repeated snapshots:
+* Combined RPS: $\sum \text{totalRequests} / \text{elapsedSec}$
+* Combined Error Rate: $(\sum \text{failedCount} / \sum \text{totalRequests}) \times 100\%$
+* Merged HTTP Status Codes: summed per code across all workers
+* Active Concurrency: $\sum \text{currentConcurrency}_i$
+
+### 3. Additive Histogram Merging
+Worker latencies are recorded in bounded-memory HDR histograms (`LatencyHistogram`, 6,801 buckets). When workers complete, their histograms are serialized and merged additively into the coordinator's master histogram:
+* Percentiles ($p_{50}, p_{95}, p_{99}$) are calculated strictly from the merged histogram distribution.
+* **Worker percentiles are never averaged**.
+* Memory remains strictly capped at $\le 35.4\text{ KB}$ regardless of the number of workers or requests.
+
+### 4. Worker Lifecycle & Failure Handling
+* **Startup & Exit**: The coordinator coordinates child process startup and monitors exit codes.
+* **Failure Cascading**: If one worker process crashes or exits unexpectedly, the coordinator immediately terminates remaining siblings with `SIGTERM`, collects available partial metrics, and marks the overall run as `failed` with diagnostic error details.
+* **Coordinated Cancellation**: `POST /api/runs/:id/cancel` broadcasts `{ type: 'cancel' }` to all workers with an escalating 1s grace timeout before `SIGTERM`/`SIGKILL`.
+* **Watchdog Protection**: A hard watchdog timer (`duration + 8s`) terminates all workers if execution hangs.
+
+### 5. Running Distributed Tests
+To run a distributed test across multiple local worker processes, include `"workerCount": 2` or `"workerCount": 4` in the `POST /api/runs` payload:
+
+```bash
+curl -X POST http://127.0.0.1:4000/api/runs \
+  -H "Authorization: Bearer <TOKEN>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "targetId": "<TARGET_ID>",
+    "path": "/api/items",
+    "method": "GET",
+    "concurrency": 20,
+    "durationSec": 10,
+    "workerCount": 4,
+    "authorized": true
+  }'
+```
+
+*When `workerCount` is omitted or set to `1`, ServerTest operates in backward-compatible single-worker mode.*
+
+### 6. Known Limitations
+* **Local Process Scope**: Phase 7 coordinates local operating system child processes. It does not provide remote cloud workers, Kubernetes pods, or cross-machine coordination.
+* **Hardware Resource Contention**: Spawning multiple worker processes on a machine with limited CPU cores or constrained network sockets can introduce resource contention. For optimal benchmarking, ensure total concurrency and worker counts align with available system CPU cores.
+
+---
 
 ### System
 * `GET /api/health` — reports system health and active storage engine

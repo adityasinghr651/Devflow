@@ -1,10 +1,10 @@
-import { fork } from 'node:child_process';
 import { EventEmitter } from 'node:events';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { config } from '../config.js';
 import { getStorage } from '../storage/index.js';
 import { isK6Available, executeK6Run } from './k6-adapter.js';
+import { TestCoordinator } from './coordinator.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -122,10 +122,10 @@ export class RunnerManager {
 
     const hasK6 = await isK6Available(config.k6Bin);
 
-    if (hasK6 && run.profile !== 'stages') {
+    if (hasK6 && run.profile !== 'stages' && (!run.workerCount || run.workerCount === 1)) {
       return this._executeWithK6(run);
     } else {
-      return this._executeWithNodeWorker(run);
+      return this._executeWithCoordinator(run);
     }
   }
 
@@ -169,107 +169,25 @@ export class RunnerManager {
     }
   }
 
-  async _executeWithNodeWorker(run) {
-    return new Promise((resolve) => {
-      const child = fork(workerPath, [], {
-        stdio: ['ignore', 'inherit', 'inherit', 'ipc'],
-      });
-
-      const totalDurationSec = run.profile === 'stages' && Array.isArray(run.stages) && run.stages.length > 0
-        ? run.stages.reduce((acc, s) => acc + s.durationSec, 0)
-        : run.durationSec;
-
-      // Hard watchdog timer: duration + 8s buffer
-      const watchdogTimeout = setTimeout(async () => {
-        console.warn(`[RunnerManager] Watchdog timeout triggered for run ${run.id}. Terminating worker.`);
-        try { child.kill('SIGKILL'); } catch {}
-        await this._transitionState(run.id, 'timed_out', {
-          error: 'Execution exceeded allowable maximum run duration watchdog threshold.',
-          finishedAt: new Date().toISOString(),
-        }).catch(() => {});
-      }, (totalDurationSec * 1000) + 8000);
-
-      const cancel = () => {
-        try {
-          child.send({ type: 'cancel' });
-          setTimeout(() => {
-            try { child.kill('SIGTERM'); } catch {}
-          }, 1000);
-        } catch {}
-      };
-
-      this.activeRuns.set(run.id, {
-        type: 'node-worker',
-        child,
-        cancel,
-        timeoutId: watchdogTimeout,
-      });
-
-      child.on('message', async (msg) => {
-        if (!msg) return;
-
-        if (msg.type === 'progress' && msg.data) {
-          this.events.emit(`progress:${run.id}`, msg.data);
-          await this.storage.updateRun(run.id, msg.data).catch(() => {});
-        } else if (msg.type === 'complete' && msg.data) {
-          clearTimeout(watchdogTimeout);
-          this.events.emit(`complete:${run.id}`, msg.data);
-          const finalStatus = msg.data.status || 'completed';
-          await this._transitionState(run.id, finalStatus, msg.data).catch(() => {});
-        } else if (msg.type === 'error') {
-          clearTimeout(watchdogTimeout);
-          this.events.emit(`error:${run.id}`, msg.error);
-          await this._transitionState(run.id, 'failed', {
-            error: String(msg.error).slice(0, 300),
-            finishedAt: new Date().toISOString(),
-          }).catch(() => {});
-        }
-      });
-
-      child.on('error', async (err) => {
-        clearTimeout(watchdogTimeout);
-        this.events.emit(`error:${run.id}`, err.message);
-        await this._transitionState(run.id, 'failed', {
-          error: `Subprocess error: ${err.message}`.slice(0, 300),
-          finishedAt: new Date().toISOString(),
-        }).catch(() => {});
-      });
-
-      child.on('exit', async (code, signal) => {
-        clearTimeout(watchdogTimeout);
-        this.activeRuns.delete(run.id);
-
-        const currentRun = await this.storage.getRunById(run.id);
-        if (currentRun && !TERMINAL_STATES.has(currentRun.status)) {
-          const finalStatus = signal === 'SIGTERM' || signal === 'SIGINT'
-            ? 'cancelled'
-            : code === 0 ? 'completed' : 'failed';
-          await this._transitionState(run.id, finalStatus, {
-            finishedAt: new Date().toISOString(),
-          }).catch(() => {});
-        }
-
-        resolve();
-      });
-
-      // Send start message via IPC
-      child.send({
-        type: 'start',
-        payload: {
-          id: run.id,
-          url: run.url,
-          method: run.method,
-          concurrency: run.concurrency,
-          durationSec: run.durationSec,
-          profile: run.profile,
-          stages: run.stages,
-          headers: run.headers,
-          body: run.body,
-          timeoutMs: run.timeoutMs || config.requestTimeoutMs || 5000,
-          allowLocalTargets: config.allowLocalTargets,
-        },
-      });
+  async _executeWithCoordinator(run) {
+    const coordinator = new TestCoordinator(run, {
+      storage: this.storage,
+      events: this.events,
+      workerPath,
+      transitionState: (id, status, updates) => this._transitionState(id, status, updates),
     });
+
+    this.activeRuns.set(run.id, {
+      type: 'coordinator',
+      coordinator,
+      cancel: () => coordinator.cancel(),
+    });
+
+    try {
+      await coordinator.start();
+    } finally {
+      this.activeRuns.delete(run.id);
+    }
   }
 }
 

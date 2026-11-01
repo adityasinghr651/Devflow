@@ -38,6 +38,7 @@ function getStagedConcurrency(elapsedSec, stages) {
 
 async function runWorker({
   id,
+  workerIndex = 0,
   url,
   method,
   concurrency,
@@ -55,6 +56,7 @@ async function runWorker({
     if (process.send) {
       process.send({
         type: 'error',
+        workerIndex,
         error: `Runtime security check failed: ${preCheck.error}`,
       });
     }
@@ -68,8 +70,8 @@ async function runWorker({
     : durationSec;
 
   const peakConcurrency = hasStages
-    ? Math.max(...stages.map(s => s.target), 1)
-    : concurrency;
+    ? Math.max(...stages.map(s => s.target), 0)
+    : Math.max(0, concurrency);
 
   const deadline = Date.now() + totalDurationSec * 1000;
   const startTime = Date.now();
@@ -80,7 +82,7 @@ async function runWorker({
   let failedCount = 0;
 
   let lastProgressReport = Date.now();
-  let currentActiveConcurrency = hasStages ? (stages[0]?.target || 1) : concurrency;
+  let currentActiveConcurrency = hasStages ? (stages[0]?.target || 0) : concurrency;
   let currentStageIndex = 0;
 
   // Prepare normalized request headers
@@ -106,6 +108,7 @@ async function runWorker({
     if (process.send) {
       process.send({
         type: 'progress',
+        workerIndex,
         data: {
           totalRequests,
           successCount,
@@ -185,14 +188,22 @@ async function runWorker({
     }
   }
 
-  // Launch slots up to peak concurrency
-  await Promise.all(
-    Array.from({ length: peakConcurrency }, (_, idx) => workerSlot(idx))
-  );
+  // Launch slots up to peak concurrency or idle wait if 0 concurrency assigned
+  if (peakConcurrency === 0) {
+    while (Date.now() < deadline && !isCancelled) {
+      await new Promise(r => setTimeout(r, 100));
+      sendProgress();
+    }
+  } else {
+    await Promise.all(
+      Array.from({ length: peakConcurrency }, (_, idx) => workerSlot(idx))
+    );
+  }
 
   const totalElapsedSec = Math.max((Date.now() - startTime) / 1000, 0.001);
 
   const finalSummary = {
+    workerIndex,
     totalRequests,
     successCount,
     failedCount,
@@ -206,11 +217,13 @@ async function runWorker({
     finishedAt: new Date().toISOString(),
     currentConcurrency: 0,
     progressPercent: 100,
+    histogram: latencyHistogram.toJSON(),
   };
 
   if (process.send) {
     process.send({
       type: 'complete',
+      workerIndex,
       data: finalSummary,
     });
   }

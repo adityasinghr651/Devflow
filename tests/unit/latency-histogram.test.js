@@ -304,5 +304,317 @@ test('LatencyHistogram: Bounded-Memory Latency Metrics Unit Suite', async (t) =>
     assert.equal(h.getSummary().count, 0);
     assert.equal(h.minOverflowLatency, Infinity, 'minOverflowLatency should be reset to Infinity');
   });
+
+  // 11. Phase 7: Merge two empty histograms
+  await t.test('11. Merge two empty histograms maintains clean initial state', () => {
+    const h1 = new LatencyHistogram();
+    const h2 = new LatencyHistogram();
+
+    h1.merge(h2);
+
+    assert.equal(h1.totalCount, 0);
+    assert.equal(h1.minLatency, Infinity);
+    assert.equal(h1.maxLatency, 0);
+    assert.equal(h1.sumLatency, 0);
+    assert.equal(h1.minOverflowLatency, Infinity);
+    assert.equal(h1.getPercentile(0.50), 0);
+    assert.equal(h1.getPercentile(0.95), 0);
+    assert.equal(h1.getPercentile(0.99), 0);
+
+    const summary = h1.getSummary();
+    assert.deepEqual(summary, {
+      count: 0,
+      min: 0,
+      max: 0,
+      mean: 0,
+      p50: 0,
+      p95: 0,
+      p99: 0,
+    });
+
+    for (let i = 0; i < BUCKET_COUNT; i++) {
+      assert.equal(h1.buckets[i], 0);
+    }
+  });
+
+  // 12. Phase 7: Merge small sample histograms (Exact Nearest-Rank mode, N <= exactCapacity)
+  await t.test('12. Merge small sample histograms matches direct recording and exact Nearest-Rank', () => {
+    const samples1 = [12.5, 45.0, 8.2, 95.4, 22.1];
+    const samples2 = [18.1, 33.7, 5.0, 120.0, 7.3];
+    const allSamples = [...samples1, ...samples2];
+
+    const hA = new LatencyHistogram();
+    samples1.forEach(s => hA.record(s));
+
+    const hB = new LatencyHistogram();
+    samples2.forEach(s => hB.record(s));
+
+    const hDirect = new LatencyHistogram();
+    allSamples.forEach(s => hDirect.record(s));
+
+    // Merge hB into hA
+    hA.merge(hB);
+
+    // Verify statistics: count, min, max, sum
+    assert.equal(hA.totalCount, hDirect.totalCount);
+    assert.equal(hA.totalCount, 10);
+    assert.equal(hA.minLatency, hDirect.minLatency);
+    assert.equal(hA.minLatency, 5.0);
+    assert.equal(hA.maxLatency, hDirect.maxLatency);
+    assert.equal(hA.maxLatency, 120.0);
+    assert.ok(Math.abs(hA.sumLatency - hDirect.sumLatency) < 1e-9);
+
+    // Verify percentiles across range
+    const percentiles = [0.10, 0.25, 0.50, 0.75, 0.90, 0.95, 0.99];
+    for (const p of percentiles) {
+      const mergedP = hA.getPercentile(p);
+      const directP = hDirect.getPercentile(p);
+      const exactNearestRank = calculatePercentile(allSamples.slice().sort((a, b) => a - b), p);
+
+      assert.equal(mergedP, directP, `Merged p(${p}) must equal direct p(${p})`);
+      assert.equal(mergedP, exactNearestRank, `Merged p(${p}) must equal exact Nearest-Rank (${exactNearestRank})`);
+    }
+
+    assert.deepEqual(hA.getSummary(), hDirect.getSummary());
+  });
+
+  // 13. Phase 7: Merge high sample counts (N > exactCapacity, Bucket interpolation mode)
+  await t.test('13. Merge high sample count histograms matches direct recording across 100 percentiles', () => {
+    const worker1 = new LatencyHistogram();
+    const worker2 = new LatencyHistogram();
+    const worker3 = new LatencyHistogram();
+    const direct = new LatencyHistogram();
+
+    const SAMPLES_PER_WORKER = 2500;
+
+    for (let i = 0; i < SAMPLES_PER_WORKER; i++) {
+      // Worker 1: fast to medium requests [0.5ms - 50ms]
+      const s1 = 0.5 + (i % 100) * 0.495;
+      worker1.record(s1);
+      direct.record(s1);
+
+      // Worker 2: medium to high requests [50ms - 800ms]
+      const s2 = 50.0 + (i % 150) * 5.0;
+      worker2.record(s2);
+      direct.record(s2);
+
+      // Worker 3: multimodal requests [10ms - 2500ms]
+      const s3 = (i % 3 === 0) ? 15.0 : (i % 3 === 1) ? 250.0 : 1800.0;
+      worker3.record(s3);
+      direct.record(s3);
+    }
+
+    const merged = new LatencyHistogram();
+    merged.merge(worker1).merge(worker2).merge(worker3);
+
+    // Total counts and stats
+    assert.equal(merged.totalCount, direct.totalCount);
+    assert.equal(merged.totalCount, SAMPLES_PER_WORKER * 3);
+    assert.equal(merged.minLatency, direct.minLatency);
+    assert.equal(merged.maxLatency, direct.maxLatency);
+    assert.ok(Math.abs(merged.sumLatency - direct.sumLatency) < 1e-4);
+
+    // Bucket-by-bucket exact parity
+    for (let i = 0; i < BUCKET_COUNT; i++) {
+      assert.equal(
+        merged.buckets[i],
+        direct.buckets[i],
+        `Bucket mismatch at index ${i}: merged=${merged.buckets[i]}, direct=${direct.buckets[i]}`
+      );
+    }
+
+    // Sweep 100 percentiles [1% to 100%]
+    for (let pct = 1; pct <= 100; pct++) {
+      const p = pct / 100;
+      const mergedP = merged.getPercentile(p);
+      const directP = direct.getPercentile(p);
+      assert.equal(mergedP, directP, `Percentile mismatch at p=${p}: merged=${mergedP}, direct=${directP}`);
+    }
+
+    assert.deepEqual(merged.getSummary(), direct.getSummary());
+  });
+
+  // 14. Phase 7: Merge overflow latencies (> 60,000ms)
+  await t.test('14. Merge correctly handles extreme tail and overflow samples (>60,000ms)', () => {
+    const hNormal = new LatencyHistogram({ exactCapacity: 0 });
+    const hOverflow = new LatencyHistogram({ exactCapacity: 0 });
+    const hDirect = new LatencyHistogram({ exactCapacity: 0 });
+
+    for (let i = 0; i < 2000; i++) {
+      const v = 20 + (i % 50);
+      hNormal.record(v);
+      hDirect.record(v);
+    }
+
+    // Overflow samples
+    hOverflow.record(68500);
+    hDirect.record(68500);
+
+    hOverflow.record(92000);
+    hDirect.record(92000);
+
+    hNormal.merge(hOverflow);
+
+    assert.equal(hNormal.totalCount, 2002);
+    assert.equal(hNormal.minOverflowLatency, 68500);
+    assert.equal(hNormal.maxLatency, 92000);
+    assert.equal(hNormal.buckets[6800], 2);
+
+    assert.equal(hNormal.getPercentile(0.999), hDirect.getPercentile(0.999));
+    assert.equal(hNormal.getPercentile(0.9999), hDirect.getPercentile(0.9999));
+    assert.equal(hNormal.getPercentile(1.0), hDirect.getPercentile(1.0));
+  });
+
+  // 15. Phase 7: Serialization and Deserialization (toJSON, serialize, fromJSON)
+  await t.test('15. Supported serialized representations can be merged seamlessly', () => {
+    const hSource = new LatencyHistogram();
+    for (let i = 0; i < 200; i++) {
+      hSource.record(5 + i * 2.5);
+    }
+
+    // 15A: Plain JSON serialization (Array buckets, simulated IPC/network payload)
+    const jsonSerialized = JSON.parse(JSON.stringify(hSource));
+    const hFromJson = new LatencyHistogram();
+    hFromJson.merge(jsonSerialized);
+
+    assert.equal(hFromJson.totalCount, hSource.totalCount);
+    assert.equal(hFromJson.minLatency, hSource.minLatency);
+    assert.equal(hFromJson.maxLatency, hSource.maxLatency);
+    assert.equal(hFromJson.sumLatency, hSource.sumLatency);
+    assert.deepEqual(hFromJson.getSummary(), hSource.getSummary());
+
+    // 15B: Typed serialization (Uint32Array buckets)
+    const typedSerialized = hSource.serialize();
+    const hFromTyped = new LatencyHistogram();
+    hFromTyped.merge(typedSerialized);
+    assert.deepEqual(hFromTyped.getSummary(), hSource.getSummary());
+
+    // 15C: Static factory LatencyHistogram.fromJSON
+    const hFactory = LatencyHistogram.fromJSON(jsonSerialized);
+    assert.deepEqual(hFactory.getSummary(), hSource.getSummary());
+  });
+
+  // 16. Phase 7: Incompatible input safety and clear errors
+  await t.test('16. Incompatible histogram inputs are rejected with descriptive errors', () => {
+    const h = new LatencyHistogram();
+
+    assert.throws(() => h.merge(null), {
+      name: 'TypeError',
+      message: /Invalid input/,
+    });
+
+    assert.throws(() => h.merge(undefined), {
+      name: 'TypeError',
+      message: /Invalid input/,
+    });
+
+    assert.throws(() => h.merge('not an object'), {
+      name: 'TypeError',
+      message: /Invalid input/,
+    });
+
+    assert.throws(() => h.merge(42), {
+      name: 'TypeError',
+      message: /Invalid input/,
+    });
+
+    assert.throws(() => h.merge({}), {
+      name: 'Error',
+      message: /missing or invalid buckets array/,
+    });
+
+    assert.throws(() => h.merge({ buckets: [1, 2, 3] }), {
+      name: 'Error',
+      message: /expected 6801 buckets, got 3/,
+    });
+
+    assert.throws(() => h.merge({ buckets: new Uint32Array(6801), totalCount: 'ten' }), {
+      name: 'Error',
+      message: /totalCount must be a non-negative number/,
+    });
+
+    assert.throws(() => h.merge({ buckets: new Uint32Array(6801), totalCount: -5 }), {
+      name: 'Error',
+      message: /totalCount must be a non-negative number/,
+    });
+
+    assert.throws(() => h.merge({ buckets: new Uint32Array(6801), totalCount: 1, sumLatency: -10 }), {
+      name: 'Error',
+      message: /sumLatency must be a non-negative number/,
+    });
+
+    assert.throws(() => h.merge({ buckets: new Uint32Array(6801), totalCount: 1, sumLatency: 10, minLatency: NaN }), {
+      name: 'Error',
+      message: /minLatency must be a valid number/,
+    });
+
+    assert.throws(() => h.merge({ buckets: new Uint32Array(6801), bucketCount: 5000, totalCount: 0 }), {
+      name: 'Error',
+      message: /Incompatible histogram bucketCount/,
+    });
+  });
+
+  // 17. Phase 7: Strict bounded-memory verification
+  await t.test('17. Merging large numbers of histograms preserves bounded memory guarantees', () => {
+    const merged = new LatencyHistogram();
+
+    // Simulate merging 20 worker outputs each with 50,000 samples (1,000,000 total samples)
+    for (let w = 0; w < 20; w++) {
+      const worker = new LatencyHistogram();
+      for (let s = 0; s < 50000; s++) {
+        worker.record(10 + (s % 100));
+      }
+      merged.merge(worker);
+    }
+
+    assert.equal(merged.totalCount, 1000000);
+
+    // Buckets Uint32Array size is strictly constant
+    assert.equal(merged.buckets.length, BUCKET_COUNT);
+    assert.equal(merged.buckets.byteLength, BUCKET_COUNT * 4); // 27,204 bytes
+
+    // Exact buffer is at most exactCapacity or null
+    const exactBytes = merged.exactBuffer ? merged.exactBuffer.byteLength : 0;
+    assert.ok(exactBytes <= 8192);
+
+    // Total memory footprint is strictly <= 35,396 bytes
+    const totalMemoryBytes = merged.buckets.byteLength + exactBytes;
+    assert.ok(totalMemoryBytes <= 36000, `Memory footprint must be <= 36KB, got ${totalMemoryBytes} bytes`);
+
+    // Percentiles work quickly and accurately
+    const p50 = merged.getPercentile(0.50);
+    assert.ok(p50 >= 10 && p50 <= 110);
+  });
+
+  // 18. Phase 7: Exact-sample fallback safety when merging without exact samples
+  await t.test('18. Exact-sample fallback safety and reset recovery', () => {
+    // Histogram A has exact samples
+    const hA = new LatencyHistogram({ exactCapacity: 1024 });
+    hA.record(10.0);
+    hA.record(20.0);
+
+    // Histogram B has NO exact samples (exactCapacity = 0)
+    const hB = new LatencyHistogram({ exactCapacity: 0 });
+    hB.record(30.0);
+    hB.record(40.0);
+
+    // Merging hB into hA
+    hA.merge(hB);
+
+    assert.equal(hA.totalCount, 4);
+    // Because hB could not provide exact samples, hA fell back safely to bucket interpolation
+    // without reading incomplete/stale entries from exactBuffer
+    const p50 = hA.getPercentile(0.50);
+    assert.ok(p50 >= 15 && p50 <= 35);
+
+    // Reset restores exactBuffer for new recordings
+    hA.reset();
+    assert.equal(hA.totalCount, 0);
+    assert.ok(hA.exactBuffer !== null, 'exactBuffer should be restored after reset');
+    assert.equal(hA.exactBuffer.length, 1024);
+
+    hA.record(100.0);
+    assert.equal(hA.getPercentile(0.50), 100.0, 'Reset histogram should use exact Nearest-Rank');
+  });
 });
 
