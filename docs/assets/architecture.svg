@@ -1,0 +1,243 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 580" width="100%" height="100%">
+  <defs>
+    <!-- Background Gradients -->
+    <radialGradient id="bgGlow" cx="50%" cy="40%" r="60%">
+      <stop offset="0%" stop-color="#0f172a" />
+      <stop offset="100%" stop-color="#020617" />
+    </radialGradient>
+    <radialGradient id="cyanGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#06b6d4" stop-opacity="0.18" />
+      <stop offset="100%" stop-color="#06b6d4" stop-opacity="0" />
+    </radialGradient>
+    <radialGradient id="greenGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#10b981" stop-opacity="0.18" />
+      <stop offset="100%" stop-color="#10b981" stop-opacity="0" />
+    </radialGradient>
+    <radialGradient id="purpleGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#8b5cf6" stop-opacity="0.18" />
+      <stop offset="100%" stop-color="#8b5cf6" stop-opacity="0" />
+    </radialGradient>
+
+    <!-- Linear Gradients for Cards & Connectors -->
+    <linearGradient id="cardGradDark" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1e293b" stop-opacity="0.9" />
+      <stop offset="100%" stop-color="#0f172a" stop-opacity="0.9" />
+    </linearGradient>
+    <linearGradient id="cyanBorder" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38bdf8" />
+      <stop offset="100%" stop-color="#0284c7" />
+    </linearGradient>
+    <linearGradient id="greenBorder" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#34d399" />
+      <stop offset="100%" stop-color="#059669" />
+    </linearGradient>
+    <linearGradient id="purpleBorder" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#c084fc" />
+      <stop offset="100%" stop-color="#7c3aed" />
+    </linearGradient>
+    <linearGradient id="amberBorder" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fbbf24" />
+      <stop offset="100%" stop-color="#d97706" />
+    </linearGradient>
+
+    <!-- Filters -->
+    <filter id="dropShadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="6" stdDeviation="8" flood-color="#000000" flood-opacity="0.5" />
+    </filter>
+
+    <!-- Markers -->
+    <marker id="arrowCyan" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
+      <path d="M 0 0 L 8 4 L 0 8 z" fill="#38bdf8" />
+    </marker>
+    <marker id="arrowGreen" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
+      <path d="M 0 0 L 8 4 L 0 8 z" fill="#34d399" />
+    </marker>
+    <marker id="arrowPurple" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
+      <path d="M 0 0 L 8 4 L 0 8 z" fill="#c084fc" />
+    </marker>
+  </defs>
+
+  <style>
+    .title { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 20px; font-weight: 700; fill: #ffffff; letter-spacing: -0.5px; }
+    .subtitle { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 12px; font-weight: 500; fill: #94a3b8; }
+    .card-title { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 14px; font-weight: 600; fill: #f8fafc; }
+    .card-meta { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 11px; fill: #94a3b8; }
+    .card-code { font-family: 'JetBrains Mono', 'Fira Code', Menlo, monospace; font-size: 11px; fill: #38bdf8; }
+    .badge-text { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+  </style>
+
+  <!-- Deep Background -->
+  <rect width="1000" height="580" rx="16" fill="url(#bgGlow)" />
+
+  <!-- Subtle Grid Pattern -->
+  <g stroke="#334155" stroke-width="0.5" stroke-opacity="0.3">
+    <line x1="50" y1="0" x2="50" y2="580" />
+    <line x1="200" y1="0" x2="200" y2="580" />
+    <line x1="380" y1="0" x2="380" y2="580" />
+    <line x1="620" y1="0" x2="620" y2="580" />
+    <line x1="820" y1="0" x2="820" y2="580" />
+    <line x1="0" y1="70" x2="1000" y2="70" />
+    <line x1="0" y1="280" x2="1000" y2="280" />
+    <line x1="0" y1="490" x2="1000" y2="490" />
+  </g>
+
+  <!-- Ambient Glow Spots -->
+  <circle cx="200" cy="180" r="150" fill="url(#cyanGlow)" />
+  <circle cx="500" cy="270" r="180" fill="url(#greenGlow)" />
+  <circle cx="820" cy="270" r="160" fill="url(#purpleGlow)" />
+
+  <!-- HEADER -->
+  <g transform="translate(40, 42)">
+    <rect x="0" y="-14" width="36" height="36" rx="8" fill="#0284c7" />
+    <path d="M 8 4 L 18 4 L 14 14 L 26 14 L 12 32 L 15 20 L 8 20 Z" fill="#ffffff" transform="translate(1, -9) scale(0.85)" />
+    <text x="48" y="10" class="title">DevFlow Distributed Architecture</text>
+    <text x="48" y="27" class="subtitle">Multi-Process Load Testing Engine • SSRF Network Firewall • Real-Time Merged Telemetry</text>
+  </g>
+
+  <!-- SECTION 1: CLIENTS & API GATEWAY -->
+  <!-- Client Layer -->
+  <g transform="translate(40, 110)" filter="url(#dropShadow)">
+    <rect width="180" height="90" rx="12" fill="url(#cardGradDark)" stroke="url(#cyanBorder)" stroke-width="1.5" />
+    <text x="18" y="28" class="card-title">🖥️ Client Layer</text>
+    <text x="18" y="48" class="card-meta">React 18 / Vite SPA</text>
+    <text x="18" y="66" class="card-code">GET /api/runs/:id/events</text>
+    <text x="18" y="80" class="card-meta">Real-time SSE Dashboard</text>
+  </g>
+
+  <!-- API Gateway & Security -->
+  <g transform="translate(40, 240)" filter="url(#dropShadow)">
+    <rect width="180" height="130" rx="12" fill="url(#cardGradDark)" stroke="url(#cyanBorder)" stroke-width="1.5" />
+    <text x="18" y="28" class="card-title">🛡️ API &amp; Security</text>
+    <text x="18" y="48" class="card-meta">• JWT Authentication</text>
+    <text x="18" y="68" class="card-meta">• SSRF Private IP Shield</text>
+    <text x="18" y="88" class="card-meta">• Multi-Tenant Isolation</text>
+    <rect x="18" y="98" width="144" height="20" rx="4" fill="#0369a1" />
+    <text x="24" y="112" class="badge-text" fill="#e0f2fe">POST /api/runs (W=1,2,4)</text>
+  </g>
+
+  <!-- Persistence -->
+  <g transform="translate(40, 410)" filter="url(#dropShadow)">
+    <rect width="180" height="95" rx="12" fill="url(#cardGradDark)" stroke="url(#purpleBorder)" stroke-width="1.5" />
+    <text x="18" y="28" class="card-title">💾 Storage Engine</text>
+    <text x="18" y="48" class="card-meta">PostgreSQL / Zero-Config JSON</text>
+    <text x="18" y="68" class="card-meta">Auto-Migrations (001-003)</text>
+    <text x="18" y="84" class="card-code">CHECK (workerCount IN (1,2,4))</text>
+  </g>
+
+  <!-- SECTION 2: COORDINATOR (ORCHESTRATION ENGINE) -->
+  <g transform="translate(270, 110)" filter="url(#dropShadow)">
+    <rect width="250" height="395" rx="14" fill="url(#cardGradDark)" stroke="url(#greenBorder)" stroke-width="2" />
+    <rect x="0" y="0" width="250" height="42" rx="14" fill="#065f46" fill-opacity="0.35" />
+    <text x="20" y="26" class="card-title" fill="#34d399">⚡ TestCoordinator</text>
+    <rect x="165" y="10" width="70" height="20" rx="6" fill="#047857" />
+    <text x="175" y="24" class="badge-text" fill="#ecfdf5">ACTIVE RUN</text>
+
+    <!-- Coordinator Submodules -->
+    <g transform="translate(18, 55)">
+      <rect width="214" height="60" rx="8" fill="#0f172a" stroke="#334155" />
+      <text x="12" y="22" class="card-title" font-size="12">1. Workload Partitioner</text>
+      <text x="12" y="38" class="card-meta">Exact remainder integer split</text>
+      <text x="12" y="52" class="card-code">C_total = Σ c_worker (Never multiplied)</text>
+    </g>
+
+    <g transform="translate(18, 125)">
+      <rect width="214" height="60" rx="8" fill="#0f172a" stroke="#334155" />
+      <text x="12" y="22" class="card-title" font-size="12">2. IPC Process Lifecycle</text>
+      <text x="12" y="38" class="card-meta">Child process fork + heartbeats</text>
+      <text x="12" y="52" class="card-code">Watchdog: Duration + 8s</text>
+    </g>
+
+    <g transform="translate(18, 195)">
+      <rect width="214" height="60" rx="8" fill="#0f172a" stroke="#334155" />
+      <text x="12" y="22" class="card-title" font-size="12">3. Cascade Safety Matrix</text>
+      <text x="12" y="38" class="card-meta">1 crash ➔ SIGTERM siblings</text>
+      <text x="12" y="52" class="card-code">Graceful cancel + clean exit</text>
+    </g>
+
+    <g transform="translate(18, 265)">
+      <rect width="214" height="60" rx="8" fill="#0f172a" stroke="#334155" />
+      <text x="12" y="22" class="card-title" font-size="12">4. Live Progress Aggregator</text>
+      <text x="12" y="38" class="card-meta">Snapshot deduplication map</text>
+      <text x="12" y="52" class="card-code">RPS = Σ req / elapsed (1s emit)</text>
+    </g>
+
+    <g transform="translate(18, 335)">
+      <rect width="214" height="48" rx="8" fill="#0f172a" stroke="#10b981" />
+      <text x="12" y="20" class="card-title" font-size="12" fill="#6ee7b7">5. Additive Histogram Merger</text>
+      <text x="12" y="36" class="card-code">Master 6,801 Bins • Bounded ≤ 35.4 KB</text>
+    </g>
+  </g>
+
+  <!-- SECTION 3: WORKER CLUSTER -->
+  <g transform="translate(570, 110)">
+    <!-- Worker 1 -->
+    <g transform="translate(0, 0)" filter="url(#dropShadow)">
+      <rect width="180" height="85" rx="10" fill="url(#cardGradDark)" stroke="url(#greenBorder)" stroke-width="1.5" />
+      <text x="16" y="24" class="card-title">🚀 Worker #1 (Child)</text>
+      <text x="16" y="44" class="card-meta">VUs: Concurrency / N</text>
+      <text x="16" y="60" class="card-code">Event Loop Dedicated</text>
+      <text x="16" y="74" class="card-meta">Bounded HDR Latency Bins</text>
+    </g>
+
+    <!-- Worker 2 -->
+    <g transform="translate(0, 100)" filter="url(#dropShadow)">
+      <rect width="180" height="85" rx="10" fill="url(#cardGradDark)" stroke="url(#greenBorder)" stroke-width="1.5" />
+      <text x="16" y="24" class="card-title">🚀 Worker #2 (Child)</text>
+      <text x="16" y="44" class="card-meta">VUs: Concurrency / N</text>
+      <text x="16" y="60" class="card-code">Event Loop Dedicated</text>
+      <text x="16" y="74" class="card-meta">Bounded HDR Latency Bins</text>
+    </g>
+
+    <!-- Worker 3 -->
+    <g transform="translate(0, 200)" filter="url(#dropShadow)">
+      <rect width="180" height="85" rx="10" fill="url(#cardGradDark)" stroke="url(#greenBorder)" stroke-width="1.5" />
+      <text x="16" y="24" class="card-title">🚀 Worker #3 (Child)</text>
+      <text x="16" y="44" class="card-meta">VUs: Concurrency / N</text>
+      <text x="16" y="60" class="card-code">Event Loop Dedicated</text>
+      <text x="16" y="74" class="card-meta">Bounded HDR Latency Bins</text>
+    </g>
+
+    <!-- Worker 4 -->
+    <g transform="translate(0, 300)" filter="url(#dropShadow)">
+      <rect width="180" height="85" rx="10" fill="url(#cardGradDark)" stroke="url(#greenBorder)" stroke-width="1.5" />
+      <text x="16" y="24" class="card-title">🚀 Worker #4 (Child)</text>
+      <text x="16" y="44" class="card-meta">VUs: Concurrency / N</text>
+      <text x="16" y="60" class="card-code">Event Loop Dedicated</text>
+      <text x="16" y="74" class="card-meta">Bounded HDR Latency Bins</text>
+    </g>
+  </g>
+
+  <!-- SECTION 4: TARGET UNDER TEST -->
+  <g transform="translate(800, 200)" filter="url(#dropShadow)">
+    <rect width="165" height="160" rx="12" fill="url(#cardGradDark)" stroke="url(#amberBorder)" stroke-width="2" />
+    <rect x="0" y="0" width="165" height="34" rx="12" fill="#78350f" fill-opacity="0.4" />
+    <text x="16" y="23" class="card-title" fill="#fcd34d">🎯 Target System</text>
+    <text x="16" y="58" class="card-meta">Production / Staging API</text>
+    <text x="16" y="78" class="card-code">HTTP/1.1 • HTTP/2</text>
+    <text x="16" y="98" class="card-meta">Keep-Alive Pooling</text>
+    <rect x="16" y="112" width="133" height="32" rx="6" fill="#1e293b" stroke="#f59e0b" stroke-width="0.8" />
+    <text x="24" y="132" class="badge-text" fill="#fde68a">Up to 5,800+ RPS</text>
+  </g>
+
+  <!-- CONNECTORS & ARROWS -->
+  <!-- API Gateway to Coordinator -->
+  <path d="M 220 300 L 270 300" stroke="#38bdf8" stroke-width="2" fill="none" marker-end="url(#arrowCyan)" />
+
+  <!-- Coordinator to Storage -->
+  <path d="M 270 450 L 220 450" stroke="#c084fc" stroke-width="2" fill="none" marker-end="url(#arrowPurple)" />
+
+  <!-- Coordinator to Workers (Forks) -->
+  <path d="M 520 180 L 545 180 L 545 45 L 570 45" stroke="#34d399" stroke-width="2" fill="none" marker-end="url(#arrowGreen)" />
+  <path d="M 520 220 L 555 220 L 555 145 L 570 145" stroke="#34d399" stroke-width="2" fill="none" marker-end="url(#arrowGreen)" />
+  <path d="M 520 280 L 555 280 L 555 245 L 570 245" stroke="#34d399" stroke-width="2" fill="none" marker-end="url(#arrowGreen)" />
+  <path d="M 520 320 L 545 320 L 545 345 L 570 345" stroke="#34d399" stroke-width="2" fill="none" marker-end="url(#arrowGreen)" />
+
+  <!-- Workers to Target -->
+  <path d="M 750 45 L 775 45 L 775 240 L 800 240" stroke="#f59e0b" stroke-width="1.5" stroke-dasharray="4,4" fill="none" />
+  <path d="M 750 145 L 775 145 L 775 260 L 800 260" stroke="#f59e0b" stroke-width="1.5" stroke-dasharray="4,4" fill="none" />
+  <path d="M 750 245 L 800 280" stroke="#f59e0b" stroke-width="1.5" stroke-dasharray="4,4" fill="none" />
+  <path d="M 750 345 L 775 345 L 775 300 L 800 300" stroke="#f59e0b" stroke-width="1.5" stroke-dasharray="4,4" fill="none" />
+
+  <!-- Live SSE Telemetry return to Client Layer -->
+  <path d="M 270 135 L 245 135 L 245 150 L 220 150" stroke="#38bdf8" stroke-width="2" fill="none" marker-end="url(#arrowCyan)" />
+</svg>
