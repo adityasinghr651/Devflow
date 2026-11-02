@@ -15,6 +15,7 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({ status, className = ''
     case 'running': label = 'Running'; break;
     case 'queued': label = 'Queued'; break;
     case 'validating': label = 'Validating'; break;
+    case 'cancelling': label = 'Cancelling...'; break;
     case 'cancelled': label = 'Cancelled'; break;
     case 'timed_out': label = 'Timed Out'; break;
     case 'failed': label = 'Failed'; break;

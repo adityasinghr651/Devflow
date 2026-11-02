@@ -58,6 +58,7 @@ export class RunnerManager {
 
     const active = this.activeRuns.get(id);
     if (active) {
+      await this._transitionState(id, 'cancelling');
       if (typeof active.cancel === 'function') {
         active.cancel();
       }
@@ -81,6 +82,11 @@ export class RunnerManager {
 
     if (TERMINAL_STATES.has(current.status)) {
       console.warn(`[RunnerManager] Disallowed transition: cannot transition from terminal state '${current.status}' to '${newStatus}' for run ${id}.`);
+      return current;
+    }
+
+    if (current.status === 'cancelling' && !['cancelled', 'failed', 'timed_out'].includes(newStatus)) {
+      console.warn(`[RunnerManager] Disallowed transition: cannot transition from 'cancelling' to '${newStatus}' for run ${id}.`);
       return current;
     }
 
@@ -120,9 +126,10 @@ export class RunnerManager {
       startedAt: new Date().toISOString(),
     });
 
-    const hasK6 = await isK6Available(config.k6Bin);
+    const enginePref = (process.env.RUNNER_ENGINE || config.runnerEngine || 'auto').toLowerCase();
+    const canUseK6 = enginePref !== 'node' && (enginePref === 'k6' || (await isK6Available(config.k6Bin)));
 
-    if (hasK6 && run.profile !== 'stages' && (!run.workerCount || run.workerCount === 1)) {
+    if (canUseK6 && run.profile !== 'stages' && (!run.workerCount || run.workerCount === 1)) {
       return this._executeWithK6(run);
     } else {
       return this._executeWithCoordinator(run);
@@ -157,11 +164,13 @@ export class RunnerManager {
 
       await this._transitionState(run.id, summary.status || 'completed', {
         ...summary,
+        engine: 'k6',
         finishedAt: new Date().toISOString(),
       });
     } catch (err) {
       await this._transitionState(run.id, 'failed', {
         error: String(err.message || err).slice(0, 300),
+        engine: 'k6',
         finishedAt: new Date().toISOString(),
       });
     } finally {
@@ -174,7 +183,7 @@ export class RunnerManager {
       storage: this.storage,
       events: this.events,
       workerPath,
-      transitionState: (id, status, updates) => this._transitionState(id, status, updates),
+      transitionState: (id, status, updates) => this._transitionState(id, status, { engine: 'node', ...updates }),
     });
 
     this.activeRuns.set(run.id, {

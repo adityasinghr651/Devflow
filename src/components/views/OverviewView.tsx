@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { Target, Run } from '../../types/index.ts';
 import { StatusBadge } from '../ui/StatusBadge.tsx';
+import { formatErrorRate, formatErrorBreakdown } from '../../utils/metrics.ts';
 
 interface OverviewViewProps {
   targets: Target[];
@@ -51,19 +52,22 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
   const avgResponseTime =
     completed.length > 0
       ? (completed.reduce((sum, r) => sum + (r.p95 || 0), 0) / completed.length).toFixed(1)
-      : '18.4';
+      : null;
 
-  const currentRps = latest ? latest.rps.toFixed(1) : '2,840';
-  const errorRate = latest
-    ? (latest.errorRate !== undefined ? (latest.errorRate * 100).toFixed(2) : '0.00')
-    : '0.00';
+  const currentRps = latest ? latest.rps.toFixed(1) : null;
+  const errorRateStr = latest
+    ? formatErrorRate(latest.errorRate, latest.failedCount, latest.totalRequests)
+    : '0.00%';
+  const errorBreakdownStr = latest
+    ? formatErrorBreakdown(latest.failedCount, latest.totalRequests, latest.errorRate)
+    : null;
 
   // Sparkline data points for performance graph
   const chartRuns = completed.length >= 3 ? completed.slice(0, 12).reverse() : [];
   const chartPoints: number[] =
     chartRuns.length >= 3
       ? chartRuns.map((r) => Math.min(80, Math.max(8, r.p95 || 20)))
-      : [14, 18, 16, 22, 19, 24, 21, 28, 25, 22, 29, 26, 31];
+      : [];
 
   return (
     <div className="overview-container page-animate">
@@ -144,10 +148,16 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
             <Clock size={15} style={{ color: 'var(--color-blue)' }} />
           </div>
           <div className="metric-value">
-            {avgResponseTime} <small style={{ fontSize: '14px', fontWeight: 500, color: 'var(--text-muted)' }}>ms</small>
+            {avgResponseTime ? (
+              <>
+                {avgResponseTime} <small style={{ fontSize: '14px', fontWeight: 500, color: 'var(--text-muted)' }}>ms</small>
+              </>
+            ) : (
+              <span style={{ fontSize: '16px', color: 'var(--text-muted)' }}>No data yet</span>
+            )}
           </div>
           <div className="metric-sub">
-            <span>p95 average over all runs</span>
+            <span>{avgResponseTime ? 'p95 average over all runs' : 'Awaiting completed test runs'}</span>
           </div>
         </div>
 
@@ -163,10 +173,16 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
             <Gauge size={15} style={{ color: 'var(--color-blue)' }} />
           </div>
           <div className="metric-value">
-            {currentRps} <small style={{ fontSize: '14px', fontWeight: 500, color: 'var(--text-muted)' }}>req/s</small>
+            {currentRps ? (
+              <>
+                {currentRps} <small style={{ fontSize: '14px', fontWeight: 500, color: 'var(--text-muted)' }}>req/s</small>
+              </>
+            ) : (
+              <span style={{ fontSize: '16px', color: 'var(--text-muted)' }}>No data yet</span>
+            )}
           </div>
           <div className="metric-sub">
-            <span>{latest ? `Target: ${latest.targetName}` : 'Peak engine throughput'}</span>
+            <span>{latest ? `Target: ${latest.targetName}` : 'Awaiting test execution'}</span>
           </div>
         </div>
 
@@ -181,11 +197,11 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
             <span>Error Rate</span>
             <CheckCircle2 size={15} style={{ color: 'var(--color-lime)' }} />
           </div>
-          <div className="metric-value" style={{ color: errorRate === '0.00' ? 'var(--color-lime)' : 'var(--color-red)' }}>
-            {errorRate}%
+          <div className="metric-value" style={{ color: (latest?.failedCount || 0) === 0 ? 'var(--color-lime)' : 'var(--color-red)' }}>
+            {latest ? errorRateStr : <span style={{ fontSize: '16px', color: 'var(--text-muted)' }}>No data yet</span>}
           </div>
           <div className="metric-sub">
-            <span>Target response reliability</span>
+            <span>{errorBreakdownStr || 'Target response reliability'}</span>
           </div>
         </div>
       </div>
@@ -227,112 +243,132 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
 
         {/* Interactive SVG Response Time Chart */}
         <div style={{ width: '100%', height: '140px', marginTop: '16px', position: 'relative' }}>
-          <svg
-            viewBox="0 0 800 130"
-            fill="none"
-            xmlns="http://www.w3.org/2000/svg"
-            preserveAspectRatio="none"
-            style={{ width: '100%', height: '100%' }}
-          >
-            <defs>
-              <linearGradient id="overviewAreaGrad" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#3B82F6" stopOpacity="0.2" />
-                <stop offset="100%" stopColor="#3B82F6" stopOpacity="0.0" />
-              </linearGradient>
-            </defs>
+          {chartPoints.length >= 3 ? (
+            <>
+              <svg
+                viewBox="0 0 800 130"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+                preserveAspectRatio="none"
+                style={{ width: '100%', height: '100%' }}
+              >
+                <defs>
+                  <linearGradient id="overviewAreaGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#3B82F6" stopOpacity="0.2" />
+                    <stop offset="100%" stopColor="#3B82F6" stopOpacity="0.0" />
+                  </linearGradient>
+                </defs>
 
-            {/* Grid guide lines */}
-            <line x1="0" y1="30" x2="800" y2="30" stroke="var(--border-subtle)" strokeDasharray="3 3" />
-            <line x1="0" y1="70" x2="800" y2="70" stroke="var(--border-subtle)" strokeDasharray="3 3" />
-            <line x1="0" y1="110" x2="800" y2="110" stroke="var(--border-subtle)" strokeDasharray="3 3" />
+                {/* Grid guide lines */}
+                <line x1="0" y1="30" x2="800" y2="30" stroke="var(--border-subtle)" strokeDasharray="3 3" />
+                <line x1="0" y1="70" x2="800" y2="70" stroke="var(--border-subtle)" strokeDasharray="3 3" />
+                <line x1="0" y1="110" x2="800" y2="110" stroke="var(--border-subtle)" strokeDasharray="3 3" />
 
-            {/* Area */}
-            <polygon
-              points={`0,130 ${chartPoints
-                .map((val, idx) => `${(idx / (chartPoints.length - 1)) * 800},${115 - val * 2.2}`)
-                .join(' ')} 800,130`}
-              fill="url(#overviewAreaGrad)"
-            />
+                {/* Area */}
+                <polygon
+                  points={`0,130 ${chartPoints
+                    .map((val, idx) => `${(idx / (chartPoints.length - 1)) * 800},${115 - val * 2.2}`)
+                    .join(' ')} 800,130`}
+                  fill="url(#overviewAreaGrad)"
+                />
 
-            {/* Polyline */}
-            <polyline
-              points={chartPoints
-                .map((val, idx) => `${(idx / (chartPoints.length - 1)) * 800},${115 - val * 2.2}`)
-                .join(' ')}
-              fill="none"
-              stroke="var(--color-blue)"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
+                {/* Polyline */}
+                <polyline
+                  points={chartPoints
+                    .map((val, idx) => `${(idx / (chartPoints.length - 1)) * 800},${115 - val * 2.2}`)
+                    .join(' ')}
+                  fill="none"
+                  stroke="var(--color-blue)"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
 
-            {/* Interactive Data point dots */}
-            {chartPoints.map((val, idx) => {
-              const cx = (idx / (chartPoints.length - 1)) * 800;
-              const cy = 115 - val * 2.2;
-              const isHovered = hoveredIdx === idx;
-              const runAtPoint = chartRuns[idx];
+                {/* Interactive Data point dots */}
+                {chartPoints.map((val, idx) => {
+                  const cx = (idx / (chartPoints.length - 1)) * 800;
+                  const cy = 115 - val * 2.2;
+                  const isHovered = hoveredIdx === idx;
+                  const runAtPoint = chartRuns[idx];
 
-              return (
-                <g key={idx}>
-                  <circle
-                    cx={cx}
-                    cy={cy}
-                    r={isHovered ? 6 : idx === chartPoints.length - 1 ? 4 : 3}
-                    fill={isHovered ? '#60A5FA' : idx === chartPoints.length - 1 ? 'var(--color-blue)' : 'var(--bg-card)'}
-                    stroke="var(--color-blue)"
-                    strokeWidth={isHovered ? 2.5 : 1.5}
-                    style={{ cursor: 'pointer', transition: 'r 0.15s ease' }}
-                    onMouseEnter={() => setHoveredIdx(idx)}
-                    onMouseLeave={() => setHoveredIdx(null)}
-                    onClick={() => {
-                      if (runAtPoint) onSelectRun(runAtPoint);
-                    }}
-                  />
-                  {/* Invisible hit area for easier mouse targeting */}
-                  <circle
-                    cx={cx}
-                    cy={cy}
-                    r={14}
-                    fill="transparent"
-                    style={{ cursor: 'pointer' }}
-                    onMouseEnter={() => setHoveredIdx(idx)}
-                    onMouseLeave={() => setHoveredIdx(null)}
-                    onClick={() => {
-                      if (runAtPoint) onSelectRun(runAtPoint);
-                    }}
-                  />
-                </g>
-              );
-            })}
-          </svg>
+                  return (
+                    <g key={idx}>
+                      <circle
+                        cx={cx}
+                        cy={cy}
+                        r={isHovered ? 6 : idx === chartPoints.length - 1 ? 4 : 3}
+                        fill={isHovered ? '#60A5FA' : idx === chartPoints.length - 1 ? 'var(--color-blue)' : 'var(--bg-card)'}
+                        stroke="var(--color-blue)"
+                        strokeWidth={isHovered ? 2.5 : 1.5}
+                        style={{ cursor: 'pointer', transition: 'r 0.15s ease' }}
+                        onMouseEnter={() => setHoveredIdx(idx)}
+                        onMouseLeave={() => setHoveredIdx(null)}
+                        onClick={() => {
+                          if (runAtPoint) onSelectRun(runAtPoint);
+                        }}
+                      />
+                      {/* Invisible hit area for easier mouse targeting */}
+                      <circle
+                        cx={cx}
+                        cy={cy}
+                        r={14}
+                        fill="transparent"
+                        style={{ cursor: 'pointer' }}
+                        onMouseEnter={() => setHoveredIdx(idx)}
+                        onMouseLeave={() => setHoveredIdx(null)}
+                        onClick={() => {
+                          if (runAtPoint) onSelectRun(runAtPoint);
+                        }}
+                      />
+                    </g>
+                  );
+                })}
+              </svg>
 
-          {/* Interactive Tooltip when hovering over a chart point */}
-          {hoveredIdx !== null && (
+              {/* Interactive Tooltip when hovering over a chart point */}
+              {hoveredIdx !== null && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: `${Math.max(0, 115 - chartPoints[hoveredIdx] * 2.2 - 40)}px`,
+                    left: `${Math.min(720, Math.max(10, (hoveredIdx / (chartPoints.length - 1)) * 100))}%`,
+                    transform: 'translateX(-50%)',
+                    background: 'var(--bg-card)',
+                    border: '1px solid var(--border-default)',
+                    borderRadius: '6px',
+                    padding: '4px 8px',
+                    boxShadow: 'var(--shadow-card)',
+                    pointerEvents: 'none',
+                    zIndex: 10,
+                    fontSize: '11px',
+                    fontFamily: 'var(--font-mono)',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  <span style={{ color: 'var(--color-blue)', fontWeight: 600 }}>{chartPoints[hoveredIdx]} ms</span>
+                  {chartRuns[hoveredIdx] && (
+                    <span style={{ color: 'var(--text-muted)', marginLeft: '6px' }}>
+                      ({chartRuns[hoveredIdx].targetName})
+                    </span>
+                  )}
+                </div>
+              )}
+            </>
+          ) : (
             <div
               style={{
-                position: 'absolute',
-                top: `${Math.max(0, 115 - chartPoints[hoveredIdx] * 2.2 - 40)}px`,
-                left: `${Math.min(720, Math.max(10, (hoveredIdx / (chartPoints.length - 1)) * 100))}%`,
-                transform: 'translateX(-50%)',
-                background: 'var(--bg-card)',
-                border: '1px solid var(--border-default)',
-                borderRadius: '6px',
-                padding: '4px 8px',
-                boxShadow: 'var(--shadow-card)',
-                pointerEvents: 'none',
-                zIndex: 10,
-                fontSize: '11px',
-                fontFamily: 'var(--font-mono)',
-                whiteSpace: 'nowrap',
+                width: '100%',
+                height: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: 'var(--text-muted)',
+                fontSize: '13px',
+                border: '1px dashed var(--border-subtle)',
+                borderRadius: '8px',
               }}
             >
-              <span style={{ color: 'var(--color-blue)', fontWeight: 600 }}>{chartPoints[hoveredIdx]} ms</span>
-              {chartRuns[hoveredIdx] && (
-                <span style={{ color: 'var(--text-muted)', marginLeft: '6px' }}>
-                  ({chartRuns[hoveredIdx].targetName})
-                </span>
-              )}
+              No data yet. Complete at least 3 load test runs to visualize latency trends.
             </div>
           )}
         </div>

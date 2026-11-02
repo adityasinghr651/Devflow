@@ -80,6 +80,10 @@ async function runWorker({
   let totalRequests = 0;
   let successCount = 0;
   let failedCount = 0;
+  let httpErrorCount = 0;
+  let timeoutCount = 0;
+  let networkErrorCount = 0;
+  let cancelledCount = 0;
 
   let lastProgressReport = Date.now();
   let currentActiveConcurrency = hasStages ? (stages[0]?.target || 0) : concurrency;
@@ -103,7 +107,7 @@ async function runWorker({
 
     const elapsedSec = Math.max((now - startTime) / 1000, 0.001);
     const rps = Number((totalRequests / elapsedSec).toFixed(2));
-    const errorRate = totalRequests ? Number(((failedCount / totalRequests) * 100).toFixed(2)) : 0;
+    const errorRate = totalRequests ? Number(((failedCount / totalRequests) * 100).toFixed(4)) : 0;
 
     if (process.send) {
       process.send({
@@ -113,6 +117,10 @@ async function runWorker({
           totalRequests,
           successCount,
           failedCount,
+          httpErrorCount,
+          timeoutCount,
+          networkErrorCount,
+          cancelledCount,
           rps,
           errorRate,
           statusCodes: { ...statusCodes },
@@ -143,6 +151,7 @@ async function runWorker({
 
       const reqStart = performance.now();
       let code = 'network_error';
+      let isAbortedReq = false;
 
       try {
         const timeoutSignal = AbortSignal.timeout(timeoutMs);
@@ -166,21 +175,38 @@ async function runWorker({
         if (response.ok) {
           successCount++;
         } else {
+          httpErrorCount++;
           failedCount++;
         }
       } catch (err) {
-        failedCount++;
-        if (err.name === 'TimeoutError') {
-          code = 'timeout';
-        } else if (err.name === 'AbortError' && isCancelled) {
+        if (err.name === 'AbortError' && isCancelled) {
           code = 'cancelled';
+          cancelledCount++;
+          isAbortedReq = true;
+        } else if (err.name === 'TimeoutError') {
+          code = 'timeout';
+          timeoutCount++;
+          failedCount++;
+        } else if (err.name === 'TypeError' && (err.cause?.message?.includes('redirect') || err.message?.includes('redirect'))) {
+          code = 'redirect_blocked';
+          networkErrorCount++;
+          failedCount++;
+        } else {
+          code = 'network_error';
+          networkErrorCount++;
+          failedCount++;
         }
       }
 
-      const elapsed = Math.max(0, performance.now() - reqStart);
-      latencyHistogram.record(elapsed);
       statusCodes[code] = (statusCodes[code] || 0) + 1;
-      totalRequests++;
+
+      // Cancelled in-flight requests must NOT be recorded in latency histogram
+      // and must NOT be in totalRequests (denominator for error rate).
+      if (!isAbortedReq) {
+        const elapsed = Math.max(0, performance.now() - reqStart);
+        latencyHistogram.record(elapsed);
+        totalRequests++;
+      }
 
       if (totalRequests % 5 === 0) {
         sendProgress();
@@ -207,12 +233,16 @@ async function runWorker({
     totalRequests,
     successCount,
     failedCount,
+    httpErrorCount,
+    timeoutCount,
+    networkErrorCount,
+    cancelledCount,
     statusCodes,
     rps: Number((totalRequests / totalElapsedSec).toFixed(2)),
     p50: latencyHistogram.getPercentile(0.50),
     p95: latencyHistogram.getPercentile(0.95),
     p99: latencyHistogram.getPercentile(0.99),
-    errorRate: totalRequests ? Number(((failedCount / totalRequests) * 100).toFixed(2)) : 0,
+    errorRate: totalRequests ? Number(((failedCount / totalRequests) * 100).toFixed(4)) : 0,
     status: isCancelled ? 'cancelled' : 'completed',
     finishedAt: new Date().toISOString(),
     currentConcurrency: 0,
@@ -221,14 +251,18 @@ async function runWorker({
   };
 
   if (process.send) {
+    const exitTimeout = setTimeout(() => process.exit(0), 1000);
     process.send({
       type: 'complete',
       workerIndex,
       data: finalSummary,
+    }, () => {
+      clearTimeout(exitTimeout);
+      process.exit(0);
     });
+  } else {
+    process.exit(0);
   }
-
-  process.exit(0);
 }
 
 process.on('message', message => {

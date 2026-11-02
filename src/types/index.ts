@@ -32,6 +32,8 @@ export type Run = {
   method: string;
   concurrency: number;
   durationSec: number;
+  workerCount?: number;
+  engine?: string;
   profile?: string;
   stages?: Stage[];
   headers?: Record<string, string>;
@@ -43,6 +45,13 @@ export type Run = {
   totalRequests: number;
   successCount: number;
   failedCount: number;
+  httpErrorCount?: number;
+  timeoutCount?: number;
+  networkErrorCount?: number;
+  cancelledCount?: number;
+  partialWorkers?: number[];
+  histogramComplete?: boolean;
+  isDemo?: boolean;
   rps: number;
   p50: number;
   p95: number;
@@ -61,6 +70,12 @@ export type LiveMetrics = {
   progressPercent?: number;
   rps?: number;
   totalRequests?: number;
+  successCount?: number;
+  failedCount?: number;
+  httpErrorCount?: number;
+  timeoutCount?: number;
+  networkErrorCount?: number;
+  cancelledCount?: number;
   errorRate?: number;
   statusCodes?: Record<string, number>;
 };

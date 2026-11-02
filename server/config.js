@@ -25,6 +25,7 @@ export const config = {
   maxActiveRuns: Number(process.env.MAX_ACTIVE_RUNS || 1),
   maxConcurrency: 20,
   maxDurationSec: 30,
+  runnerEngine: (process.env.RUNNER_ENGINE || 'auto').toLowerCase(),
   k6Bin: process.env.K6_BIN || 'k6',
   requestTimeoutMs: Number(process.env.REQUEST_TIMEOUT_MS || 5000),
   databaseUrl: process.env.DATABASE_URL || '',

@@ -1,0 +1,318 @@
+{
+  "meta": {
+    "timestamp": "2026-11-02T14:54:48.196Z",
+    "commit": "65b7bf7f012fe04b4a956bde0c86060070f0fca8",
+    "branch": "fix/phase-7-metrics-correctness",
+    "os": "Windows_NT 10.0.26300 (x64)",
+    "cpu": "AMD Ryzen 5 5600H with Radeon Graphics          (12 cores)",
+    "memory": "7.3 GB",
+    "node": "v22.14.0",
+    "engine": "node",
+    "targetUrl": "http://127.0.0.1:5050/health",
+    "method": "GET",
+    "vus": 8,
+    "durationSec": 5,
+    "rounds": 3
+  },
+  "summary": {
+    "1": {
+      "workerCount": 1,
+      "runsCount": 3,
+      "rps": {
+        "median": 2855.06,
+        "min": 2605.08,
+        "max": 2856.02,
+        "spread": 250.94
+      },
+      "p50": {
+        "median": 1.96,
+        "min": 1.95,
+        "max": 2.05,
+        "spread": 0.1
+      },
+      "p95": {
+        "median": 3.54,
+        "min": 3.18,
+        "max": 4.09,
+        "spread": 0.91
+      },
+      "p99": {
+        "median": 6.46,
+        "min": 6.08,
+        "max": 6.79,
+        "spread": 0.71
+      },
+      "totalRequests": {
+        "median": 14480,
+        "min": 13226,
+        "max": 14498,
+        "spread": 1272
+      },
+      "errorRate": {
+        "median": 0,
+        "min": 0,
+        "max": 0,
+        "spread": 0
+      }
+    },
+    "2": {
+      "workerCount": 2,
+      "runsCount": 3,
+      "rps": {
+        "median": 4568.52,
+        "min": 4482.79,
+        "max": 5633.57,
+        "spread": 1150.78
+      },
+      "p50": {
+        "median": 1.07,
+        "min": 0.86,
+        "max": 1.11,
+        "spread": 0.25
+      },
+      "p95": {
+        "median": 1.94,
+        "min": 1.67,
+        "max": 1.97,
+        "spread": 0.3
+      },
+      "p99": {
+        "median": 5.35,
+        "min": 4.71,
+        "max": 5.46,
+        "spread": 0.75
+      },
+      "totalRequests": {
+        "median": 23336,
+        "min": 22795,
+        "max": 28596,
+        "spread": 5801
+      },
+      "errorRate": {
+        "median": 0,
+        "min": 0,
+        "max": 0,
+        "spread": 0
+      }
+    },
+    "4": {
+      "workerCount": 4,
+      "runsCount": 3,
+      "rps": {
+        "median": 7788.63,
+        "min": 7661.12,
+        "max": 7894.91,
+        "spread": 233.79
+      },
+      "p50": {
+        "median": 0.69,
+        "min": 0.64,
+        "max": 0.71,
+        "spread": 0.07
+      },
+      "p95": {
+        "median": 1.37,
+        "min": 1.12,
+        "max": 1.46,
+        "spread": 0.34
+      },
+      "p99": {
+        "median": 3.83,
+        "min": 3.25,
+        "max": 4.42,
+        "spread": 1.17
+      },
+      "totalRequests": {
+        "median": 40343,
+        "min": 39722,
+        "max": 44197,
+        "spread": 4475
+      },
+      "errorRate": {
+        "median": 0,
+        "min": 0,
+        "max": 0,
+        "spread": 0
+      }
+    }
+  },
+  "ratios": {
+    "w1": {
+      "rpsRatio": 1,
+      "p50ChangePercent": 0
+    },
+    "w2": {
+      "rpsRatio": 1.6,
+      "p50ChangePercent": -45.4
+    },
+    "w4": {
+      "rpsRatio": 2.73,
+      "p50ChangePercent": -64.8
+    },
+    "scalingVerdict": "Moderate Sublinear Scaling (CPU Saturated)"
+  },
+  "perRunResults": [
+    {
+      "round": 1,
+      "workerCount": 1,
+      "totalRequests": 13226,
+      "successCount": 13226,
+      "failedCount": 0,
+      "httpErrorCount": 0,
+      "timeoutCount": 0,
+      "networkErrorCount": 0,
+      "cancelledCount": 0,
+      "errorRate": 0,
+      "rps": 2605.08,
+      "p50": 2.05,
+      "p95": 4.09,
+      "p99": 6.79,
+      "status": "completed",
+      "engine": "node"
+    },
+    {
+      "round": 1,
+      "workerCount": 2,
+      "totalRequests": 22795,
+      "successCount": 22795,
+      "failedCount": 0,
+      "httpErrorCount": 0,
+      "timeoutCount": 0,
+      "networkErrorCount": 0,
+      "cancelledCount": 0,
+      "errorRate": 0,
+      "rps": 4482.79,
+      "p50": 1.11,
+      "p95": 1.94,
+      "p99": 5.35,
+      "status": "completed",
+      "engine": "node"
+    },
+    {
+      "round": 1,
+      "workerCount": 4,
+      "totalRequests": 40343,
+      "successCount": 40343,
+      "failedCount": 0,
+      "httpErrorCount": 0,
+      "timeoutCount": 0,
+      "networkErrorCount": 0,
+      "cancelledCount": 0,
+      "errorRate": 0,
+      "rps": 7894.91,
+      "p50": 0.69,
+      "p95": 1.37,
+      "p99": 3.83,
+      "status": "completed",
+      "engine": "node"
+    },
+    {
+      "round": 2,
+      "workerCount": 2,
+      "totalRequests": 23336,
+      "successCount": 23336,
+      "failedCount": 0,
+      "httpErrorCount": 0,
+      "timeoutCount": 0,
+      "networkErrorCount": 0,
+      "cancelledCount": 0,
+      "errorRate": 0,
+      "rps": 4568.52,
+      "p50": 1.07,
+      "p95": 1.97,
+      "p99": 5.46,
+      "status": "completed",
+      "engine": "node"
+    },
+    {
+      "round": 2,
+      "workerCount": 4,
+      "totalRequests": 39722,
+      "successCount": 39722,
+      "failedCount": 0,
+      "httpErrorCount": 0,
+      "timeoutCount": 0,
+      "networkErrorCount": 0,
+      "cancelledCount": 0,
+      "errorRate": 0,
+      "rps": 7788.63,
+      "p50": 0.71,
+      "p95": 1.46,
+      "p99": 4.42,
+      "status": "completed",
+      "engine": "node"
+    },
+    {
+      "round": 2,
+      "workerCount": 1,
+      "totalRequests": 14498,
+      "successCount": 14498,
+      "failedCount": 0,
+      "httpErrorCount": 0,
+      "timeoutCount": 0,
+      "networkErrorCount": 0,
+      "cancelledCount": 0,
+      "errorRate": 0,
+      "rps": 2855.06,
+      "p50": 1.96,
+      "p95": 3.54,
+      "p99": 6.46,
+      "status": "completed",
+      "engine": "node"
+    },
+    {
+      "round": 3,
+      "workerCount": 4,
+      "totalRequests": 44197,
+      "successCount": 44197,
+      "failedCount": 0,
+      "httpErrorCount": 0,
+      "timeoutCount": 0,
+      "networkErrorCount": 0,
+      "cancelledCount": 0,
+      "errorRate": 0,
+      "rps": 7661.12,
+      "p50": 0.64,
+      "p95": 1.12,
+      "p99": 3.25,
+      "status": "completed",
+      "engine": "node"
+    },
+    {
+      "round": 3,
+      "workerCount": 1,
+      "totalRequests": 14480,
+      "successCount": 14480,
+      "failedCount": 0,
+      "httpErrorCount": 0,
+      "timeoutCount": 0,
+      "networkErrorCount": 0,
+      "cancelledCount": 0,
+      "errorRate": 0,
+      "rps": 2856.02,
+      "p50": 1.95,
+      "p95": 3.18,
+      "p99": 6.08,
+      "status": "completed",
+      "engine": "node"
+    },
+    {
+      "round": 3,
+      "workerCount": 2,
+      "totalRequests": 28596,
+      "successCount": 28596,
+      "failedCount": 0,
+      "httpErrorCount": 0,
+      "timeoutCount": 0,
+      "networkErrorCount": 0,
+      "cancelledCount": 0,
+      "errorRate": 0,
+      "rps": 5633.57,
+      "p50": 0.86,
+      "p95": 1.67,
+      "p99": 4.71,
+      "status": "completed",
+      "engine": "node"
+    }
+  ]
+}

@@ -5,6 +5,7 @@ import { Card, PanelTitle } from '../ui/Card.tsx';
 import { EmptyState } from '../ui/EmptyState.tsx';
 import { StatusBadge } from '../ui/StatusBadge.tsx';
 import { Button } from '../ui/Button.tsx';
+import { formatErrorRate } from '../../utils/metrics.ts';
 
 interface ReportsViewProps {
   completed: Run[];
@@ -51,7 +52,8 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ completed, exportRun, 
                 </span>
                 <span>
                   <small>Error Rate</small>
-                  <b>{r.errorRate.toFixed(2)}%</b>
+                  <b>{formatErrorRate(r.errorRate, r.failedCount, r.totalRequests)}</b>
+                  {(r.failedCount || 0) > 0 && <small style={{ color: 'var(--text-muted)' }}>({r.failedCount.toLocaleString()} failed)</small>}
                 </span>
               </div>
               <Button

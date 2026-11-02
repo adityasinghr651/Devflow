@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { Run } from '../../types/index.ts';
 import { StatusBadge } from '../ui/StatusBadge.tsx';
+import { formatErrorRate } from '../../utils/metrics.ts';
 
 interface TestRunsViewProps {
   runs: Run[];
@@ -230,9 +231,16 @@ export const TestRunsView: React.FC<TestRunsViewProps> = ({
                     </td>
 
                     <td>
-                      <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', fontWeight: 700, color: r.errorRate > 0 ? 'var(--color-red)' : 'var(--color-lime)' }}>
-                        {r.errorRate !== undefined ? `${(r.errorRate * 100).toFixed(2)}%` : '0.00%'}
-                      </span>
+                      <div>
+                        <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', fontWeight: 700, color: (r.failedCount || 0) > 0 ? 'var(--color-red)' : 'var(--color-lime)' }}>
+                          {formatErrorRate(r.errorRate, r.failedCount, r.totalRequests)}
+                        </span>
+                        {(r.failedCount || 0) > 0 && (
+                          <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
+                            {r.failedCount.toLocaleString()} failed
+                          </div>
+                        )}
+                      </div>
                     </td>
 
                     <td style={{ textAlign: 'right' }}>

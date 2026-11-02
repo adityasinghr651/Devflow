@@ -144,7 +144,7 @@ test('Progress Aggregation: Multi-worker cumulative progress snapshots', async (
   assert.equal(p2.currentConcurrency, 10);
   assert.deepEqual(p2.statusCodes, { '200': 88, '500': 2 });
   assert.ok(p2.rps > 0);
-  assert.equal(p2.errorRate, Number(((2 / 90) * 100).toFixed(2)));
+  assert.equal(p2.errorRate, Number(((2 / 90) * 100).toFixed(4)));
 
   // Cumulative snapshot from Worker 0 (total 100, NOT adding 50 + 100)
   const p3 = aggregator.updateWorker(0, {

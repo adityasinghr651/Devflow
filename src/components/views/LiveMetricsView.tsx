@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { Run, LiveMetrics, Target } from '../../types/index.ts';
 import { StatusBadge } from '../ui/StatusBadge.tsx';
+import { formatErrorRate, formatErrorBreakdown } from '../../utils/metrics.ts';
 
 interface LiveMetricsViewProps {
   runs: Run[];
@@ -243,13 +244,13 @@ export const LiveMetricsView: React.FC<LiveMetricsViewProps> = ({
         <div className="metric-box-clean">
           <div className="metric-label">
             <span>Error Rate</span>
-            <ShieldCheck size={15} style={{ color: 'var(--color-lime)' }} />
+            <ShieldCheck size={15} style={{ color: (activeRun.failedCount || 0) === 0 ? 'var(--color-lime)' : 'var(--color-red)' }} />
           </div>
-          <div className="metric-value" style={{ color: 'var(--color-lime)' }}>
-            0.00%
+          <div className="metric-value" style={{ color: (activeRun.failedCount || 0) === 0 ? 'var(--color-lime)' : 'var(--color-red)' }}>
+            {formatErrorRate(liveMetrics.errorRate ?? activeRun.errorRate, liveMetrics.failedCount ?? activeRun.failedCount, liveMetrics.totalRequests ?? activeRun.totalRequests)}
           </div>
           <div className="metric-sub">
-            <span>Target response reliability</span>
+            <span>{formatErrorBreakdown(liveMetrics.failedCount ?? activeRun.failedCount, liveMetrics.totalRequests ?? activeRun.totalRequests, liveMetrics.errorRate ?? activeRun.errorRate)}</span>
           </div>
         </div>
       </div>
@@ -407,8 +408,8 @@ export const LiveMetricsView: React.FC<LiveMetricsViewProps> = ({
                 </span>
                 <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Gateway &amp; Host Drops</span>
               </div>
-              <b style={{ fontFamily: 'var(--font-mono)', fontSize: '13px', color: 'var(--text-dim)' }}>
-                {activeRun.failedCount || 0} (0.00%)
+              <b style={{ fontFamily: 'var(--font-mono)', fontSize: '13px', color: (activeRun.failedCount || 0) > 0 ? 'var(--color-red)' : 'var(--text-dim)' }}>
+                {activeRun.failedCount || 0} ({formatErrorRate(activeRun.errorRate, activeRun.failedCount, activeRun.totalRequests)})
               </b>
             </div>
           </div>

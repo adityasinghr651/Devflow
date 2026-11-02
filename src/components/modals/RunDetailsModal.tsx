@@ -16,6 +16,7 @@ import { Run, LiveMetrics } from '../../types/index.ts';
 import { Modal } from '../ui/Modal.tsx';
 import { Button } from '../ui/Button.tsx';
 import { StatusBadge } from '../ui/StatusBadge.tsx';
+import { formatErrorRate, formatErrorBreakdown } from '../../utils/metrics.ts';
 
 interface RunDetailsModalProps {
   selectedRun: Run;
@@ -148,12 +149,12 @@ export const RunDetailsModal: React.FC<RunDetailsModalProps> = ({
           <div className="metric-box-clean">
             <div className="metric-label">
               <span>Error Rate</span>
-              <ShieldCheck size={14} style={{ color: 'var(--color-lime)' }} />
+              <ShieldCheck size={14} style={{ color: (selectedRun.failedCount || 0) === 0 ? 'var(--color-lime)' : 'var(--color-red)' }} />
             </div>
-            <div className="metric-value" style={{ color: 'var(--color-lime)' }}>
-              0.00%
+            <div className="metric-value" style={{ color: (selectedRun.failedCount || 0) === 0 ? 'var(--color-lime)' : 'var(--color-red)' }}>
+              {formatErrorRate(selectedRun.errorRate, selectedRun.failedCount, totalReqs)}
             </div>
-            <div className="metric-sub">0 failed requests</div>
+            <div className="metric-sub">{formatErrorBreakdown(selectedRun.failedCount, totalReqs, selectedRun.errorRate)}</div>
           </div>
         </div>
 
@@ -290,19 +291,65 @@ export const RunDetailsModal: React.FC<RunDetailsModalProps> = ({
           </div>
         )}
 
-        {/* Tab 3: HTTP Codes */}
+        {/* Tab 3: HTTP Codes & Error Breakdown */}
         {activeTab === 'codes' && (
           <div style={{ background: 'var(--bg-subtle)', border: '1px solid var(--border-default)', borderRadius: '8px', padding: '16px' }}>
             <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
-              Response Code Frequency
+              Response Code Frequency & Error Breakdown
             </span>
             <div style={{ display: 'flex', gap: '10px', marginTop: '10px', flexWrap: 'wrap' }}>
-              <div style={{ padding: '8px 14px', borderRadius: '6px', background: 'rgba(183, 245, 0, 0.1)', border: '1px solid rgba(183, 245, 0, 0.3)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span style={{ fontWeight: 700, color: 'var(--color-lime)', fontFamily: 'var(--font-mono)' }}>200 OK</span>
-                <span style={{ fontSize: '13px', color: 'var(--text-primary)', fontWeight: 600 }}>{fmt(totalReqs)}</span>
-                <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>(100.0%)</span>
-              </div>
+              {selectedRun.statusCodes && Object.keys(selectedRun.statusCodes).length > 0 ? (
+                Object.entries(selectedRun.statusCodes).map(([code, count]) => {
+                  const isOk = code === '200' || code.startsWith('2');
+                  const isCancel = code === 'cancelled';
+                  const isTimeout = code === 'timeout';
+                  const badgeColor = isOk
+                    ? 'var(--color-lime)'
+                    : isCancel
+                    ? 'var(--color-blue)'
+                    : isTimeout
+                    ? 'var(--color-amber)'
+                    : 'var(--color-red)';
+                  return (
+                    <div
+                      key={code}
+                      style={{
+                        padding: '8px 14px',
+                        borderRadius: '6px',
+                        background: 'var(--bg-card)',
+                        border: '1px solid var(--border-default)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                      }}
+                    >
+                      <span style={{ fontWeight: 700, color: badgeColor, fontFamily: 'var(--font-mono)' }}>
+                        {code.toUpperCase()}
+                      </span>
+                      <span style={{ fontSize: '13px', color: 'var(--text-primary)', fontWeight: 600 }}>
+                        {fmt(count)}
+                      </span>
+                      {totalReqs > 0 && (
+                        <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                          ({((count / totalReqs) * 100).toFixed(2)}%)
+                        </span>
+                      )}
+                    </div>
+                  );
+                })
+              ) : (
+                <div style={{ color: 'var(--text-muted)', fontSize: '12px' }}>No status codes recorded.</div>
+              )}
             </div>
+
+            {(selectedRun.httpErrorCount || selectedRun.timeoutCount || selectedRun.networkErrorCount || selectedRun.cancelledCount) ? (
+              <div style={{ marginTop: '14px', paddingTop: '10px', borderTop: '1px solid var(--border-subtle)', display: 'flex', gap: '16px', fontSize: '12px' }}>
+                <span>HTTP Errors: <b>{fmt(selectedRun.httpErrorCount || 0)}</b></span>
+                <span>Timeouts: <b>{fmt(selectedRun.timeoutCount || 0)}</b></span>
+                <span>Network Errors: <b>{fmt(selectedRun.networkErrorCount || 0)}</b></span>
+                <span>Cancelled: <b>{fmt(selectedRun.cancelledCount || 0)}</b></span>
+              </div>
+            ) : null}
           </div>
         )}
 

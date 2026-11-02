@@ -40,7 +40,7 @@ export const ComparisonsView: React.FC<ComparisonsViewProps> = ({ completed }) =
                 <span>{m.label}</span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', margin: '12px 0' }}>
                   <b style={{ fontSize: '13px', color: 'var(--text-primary)' }}>
-                    {m.a.toFixed(1)} {m.unit}
+                    {m.unit === '%' ? (m.a > 0 && m.a < 0.01 ? m.a.toFixed(4) : m.a.toFixed(2)) : m.a.toFixed(1)} {m.unit}
                   </b>
                   <ArrowDownRight
                     size={15}
@@ -50,7 +50,7 @@ export const ComparisonsView: React.FC<ComparisonsViewProps> = ({ completed }) =
                     }}
                   />
                   <b style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
-                    {m.b.toFixed(1)} {m.unit}
+                    {m.unit === '%' ? (m.b > 0 && m.b < 0.01 ? m.b.toFixed(4) : m.b.toFixed(2)) : m.b.toFixed(1)} {m.unit}
                   </b>
                 </div>
                 <small style={{ color: 'var(--text-dim)' }}>

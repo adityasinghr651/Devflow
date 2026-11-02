@@ -36,6 +36,10 @@ export class ProgressAggregator {
     let totalRequests = 0;
     let successCount = 0;
     let failedCount = 0;
+    let httpErrorCount = 0;
+    let timeoutCount = 0;
+    let networkErrorCount = 0;
+    let cancelledCount = 0;
     let currentConcurrency = 0;
     const statusCodes = {};
     let maxElapsedSec = 0;
@@ -48,6 +52,10 @@ export class ProgressAggregator {
       totalRequests += Number(snap.totalRequests) || 0;
       successCount += Number(snap.successCount) || 0;
       failedCount += Number(snap.failedCount) || 0;
+      httpErrorCount += Number(snap.httpErrorCount) || 0;
+      timeoutCount += Number(snap.timeoutCount) || 0;
+      networkErrorCount += Number(snap.networkErrorCount) || 0;
+      cancelledCount += Number(snap.cancelledCount) || 0;
       currentConcurrency += Number(snap.currentConcurrency) || 0;
 
       if (snap.statusCodes && typeof snap.statusCodes === 'object') {
@@ -74,7 +82,7 @@ export class ProgressAggregator {
     const wallElapsedSec = Math.max((Date.now() - this.startTime) / 1000, 0.001);
     const elapsedSec = maxElapsedSec > 0 ? maxElapsedSec : Number(wallElapsedSec.toFixed(1));
     const rps = Number((totalRequests / Math.max(elapsedSec, 0.001)).toFixed(2));
-    const errorRate = totalRequests ? Number(((failedCount / totalRequests) * 100).toFixed(2)) : 0;
+    const errorRate = totalRequests ? Number(((failedCount / totalRequests) * 100).toFixed(4)) : 0;
     const progressPercent = Math.min(
       100,
       Math.max(maxProgressPercent, Number(((elapsedSec / this.totalDurationSec) * 100).toFixed(1)))
@@ -84,6 +92,10 @@ export class ProgressAggregator {
       totalRequests,
       successCount,
       failedCount,
+      httpErrorCount,
+      timeoutCount,
+      networkErrorCount,
+      cancelledCount,
       rps,
       errorRate,
       statusCodes,

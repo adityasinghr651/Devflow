@@ -281,24 +281,28 @@ test('Failure Injection & Reliability: Complete fault matrix verification', asyn
       statusCodes: {},
     };
 
-    await storage.createRun(runRecord);
-    await runner.enqueueRun(runRecord);
+    try {
+      await storage.createRun(runRecord);
+      await runner.enqueueRun(runRecord);
 
-    // Wait for child process to spawn
-    await new Promise(r => setTimeout(r, 300));
-    const active = runner.activeRuns.get(runId);
-    assert.ok(active?.child?.pid, 'Child worker process must be active');
+      // Wait for child process to spawn
+      await new Promise(r => setTimeout(r, 400));
+      const active = runner.activeRuns.get(runId);
+      assert.ok(active, 'Active run must exist in runner');
+      const childWorker = active.coordinator ? active.coordinator.workers[0]?.child : active.child;
+      assert.ok(childWorker?.pid, 'Child worker process must be active');
 
-    // Terminate worker abruptly with SIGTERM
-    active.child.kill('SIGTERM');
+      // Terminate worker abruptly with SIGTERM
+      childWorker.kill('SIGTERM');
 
-    const terminatedRun = await waitForTerminalRun(storage, runId, 4000);
-    assert.ok(['cancelled', 'failed'].includes(terminatedRun.status));
-    assert.ok(terminatedRun.finishedAt);
-    assert.equal(runner.activeRuns.has(runId), false, 'Worker must be removed from activeRuns map');
-
-    targetServer.close();
-    await fs.rm(tmpDir, { recursive: true, force: true }).catch(() => {});
+      const terminatedRun = await waitForTerminalRun(storage, runId, 4000);
+      assert.ok(['cancelled', 'failed'].includes(terminatedRun.status));
+      assert.ok(terminatedRun.finishedAt);
+      assert.equal(runner.activeRuns.has(runId), false, 'Worker must be removed from activeRuns map');
+    } finally {
+      await new Promise(resolve => targetServer.close(resolve)).catch(() => {});
+      await fs.rm(tmpDir, { recursive: true, force: true }).catch(() => {});
+    }
   });
 
   // =========================================================================

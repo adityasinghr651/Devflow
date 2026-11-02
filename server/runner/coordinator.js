@@ -65,6 +65,14 @@ export class TestCoordinator {
   }
 
   /**
+   * Returns PIDs of all currently active spawned worker processes.
+   * @returns {number[]}
+   */
+  getWorkerPids() {
+    return this.workers.map(w => w.child?.pid).filter(Boolean);
+  }
+
+  /**
    * Starts all worker child processes and coordinates execution.
    *
    * @returns {Promise<object>} Resolves with the final unified run summary.
@@ -180,7 +188,7 @@ export class TestCoordinator {
       }
     } else if (msg.type === 'complete' && msg.data) {
       const worker = this.workers[workerIndex];
-      if (worker) {
+      if (worker && worker.state !== 'completed') {
         worker.state = 'completed';
         worker.summary = msg.data;
         if (msg.data.histogram) {
@@ -212,9 +220,9 @@ export class TestCoordinator {
     if (worker) {
       worker.exitCode = code;
       if (worker.state !== 'completed') {
-        if (this.isCancelled || signal === 'SIGTERM' || signal === 'SIGINT') {
+        if (this.isCancelled) {
           worker.state = 'cancelled';
-        } else if (code === 0) {
+        } else if (code === 0 && worker.summary) {
           worker.state = 'completed';
         } else {
           this._handleWorkerFailure(
@@ -279,19 +287,32 @@ export class TestCoordinator {
     let totalRequests = 0;
     let successCount = 0;
     let failedCount = 0;
+    let httpErrorCount = 0;
+    let timeoutCount = 0;
+    let networkErrorCount = 0;
+    let cancelledCount = 0;
     const statusCodes = {};
+    const partialWorkers = [];
 
     for (const w of this.workers) {
-      if (w.summary) {
-        totalRequests += Number(w.summary.totalRequests) || 0;
-        successCount += Number(w.summary.successCount) || 0;
-        failedCount += Number(w.summary.failedCount) || 0;
+      const data = w.summary || this.progressAggregator.workerSnapshots.get(w.id);
+      if (data) {
+        totalRequests += Number(data.totalRequests) || 0;
+        successCount += Number(data.successCount) || 0;
+        failedCount += Number(data.failedCount) || 0;
+        httpErrorCount += Number(data.httpErrorCount) || 0;
+        timeoutCount += Number(data.timeoutCount) || 0;
+        networkErrorCount += Number(data.networkErrorCount) || 0;
+        cancelledCount += Number(data.cancelledCount) || 0;
 
-        if (w.summary.statusCodes) {
-          for (const [code, count] of Object.entries(w.summary.statusCodes)) {
+        if (data.statusCodes) {
+          for (const [code, count] of Object.entries(data.statusCodes)) {
             statusCodes[code] = (statusCodes[code] || 0) + Number(count || 0);
           }
         }
+      }
+      if (!w.summary) {
+        partialWorkers.push(w.id);
       }
     }
 
@@ -305,14 +326,21 @@ export class TestCoordinator {
     }
 
     const rps = Number((totalRequests / totalElapsedSec).toFixed(2));
-    const errorRate = totalRequests ? Number(((failedCount / totalRequests) * 100).toFixed(2)) : 0;
+    const errorRate = totalRequests ? Number(((failedCount / totalRequests) * 100).toFixed(4)) : 0;
     const finalStatus = this.isCancelled ? 'cancelled' : 'completed';
 
     const finalSummary = {
       totalRequests,
       successCount,
       failedCount,
+      httpErrorCount,
+      timeoutCount,
+      networkErrorCount,
+      cancelledCount,
       statusCodes,
+      engine: 'node',
+      partialWorkers: partialWorkers.length > 0 ? partialWorkers : undefined,
+      histogramComplete: partialWorkers.length === 0,
       rps,
       p50: this.masterHistogram.getPercentile(0.50),
       p95: this.masterHistogram.getPercentile(0.95),

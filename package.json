@@ -12,6 +12,7 @@
     "bench:ci": "node tools/run-benchmark.js --ci",
     "bench:compare": "node tools/compare-benchmarks.js",
     "bench:baseline": "node tools/run-benchmark.js --ci --save-baseline",
+    "bench:scaling": "node tools/run-worker-scaling-benchmark.js",
     "test": "node --test tests/**/*.test.js",
     "build": "tsc --noEmit && vite build",
     "lint": "tsc --noEmit",
