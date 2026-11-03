@@ -285,5 +285,5 @@ process.on('message', message => {
 process.on('SIGTERM', () => {
   isCancelled = true;
   abortController.abort();
-  setTimeout(() => process.exit(0), 500);
+  process.exit(143);
 });

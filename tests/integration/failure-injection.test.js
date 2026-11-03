@@ -32,11 +32,13 @@ test('Failure Injection & Reliability: Complete fault matrix verification', asyn
   // =========================================================================
   await t.test('Scenario 1: Cancel active run terminates execution without rogue worker requests', async () => {
     let targetRequestsReceived = 0;
+    let targetRequestsCompleted = 0;
     const targetServer = http.createServer((req, res) => {
       targetRequestsReceived++;
       setTimeout(() => {
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ status: 'ok', count: targetRequestsReceived }));
+        targetRequestsCompleted++;
       }, 80);
     });
     await new Promise(resolve => targetServer.listen(0, '127.0.0.1', resolve));
@@ -79,12 +81,12 @@ test('Failure Injection & Reliability: Complete fault matrix verification', asyn
     await storage.createRun(runRecord);
     await runner.enqueueRun(runRecord);
 
-    // Wait until worker spawns and target receives at least 1 request
+    // Wait until worker spawns and target completes at least 1 request
     const startDeadline = Date.now() + 5000;
-    while (targetRequestsReceived === 0 && Date.now() < startDeadline) {
+    while (targetRequestsCompleted === 0 && Date.now() < startDeadline) {
       await new Promise(r => setTimeout(r, 50));
     }
-    assert.ok(targetRequestsReceived > 0, 'Target should have received initial requests');
+    assert.ok(targetRequestsCompleted > 0, 'Target should have completed initial requests');
 
     // Cancel the active run
     const cancelRes = await runner.cancelRun(runId);
@@ -106,6 +108,7 @@ test('Failure Injection & Reliability: Complete fault matrix verification', asyn
     );
 
     targetServer.close();
+    await new Promise(r => setTimeout(r, 100));
     await fs.rm(tmpDir, { recursive: true, force: true }).catch(() => {});
   });
 
@@ -172,6 +175,7 @@ test('Failure Injection & Reliability: Complete fault matrix verification', asyn
     assert.equal(finishedRun.successCount + finishedRun.failedCount, finishedRun.totalRequests);
     assert.ok(finishedRun.errorRate > 0, 'Error rate must reflect connection failures');
 
+    await new Promise(r => setTimeout(r, 100));
     await fs.rm(tmpDir, { recursive: true, force: true }).catch(() => {});
   });
 
@@ -234,6 +238,7 @@ test('Failure Injection & Reliability: Complete fault matrix verification', asyn
     assert.equal(finishedRun.errorRate, 100, 'Error rate must be 100%');
 
     targetServer.close();
+    await new Promise(r => setTimeout(r, 100));
     await fs.rm(tmpDir, { recursive: true, force: true }).catch(() => {});
   });
 
@@ -301,6 +306,7 @@ test('Failure Injection & Reliability: Complete fault matrix verification', asyn
       assert.equal(runner.activeRuns.has(runId), false, 'Worker must be removed from activeRuns map');
     } finally {
       await new Promise(resolve => targetServer.close(resolve)).catch(() => {});
+      await new Promise(r => setTimeout(r, 100));
       await fs.rm(tmpDir, { recursive: true, force: true }).catch(() => {});
     }
   });
@@ -333,6 +339,7 @@ test('Failure Injection & Reliability: Complete fault matrix verification', asyn
     subT.after(async () => {
       targetServer.close();
       await new Promise(r => apiServer.close(r));
+      await new Promise(r => setTimeout(r, 100));
       await fs.rm(tmpDir, { recursive: true, force: true }).catch(() => {});
     });
 
@@ -474,6 +481,7 @@ test('Failure Injection & Reliability: Complete fault matrix verification', asyn
     const c = await storage.getRunById('stable-completed');
     assert.equal(c.status, 'completed', 'Completed runs must remain completed');
 
+    await new Promise(r => setTimeout(r, 100));
     await fs.rm(tmpDir, { recursive: true, force: true }).catch(() => {});
   });
 
@@ -550,6 +558,7 @@ test('Failure Injection & Reliability: Complete fault matrix verification', asyn
 
     subT.after(async () => {
       await new Promise(r => apiServer.close(r));
+      await new Promise(r => setTimeout(r, 100));
       await fs.rm(tmpDir, { recursive: true, force: true }).catch(() => {});
     });
 

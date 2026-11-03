@@ -219,6 +219,13 @@ export class TestCoordinator {
     const worker = this.workers[workerIndex];
     if (worker) {
       worker.exitCode = code;
+      if (!this.isCancelled && (signal !== null || (code !== null && code !== 0))) {
+        this._handleWorkerFailure(
+          workerIndex,
+          `Worker ${workerIndex} exited prematurely with exit code ${code} (signal: ${signal})`
+        );
+        return;
+      }
       if (worker.state !== 'completed') {
         if (this.isCancelled) {
           worker.state = 'cancelled';

@@ -181,8 +181,8 @@ test('Metrics Correctness: Comprehensive audit against controlled test target', 
     assert.equal(run.statusCodes['500'], run.failedCount);
     assert.equal(run.successCount + run.failedCount, run.totalRequests);
 
-    // Error rate must reflect 500 count / totalRequests
-    const expectedErrorRate = Number(((run.failedCount / run.totalRequests) * 100).toFixed(2));
+    // Error rate must reflect 500 count / totalRequests (4-decimal precision contract)
+    const expectedErrorRate = Number(((run.failedCount / run.totalRequests) * 100).toFixed(4));
     assert.equal(run.errorRate, expectedErrorRate);
     assert.ok(run.errorRate > 0 && run.errorRate < 100, `Error rate should be mixed, got ${run.errorRate}%`);
   });

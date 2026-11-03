@@ -58,6 +58,15 @@ export class RunnerManager {
 
     const active = this.activeRuns.get(id);
     if (active) {
+      if (active.type === 'starting') {
+        if (typeof active.cancel === 'function') {
+          active.cancel();
+        }
+        await this._transitionState(id, 'cancelled', {
+          finishedAt: new Date().toISOString(),
+        });
+        return { success: true, status: 'cancelled' };
+      }
       await this._transitionState(id, 'cancelling');
       if (typeof active.cancel === 'function') {
         active.cancel();
@@ -118,34 +127,93 @@ export class RunnerManager {
   }
 
   async _executeRun(run) {
-    // Transition: queued -> validating
-    await this._transitionState(run.id, 'validating');
+    // If run was already cancelled or is in terminal state, do not execute
+    const initial = await this.storage.getRunById(run.id);
+    if (!initial || TERMINAL_STATES.has(initial.status) || initial.status === 'cancelling') {
+      return;
+    }
 
-    // Transition: validating -> running
-    await this._transitionState(run.id, 'running', {
-      startedAt: new Date().toISOString(),
+    // Register active run entry early so cancelRun can hook into it
+    let cancelDelegate = null;
+    let isEarlyCancelled = false;
+
+    this.activeRuns.set(run.id, {
+      type: 'starting',
+      cancel: () => {
+        isEarlyCancelled = true;
+        if (cancelDelegate) {
+          cancelDelegate();
+        }
+      },
     });
 
-    const enginePref = (process.env.RUNNER_ENGINE || config.runnerEngine || 'auto').toLowerCase();
-    const canUseK6 = enginePref !== 'node' && (enginePref === 'k6' || (await isK6Available(config.k6Bin)));
+    try {
+      const beforeVal = await this.storage.getRunById(run.id);
+      if (!beforeVal || TERMINAL_STATES.has(beforeVal.status) || beforeVal.status === 'cancelling' || isEarlyCancelled) {
+        if (beforeVal && (beforeVal.status === 'cancelling' || isEarlyCancelled) && !TERMINAL_STATES.has(beforeVal.status)) {
+          await this._transitionState(run.id, 'cancelled', { finishedAt: new Date().toISOString() });
+        }
+        return;
+      }
 
-    if (canUseK6 && run.profile !== 'stages' && (!run.workerCount || run.workerCount === 1)) {
-      return this._executeWithK6(run);
-    } else {
-      return this._executeWithCoordinator(run);
+      // Transition: queued -> validating
+      const valState = await this._transitionState(run.id, 'validating');
+      if (!valState || TERMINAL_STATES.has(valState.status) || valState.status === 'cancelling' || isEarlyCancelled) {
+        if (valState && (valState.status === 'cancelling' || isEarlyCancelled) && !TERMINAL_STATES.has(valState.status)) {
+          await this._transitionState(run.id, 'cancelled', {
+            finishedAt: new Date().toISOString(),
+          });
+        }
+        return;
+      }
+
+      const beforeRun = await this.storage.getRunById(run.id);
+      if (!beforeRun || TERMINAL_STATES.has(beforeRun.status) || beforeRun.status === 'cancelling' || isEarlyCancelled) {
+        if (beforeRun && (beforeRun.status === 'cancelling' || isEarlyCancelled) && !TERMINAL_STATES.has(beforeRun.status)) {
+          await this._transitionState(run.id, 'cancelled', { finishedAt: new Date().toISOString() });
+        }
+        return;
+      }
+
+      // Transition: validating -> running
+      const runState = await this._transitionState(run.id, 'running', {
+        startedAt: new Date().toISOString(),
+      });
+      if (!runState || TERMINAL_STATES.has(runState.status) || runState.status === 'cancelling' || isEarlyCancelled) {
+        if (runState && (runState.status === 'cancelling' || isEarlyCancelled) && !TERMINAL_STATES.has(runState.status)) {
+          await this._transitionState(run.id, 'cancelled', {
+            finishedAt: new Date().toISOString(),
+          });
+        }
+        return;
+      }
+
+      const enginePref = (process.env.RUNNER_ENGINE || config.runnerEngine || 'auto').toLowerCase();
+      const canUseK6 = enginePref !== 'node' && (enginePref === 'k6' || (await isK6Available(config.k6Bin)));
+
+      if (canUseK6 && run.profile !== 'stages' && (!run.workerCount || run.workerCount === 1)) {
+        return await this._executeWithK6(run, fn => { cancelDelegate = fn; });
+      } else {
+        return await this._executeWithCoordinator(run, fn => { cancelDelegate = fn; });
+      }
+    } finally {
+      this.activeRuns.delete(run.id);
     }
   }
 
-  async _executeWithK6(run) {
+  async _executeWithK6(run, registerCancelFn) {
     let cancelCallback = null;
     const cancelPromise = new Promise(resolve => {
       cancelCallback = resolve;
     });
 
-    this.activeRuns.set(run.id, {
-      type: 'k6',
-      cancel: () => cancelCallback && cancelCallback(),
-    });
+    const activeEntry = this.activeRuns.get(run.id);
+    if (activeEntry) {
+      activeEntry.type = 'k6';
+    }
+    if (registerCancelFn) {
+      registerCancelFn(() => cancelCallback && cancelCallback());
+    }
 
     try {
       const summary = await executeK6Run(
@@ -173,12 +241,10 @@ export class RunnerManager {
         engine: 'k6',
         finishedAt: new Date().toISOString(),
       });
-    } finally {
-      this.activeRuns.delete(run.id);
     }
   }
 
-  async _executeWithCoordinator(run) {
+  async _executeWithCoordinator(run, registerCancelFn) {
     const coordinator = new TestCoordinator(run, {
       storage: this.storage,
       events: this.events,
@@ -186,17 +252,16 @@ export class RunnerManager {
       transitionState: (id, status, updates) => this._transitionState(id, status, { engine: 'node', ...updates }),
     });
 
-    this.activeRuns.set(run.id, {
-      type: 'coordinator',
-      coordinator,
-      cancel: () => coordinator.cancel(),
-    });
-
-    try {
-      await coordinator.start();
-    } finally {
-      this.activeRuns.delete(run.id);
+    const activeEntry = this.activeRuns.get(run.id);
+    if (activeEntry) {
+      activeEntry.type = 'coordinator';
+      activeEntry.coordinator = coordinator;
     }
+    if (registerCancelFn) {
+      registerCancelFn(() => coordinator.cancel());
+    }
+
+    await coordinator.start();
   }
 }
 
