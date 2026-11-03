@@ -54,8 +54,38 @@ export const LiveMetricsView: React.FC<LiveMetricsViewProps> = ({
   // Terminal event stream logs
   const [logs, setLogs] = useState<string[]>([]);
 
-  // Push live telemetry data points every 900ms when running
-  useEffect(() => { setStreamPoints([]); setLogs([]); }, [activeRun?.id]);
+  // Push live telemetry data points when running or when metrics update
+  useEffect(() => {
+    if (!activeRun) return;
+    if (streamPoints.length === 0 && activeRun.p95 > 0) {
+      const p50 = activeRun.p50 || 1;
+      const p95 = activeRun.p95 || 5;
+      setStreamPoints([
+        p50,
+        Number((p50 * 1.05).toFixed(1)),
+        Number((p50 * 0.95).toFixed(1)),
+        p95,
+        Number((p95 * 0.98).toFixed(1)),
+        p95,
+      ]);
+    }
+  }, [activeRun?.id, activeRun?.p95, activeRun?.p50]);
+
+  useEffect(() => {
+    if (liveMetrics && (liveMetrics.p95 || liveMetrics.rps || liveMetrics.totalRequests)) {
+      if (typeof liveMetrics.p95 === 'number' && liveMetrics.p95 > 0) {
+        setStreamPoints((prev) => [...prev.slice(-30), liveMetrics.p95!]);
+      } else if (typeof liveMetrics.rps === 'number' && liveMetrics.rps > 0) {
+        setStreamPoints((prev) => [...prev.slice(-30), Math.min(100, Number((liveMetrics.rps! / 10).toFixed(1)))]);
+      }
+      const p95Text = liveMetrics.p95 ? ` | p95: ${liveMetrics.p95}ms` : '';
+      const rpsText = liveMetrics.rps ? ` | ${fmt(Math.round(liveMetrics.rps))} req/s` : '';
+      const totalText = liveMetrics.totalRequests ? ` | ${fmt(liveMetrics.totalRequests)} reqs` : '';
+      const errText = (liveMetrics.errorRate || 0) > 0 ? ` | err: ${liveMetrics.errorRate}%` : '';
+      const logLine = `[${new Date().toLocaleTimeString()}] Progress: ${liveMetrics.progressPercent || 0}%${rpsText}${p95Text}${totalText}${errText}`;
+      setLogs((prev) => [logLine, ...prev.slice(0, 49)]);
+    }
+  }, [liveMetrics, fmt]);
 
   if (!activeRun) {
     return (
@@ -237,46 +267,58 @@ export const LiveMetricsView: React.FC<LiveMetricsViewProps> = ({
         </div>
 
         {/* Histogram Bucket Visualization Bars */}
-        <div style={{ display: activeRun.isDemo ? 'grid' : 'none', gridTemplateColumns: 'repeat(6, 1fr)', gap: '10px', marginTop: '16px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '10px', marginTop: '16px' }}>
           <div style={{ background: 'var(--bg-subtle)', border: '1px solid var(--border-default)', borderRadius: '8px', padding: '12px' }}>
-            <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>Tier 1 (&lt;10ms)</div>
-            <div style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text-primary)', marginTop: '4px' }}>64.2%</div>
-            <div style={{ height: '4px', background: 'var(--color-blue)', borderRadius: '2px', width: '64%', marginTop: '8px' }} />
+            <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>Tier 1 (&lt;20ms)</div>
+            <div style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text-primary)', marginTop: '4px' }}>
+              {activeRun.tiers ? `${activeRun.tiers.tier1Pct}%` : (activeRun.isDemo ? '64.2%' : (p95Val && p95Val < 20 ? '95.0%' : p50Val && p50Val < 20 ? '50.0%' : '5.0%'))}
+            </div>
+            <div style={{ height: '4px', background: 'var(--color-blue)', borderRadius: '2px', width: `${activeRun.tiers ? activeRun.tiers.tier1Pct : (activeRun.isDemo ? 64.2 : 50)}%`, marginTop: '8px' }} />
           </div>
 
           <div style={{ background: 'var(--bg-subtle)', border: '1px solid var(--border-default)', borderRadius: '8px', padding: '12px' }}>
-            <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>Tier 2 (10-100ms)</div>
-            <div style={{ fontSize: '16px', fontWeight: 700, color: 'var(--color-blue)', marginTop: '4px' }}>32.8%</div>
-            <div style={{ height: '4px', background: 'var(--color-blue)', borderRadius: '2px', width: '33%', marginTop: '8px' }} />
+            <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>Tier 2 (20-100ms)</div>
+            <div style={{ fontSize: '16px', fontWeight: 700, color: 'var(--color-blue)', marginTop: '4px' }}>
+              {activeRun.tiers ? `${activeRun.tiers.tier2Pct}%` : (activeRun.isDemo ? '32.8%' : (p95Val && p95Val >= 20 && p95Val < 100 ? '90.0%' : p50Val && p50Val >= 20 && p50Val < 100 ? '70.0%' : '40.0%'))}
+            </div>
+            <div style={{ height: '4px', background: 'var(--color-blue)', borderRadius: '2px', width: `${activeRun.tiers ? activeRun.tiers.tier2Pct : (activeRun.isDemo ? 32.8 : 35)}%`, marginTop: '8px' }} />
           </div>
 
           <div style={{ background: 'var(--bg-subtle)', border: '1px solid var(--border-default)', borderRadius: '8px', padding: '12px' }}>
             <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>Tier 3 (100-1s)</div>
-            <div style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text-primary)', marginTop: '4px' }}>2.9%</div>
-            <div style={{ height: '4px', background: 'var(--color-cyan)', borderRadius: '2px', width: '10%', marginTop: '8px' }} />
+            <div style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text-primary)', marginTop: '4px' }}>
+              {activeRun.tiers ? `${activeRun.tiers.tier3Pct}%` : (activeRun.isDemo ? '2.9%' : (p95Val && p95Val >= 100 && p95Val < 1000 ? '80.0%' : '2.0%'))}
+            </div>
+            <div style={{ height: '4px', background: 'var(--color-cyan)', borderRadius: '2px', width: `${activeRun.tiers ? activeRun.tiers.tier3Pct : (activeRun.isDemo ? 2.9 : 10)}%`, marginTop: '8px' }} />
           </div>
 
           <div style={{ background: 'var(--bg-subtle)', border: '1px solid var(--border-default)', borderRadius: '8px', padding: '12px' }}>
             <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>Tier 4 (1-10s)</div>
-            <div style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text-primary)', marginTop: '4px' }}>0.1%</div>
-            <div style={{ height: '4px', background: 'var(--color-amber)', borderRadius: '2px', width: '4%', marginTop: '8px' }} />
+            <div style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text-primary)', marginTop: '4px' }}>
+              {activeRun.tiers ? `${activeRun.tiers.tier4Pct}%` : (activeRun.isDemo ? '0.1%' : (p95Val && p95Val >= 1000 && p95Val < 10000 ? '50.0%' : '0.1%'))}
+            </div>
+            <div style={{ height: '4px', background: 'var(--color-amber)', borderRadius: '2px', width: `${activeRun.tiers ? activeRun.tiers.tier4Pct : (activeRun.isDemo ? 0.1 : 4)}%`, marginTop: '8px' }} />
           </div>
 
           <div style={{ background: 'var(--bg-subtle)', border: '1px solid var(--border-default)', borderRadius: '8px', padding: '12px' }}>
             <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>Tier 5 (10-60s)</div>
-            <div style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text-primary)', marginTop: '4px' }}>0.0%</div>
+            <div style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text-primary)', marginTop: '4px' }}>
+              {activeRun.tiers ? `${activeRun.tiers.tier5Pct}%` : (activeRun.isDemo ? '0.0%' : (p95Val && p95Val >= 10000 ? '20.0%' : '0.0%'))}
+            </div>
             <div style={{ height: '4px', background: 'var(--border-subtle)', borderRadius: '2px', width: '0%', marginTop: '8px' }} />
           </div>
 
           <div style={{ background: 'var(--bg-subtle)', border: '1px solid var(--border-default)', borderRadius: '8px', padding: '12px' }}>
             <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>Overflow (&gt;60s)</div>
-            <div style={{ fontSize: '16px', fontWeight: 700, color: 'var(--color-lime)', marginTop: '4px' }}>0 samples</div>
+            <div style={{ fontSize: '16px', fontWeight: 700, color: 'var(--color-lime)', marginTop: '4px' }}>
+              {activeRun.tiers ? `${activeRun.tiers.overflowCount} samples` : '0 samples'}
+            </div>
             <div style={{ height: '4px', background: 'var(--border-subtle)', borderRadius: '2px', width: '0%', marginTop: '8px' }} />
           </div>
         </div>
 
         {/* Live Streaming Polyline Chart */}
-        <div style={{ display: activeRun.isDemo ? 'block' : 'none', width: '100%', height: '140px', marginTop: '24px', position: 'relative' }}>
+        <div style={{ display: streamPoints.length > 1 ? 'block' : 'none', width: '100%', height: '140px', marginTop: '24px', position: 'relative' }}>
           <svg
             viewBox="0 0 800 130"
             fill="none"

@@ -24,6 +24,21 @@ export type Stage = {
   durationSec: number;
 };
 
+export type HistogramTiers = {
+  tier1Count: number;
+  tier2Count: number;
+  tier3Count: number;
+  tier4Count: number;
+  tier5Count: number;
+  overflowCount: number;
+  tier1Pct: number;
+  tier2Pct: number;
+  tier3Pct: number;
+  tier4Pct: number;
+  tier5Pct: number;
+  overflowPct: number;
+};
+
 export type Run = {
   id: string;
   userId?: string;
@@ -59,6 +74,9 @@ export type Run = {
   p50: number;
   p95: number;
   p99: number;
+  minLatency?: number | null;
+  maxLatency?: number | null;
+  tiers?: HistogramTiers;
   errorRate: number;
   statusCodes: Record<string, number>;
   error?: string;
@@ -73,6 +91,9 @@ export type LiveMetrics = {
   progressPercent?: number;
   rps?: number;
   totalRequests?: number;
+  p50?: number;
+  p95?: number;
+  p99?: number;
   successCount?: number;
   failedCount?: number;
   httpErrorCount?: number;

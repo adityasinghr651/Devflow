@@ -25,6 +25,8 @@ interface TestConfigModalProps {
   setHeadersText: (val: string) => void;
   bodyText: string;
   setBodyText: (val: string) => void;
+  workerCount: number;
+  setWorkerCount: (val: number) => void;
   timeoutMs: number;
   setTimeoutMs: (val: number) => void;
   authorized: boolean;
@@ -57,6 +59,8 @@ export const TestConfigModal: React.FC<TestConfigModalProps> = ({
   setHeadersText,
   bodyText,
   setBodyText,
+  workerCount,
+  setWorkerCount,
   timeoutMs,
   setTimeoutMs,
   authorized,
@@ -422,6 +426,37 @@ export const TestConfigModal: React.FC<TestConfigModalProps> = ({
                   />
                   <span style={{ fontSize: '10px', color: 'var(--text-dim)' }}>Fail-fast threshold (1s–10s)</span>
                 </label>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>
+                  Worker Process Distribution
+                </label>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
+                  {[1, 2, 4].map((count) => (
+                    <button
+                      key={count}
+                      type="button"
+                      className="social-btn"
+                      style={{
+                        padding: '8px 10px',
+                        fontSize: '11px',
+                        fontWeight: 600,
+                        textAlign: 'center',
+                        justifyContent: 'center',
+                        border: workerCount === count ? '1px solid var(--color-blue)' : '1px solid var(--border-default)',
+                        background: workerCount === count ? 'rgba(59, 130, 246, 0.15)' : 'var(--bg-subtle)',
+                        color: workerCount === count ? 'var(--color-blue)' : 'var(--text-secondary)',
+                      }}
+                      onClick={() => setWorkerCount(count)}
+                    >
+                      {count} {count === 1 ? 'Worker Process' : 'Worker Processes'}
+                    </button>
+                  ))}
+                </div>
+                <span style={{ fontSize: '10px', color: 'var(--text-dim)', marginTop: '4px', display: 'block' }}>
+                  Splits total concurrency into isolated child processes via workload partitioning.
+                </span>
               </div>
             </div>
           )}

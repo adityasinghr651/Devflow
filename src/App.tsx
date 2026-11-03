@@ -270,6 +270,7 @@ export default function App() {
   ]);
   const [headersText, setHeadersText] = useState('');
   const [bodyText, setBodyText] = useState('');
+  const [workerCount, setWorkerCount] = useState<number>(1);
   const [timeoutMs, setTimeoutMs] = useState(5000);
   const [authorized, setAuthorized] = useState(false);
   const [starting, setStarting] = useState(false);
@@ -609,95 +610,6 @@ export default function App() {
     finally { setVerifyLoading(false); }
   }
 
-  // Interactive Live Test Execution (Works Online & In Offline Simulator)
-  function simulateLiveTest(t: Target, payload: any) {
-    const runId = `run_${Math.random().toString(36).slice(2, 8)}`;
-    const concurrencyVal = payload.concurrency || 20;
-    const initialRun: Run = {
-      id: runId,
-      targetId: t.id,
-      targetName: t.name,
-      url: `${t.url}${payload.path || '/'}`,
-      method: payload.method || 'GET',
-      concurrency: concurrencyVal,
-      durationSec: payload.durationSec || 10,
-      profile: payload.profile || 'fixed',
-      status: 'running',
-      isDemo: true,
-      startedAt: new Date().toISOString(),
-      totalRequests: 0,
-      successCount: 0,
-      failedCount: 0,
-      rps: 0,
-      p50: 0,
-      p95: 0,
-      p99: 0,
-      errorRate: 0,
-      statusCodes: { '200': 0 },
-      progressPercent: 0,
-    };
-
-    setRuns((prev) => [initialRun, ...prev]);
-    setSelectedRun(initialRun);
-    setShowTest(false);
-    navigateTo('Test Runs');
-    setNotice(`Started load test ${runId} on ${initialRun.method} ${initialRun.url}. Streaming telemetry…`);
-
-    let step = 0;
-    const totalSteps = 8;
-    const stepInterval = 650; // ~5.2 seconds total
-    const timer = setInterval(() => {
-      step++;
-      const progress = Math.min(100, Math.round((step / totalSteps) * 100));
-      const currentReqs = Math.round(step * (concurrencyVal * 190) + (Math.random() - 0.5) * 40);
-      const currentRps = Math.round(concurrencyVal * 72 + (Math.random() - 0.5) * 45);
-      const curP95 = Number((15 + (concurrencyVal / 20) * 3 + (Math.random() - 0.5) * 2).toFixed(1));
-
-      setLiveMetrics({
-        concurrency: concurrencyVal,
-        progressPercent: progress,
-        rps: currentRps,
-        totalRequests: currentReqs,
-        errorRate: 0.00,
-        statusCodes: { '200': currentReqs },
-      });
-
-      if (step >= totalSteps) {
-        clearInterval(timer);
-        const finishedRun: Run = {
-          ...initialRun,
-          status: 'completed',
-          finishedAt: new Date().toISOString(),
-          totalRequests: currentReqs,
-          successCount: currentReqs,
-          failedCount: 0,
-          rps: currentRps,
-          p50: Number((curP95 * 0.45).toFixed(1)),
-          p95: curP95,
-          p99: Number((curP95 * 1.5).toFixed(1)),
-          errorRate: 0.00,
-          statusCodes: { '200': currentReqs },
-          progressPercent: 100,
-        };
-        setRuns((prev) => prev.map((r) => (r.id === runId ? finishedRun : r)));
-        setSelectedRun(finishedRun);
-        setNotice(`Test ${runId} completed: ${fmt(currentReqs)} requests at ${fmt(currentRps)} req/s (p95: ${curP95}ms).`);
-      } else {
-        setSelectedRun((prev) =>
-          prev && prev.id === runId
-            ? {
-                ...prev,
-                totalRequests: currentReqs,
-                rps: currentRps,
-                p95: curP95,
-                progressPercent: progress,
-              }
-            : prev
-        );
-      }
-    }, stepInterval);
-  }
-
   async function launchTest(e: React.FormEvent) {
     e.preventDefault();
     setTestError('');
@@ -713,20 +625,36 @@ export default function App() {
       return;
     }
 
+    const headers: Record<string, string> = {};
+    if (headersText.trim()) {
+      headersText.split('\n').forEach((line) => {
+        const colonIdx = line.indexOf(':');
+        if (colonIdx > 0) {
+          const k = line.slice(0, colonIdx).trim();
+          const v = line.slice(colonIdx + 1).trim();
+          if (k && v) headers[k] = v;
+        }
+      });
+    }
+
     const payload: any = {
       targetId: t.id,
       path,
       method,
       authorized: true,
-      headers: {},
+      headers,
       timeoutMs,
       concurrency,
       durationSec: duration,
       profile: testProfile,
+      workerCount,
     };
 
     if (testProfile === 'stages') {
       payload.stages = stages;
+    }
+    if (bodyText.trim() && ['POST', 'PUT', 'PATCH'].includes(method)) {
+      payload.body = bodyText.trim();
     }
 
     try {
@@ -864,6 +792,8 @@ export default function App() {
           setHeadersText={setHeadersText}
           bodyText={bodyText}
           setBodyText={setBodyText}
+          workerCount={workerCount}
+          setWorkerCount={setWorkerCount}
           timeoutMs={timeoutMs}
           setTimeoutMs={setTimeoutMs}
           authorized={authorized}

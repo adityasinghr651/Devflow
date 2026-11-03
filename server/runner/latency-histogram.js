@@ -175,6 +175,40 @@ export class LatencyHistogram {
   }
 
   /**
+   * Returns bucket counts and percentages across the 5 resolution tiers plus overflow.
+   */
+  getTierSummary() {
+    let tier1Count = 0;
+    let tier2Count = 0;
+    let tier3Count = 0;
+    let tier4Count = 0;
+    let tier5Count = 0;
+    let overflowCount = this.buckets[6800] || 0;
+
+    for (let i = 0; i < 400; i++) tier1Count += this.buckets[i];
+    for (let i = 400; i < 1200; i++) tier2Count += this.buckets[i];
+    for (let i = 1200; i < 3000; i++) tier3Count += this.buckets[i];
+    for (let i = 3000; i < 4800; i++) tier4Count += this.buckets[i];
+    for (let i = 4800; i < 6800; i++) tier5Count += this.buckets[i];
+
+    const total = this.totalCount || 1;
+    return {
+      tier1Count,
+      tier2Count,
+      tier3Count,
+      tier4Count,
+      tier5Count,
+      overflowCount,
+      tier1Pct: Number(((tier1Count / total) * 100).toFixed(1)),
+      tier2Pct: Number(((tier2Count / total) * 100).toFixed(1)),
+      tier3Pct: Number(((tier3Count / total) * 100).toFixed(1)),
+      tier4Pct: Number(((tier4Count / total) * 100).toFixed(1)),
+      tier5Pct: Number(((tier5Count / total) * 100).toFixed(1)),
+      overflowPct: Number(((overflowCount / total) * 100).toFixed(1)),
+    };
+  }
+
+  /**
    * Resets all bucket counters and buffers for reuse.
    */
   reset() {
