@@ -15,6 +15,7 @@ export type Target = {
   verificationToken?: string;
   verificationMethod?: string;
   verifiedAt?: string;
+  isDemo?: boolean;
   createdAt: string;
 };
 
@@ -48,6 +49,8 @@ export type Run = {
   httpErrorCount?: number;
   timeoutCount?: number;
   networkErrorCount?: number;
+  redirectBlockedCount?: number;
+  measurementWindowSec?: number | null;
   cancelledCount?: number;
   partialWorkers?: number[];
   histogramComplete?: boolean;
@@ -75,6 +78,8 @@ export type LiveMetrics = {
   httpErrorCount?: number;
   timeoutCount?: number;
   networkErrorCount?: number;
+  redirectBlockedCount?: number;
+  measurementWindowSec?: number | null;
   cancelledCount?: number;
   errorRate?: number;
   statusCodes?: Record<string, number>;

@@ -39,12 +39,15 @@ export class ProgressAggregator {
     let httpErrorCount = 0;
     let timeoutCount = 0;
     let networkErrorCount = 0;
+    let redirectBlockedCount = 0;
     let cancelledCount = 0;
     let currentConcurrency = 0;
     const statusCodes = {};
     let maxElapsedSec = 0;
     let maxProgressPercent = 0;
     let currentStageIndex = null;
+    let firstRequestStartedAt = null;
+    let lastRequestCompletedAt = null;
 
     for (const snap of this.workerSnapshots.values()) {
       if (!snap) continue;
@@ -55,7 +58,18 @@ export class ProgressAggregator {
       httpErrorCount += Number(snap.httpErrorCount) || 0;
       timeoutCount += Number(snap.timeoutCount) || 0;
       networkErrorCount += Number(snap.networkErrorCount) || 0;
+      redirectBlockedCount += Number(snap.redirectBlockedCount) || 0;
       cancelledCount += Number(snap.cancelledCount) || 0;
+      if (Number.isFinite(snap.firstRequestStartedAt)) {
+        firstRequestStartedAt = firstRequestStartedAt === null
+          ? snap.firstRequestStartedAt
+          : Math.min(firstRequestStartedAt, snap.firstRequestStartedAt);
+      }
+      if (Number.isFinite(snap.lastRequestCompletedAt)) {
+        lastRequestCompletedAt = lastRequestCompletedAt === null
+          ? snap.lastRequestCompletedAt
+          : Math.max(lastRequestCompletedAt, snap.lastRequestCompletedAt);
+      }
       currentConcurrency += Number(snap.currentConcurrency) || 0;
 
       if (snap.statusCodes && typeof snap.statusCodes === 'object') {
@@ -81,7 +95,12 @@ export class ProgressAggregator {
 
     const wallElapsedSec = Math.max((Date.now() - this.startTime) / 1000, 0.001);
     const elapsedSec = maxElapsedSec > 0 ? maxElapsedSec : Number(wallElapsedSec.toFixed(1));
-    const rps = Number((totalRequests / Math.max(elapsedSec, 0.001)).toFixed(2));
+    const measurementWindowSec = firstRequestStartedAt !== null && lastRequestCompletedAt !== null
+      ? Math.max((lastRequestCompletedAt - firstRequestStartedAt) / 1000, 0.001)
+      : null;
+    const rps = measurementWindowSec === null
+      ? 0
+      : Number((totalRequests / measurementWindowSec).toFixed(2));
     const errorRate = totalRequests ? Number(((failedCount / totalRequests) * 100).toFixed(4)) : 0;
     const progressPercent = Math.min(
       100,
@@ -95,8 +114,10 @@ export class ProgressAggregator {
       httpErrorCount,
       timeoutCount,
       networkErrorCount,
+      redirectBlockedCount,
       cancelledCount,
       rps,
+      measurementWindowSec,
       errorRate,
       statusCodes,
       currentConcurrency,

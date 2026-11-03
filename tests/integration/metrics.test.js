@@ -100,8 +100,10 @@ test('Metrics Correctness: Comprehensive audit against controlled test target', 
     assert.equal(run.statusCodes['200'], run.totalRequests, 'statusCodes[200] must match totalRequests');
     assert.equal(Object.keys(run.statusCodes).length, 1, 'Only 200 status code expected');
 
-    // RPS validation: positive and matches totalRequests / elapsedSec
+    // RPS validation: positive and computed from the measured request window
     assert.ok(run.rps > 0, `RPS must be positive, got ${run.rps}`);
+    assert.ok(run.measurementWindowSec > 0, 'Measurement window must span the first request start through last completion');
+    assert.equal(run.rps, Number((run.totalRequests / run.measurementWindowSec).toFixed(2)));
 
     // Latency percentiles monotonic order and fast threshold
     assert.ok(run.p50 <= run.p95, `p50 (${run.p50}) must be <= p95 (${run.p95})`);
@@ -445,10 +447,10 @@ test('Metrics Correctness: Comprehensive audit against controlled test target', 
     const completedRedRun = await waitForRun(redRunId, 4000);
 
     assert.equal(completedRedRun.status, 'completed');
-    assert.ok(completedRedRun.networkErrorCount > 0, 'networkErrorCount must record redirect blocks');
+    assert.ok(completedRedRun.redirectBlockedCount > 0, 'redirectBlockedCount must record redirect blocks');
     assert.ok(completedRedRun.failedCount > 0, 'failedCount must include redirect blocks');
     assert.ok(completedRedRun.statusCodes['redirect_blocked'] > 0, 'statusCodes must record redirect_blocked');
-    assert.equal(completedRedRun.failedCount, completedRedRun.httpErrorCount + completedRedRun.timeoutCount + completedRedRun.networkErrorCount);
+    assert.equal(completedRedRun.failedCount, completedRedRun.httpErrorCount + completedRedRun.timeoutCount + completedRedRun.networkErrorCount + completedRedRun.redirectBlockedCount);
 
     // 2. Test timeout
     const toRunId = 'metrics-timeout-run';
@@ -475,7 +477,7 @@ test('Metrics Correctness: Comprehensive audit against controlled test target', 
 
     assert.equal(completedToRun.status, 'completed');
     assert.ok(completedToRun.timeoutCount > 0, 'timeoutCount must record timeouts');
-    assert.equal(completedToRun.failedCount, completedToRun.httpErrorCount + completedToRun.timeoutCount + completedToRun.networkErrorCount);
+    assert.equal(completedToRun.failedCount, completedToRun.httpErrorCount + completedToRun.timeoutCount + completedToRun.networkErrorCount + completedToRun.redirectBlockedCount);
     assert.ok(completedToRun.statusCodes['timeout'] > 0);
 
     // 3. Test HTTP 404 & 500 error counts
@@ -503,7 +505,7 @@ test('Metrics Correctness: Comprehensive audit against controlled test target', 
 
     assert.equal(completedErrRun.status, 'completed');
     assert.ok(completedErrRun.httpErrorCount > 0, 'httpErrorCount must record 500 status');
-    assert.equal(completedErrRun.failedCount, completedErrRun.httpErrorCount + completedErrRun.timeoutCount + completedErrRun.networkErrorCount);
+    assert.equal(completedErrRun.failedCount, completedErrRun.httpErrorCount + completedErrRun.timeoutCount + completedErrRun.networkErrorCount + completedErrRun.redirectBlockedCount);
     assert.equal(completedErrRun.statusCodes['500'], completedErrRun.httpErrorCount);
   });
 
@@ -563,8 +565,8 @@ test('Metrics Correctness: Comprehensive audit against controlled test target', 
     );
     assert.equal(
       cancelledRun.failedCount,
-      cancelledRun.httpErrorCount + cancelledRun.timeoutCount + cancelledRun.networkErrorCount,
-      'failedCount must strictly equal httpErrorCount + timeoutCount + networkErrorCount'
+      cancelledRun.httpErrorCount + cancelledRun.timeoutCount + cancelledRun.networkErrorCount + cancelledRun.redirectBlockedCount,
+      'failedCount must equal all failure category counters'
     );
   });
 

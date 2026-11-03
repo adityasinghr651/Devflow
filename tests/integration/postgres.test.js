@@ -156,6 +156,8 @@ test('PostgreSQL: Real Database Integration & Lifecycle', async (t) => {
     p95: 45.2,
     p99: 89.0,
     errorRate: 2.0,
+    redirectBlockedCount: 0,
+    measurementWindowSec: 10,
     statusCodes: { '200': 245, '500': 5 },
     finishedAt: new Date().toISOString(),
   });
@@ -164,6 +166,7 @@ test('PostgreSQL: Real Database Integration & Lifecycle', async (t) => {
   assert.equal(completedRun.status, 'completed');
   assert.equal(completedRun.totalRequests, 250);
   assert.equal(completedRun.p95, 45.2);
+  assert.equal(completedRun.measurementWindowSec, 10);
   assert.deepEqual(completedRun.statusCodes, { '200': 245, '500': 5 });
 
   // 5. Verification of Persistence Across Backend Restart

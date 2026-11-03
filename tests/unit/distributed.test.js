@@ -30,6 +30,27 @@ test('Workload Partitioning: partitionInteger remainder distribution', async (t)
   assert.deepEqual(partitionInteger(10, null), [10]);
 });
 
+test('ProgressAggregator: RPS uses first request start through last completion across workers', () => {
+  const aggregator = new ProgressAggregator(2, 10);
+  aggregator.updateWorker(0, {
+    totalRequests: 10,
+    successCount: 10,
+    failedCount: 0,
+    firstRequestStartedAt: 1000,
+    lastRequestCompletedAt: 3000,
+  });
+  const aggregate = aggregator.updateWorker(1, {
+    totalRequests: 10,
+    successCount: 10,
+    failedCount: 0,
+    firstRequestStartedAt: 1500,
+    lastRequestCompletedAt: 5000,
+  });
+
+  assert.equal(aggregate.measurementWindowSec, 4);
+  assert.equal(aggregate.rps, 5);
+});
+
 test('Workload Partitioning: partitionWorkload fixed concurrency profile', async (t) => {
   const runConfig = {
     id: 'run-1',
@@ -117,6 +138,8 @@ test('Progress Aggregation: Multi-worker cumulative progress snapshots', async (
     currentConcurrency: 5,
     statusCodes: { '200': 48, '500': 2 },
     elapsedSec: 2.0,
+    firstRequestStartedAt: 1000,
+    lastRequestCompletedAt: 3000,
     progressPercent: 20.0,
   });
 
@@ -134,6 +157,8 @@ test('Progress Aggregation: Multi-worker cumulative progress snapshots', async (
     currentConcurrency: 5,
     statusCodes: { '200': 40 },
     elapsedSec: 2.1,
+    firstRequestStartedAt: 1200,
+    lastRequestCompletedAt: 3100,
     progressPercent: 21.0,
   });
 
@@ -154,6 +179,8 @@ test('Progress Aggregation: Multi-worker cumulative progress snapshots', async (
     currentConcurrency: 5,
     statusCodes: { '200': 96, '500': 4 },
     elapsedSec: 4.0,
+    firstRequestStartedAt: 1000,
+    lastRequestCompletedAt: 5000,
     progressPercent: 40.0,
   });
 

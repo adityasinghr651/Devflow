@@ -83,7 +83,10 @@ async function runWorker({
   let httpErrorCount = 0;
   let timeoutCount = 0;
   let networkErrorCount = 0;
+  let redirectBlockedCount = 0;
   let cancelledCount = 0;
+  let firstRequestStartedAt = null;
+  let lastRequestCompletedAt = null;
 
   let lastProgressReport = Date.now();
   let currentActiveConcurrency = hasStages ? (stages[0]?.target || 0) : concurrency;
@@ -120,7 +123,10 @@ async function runWorker({
           httpErrorCount,
           timeoutCount,
           networkErrorCount,
+          redirectBlockedCount,
           cancelledCount,
+          firstRequestStartedAt,
+          lastRequestCompletedAt,
           rps,
           errorRate,
           statusCodes: { ...statusCodes },
@@ -150,6 +156,7 @@ async function runWorker({
       }
 
       const reqStart = performance.now();
+      const reqStartEpoch = Date.now();
       let code = 'network_error';
       let isAbortedReq = false;
 
@@ -189,7 +196,7 @@ async function runWorker({
           failedCount++;
         } else if (err.name === 'TypeError' && (err.cause?.message?.includes('redirect') || err.message?.includes('redirect'))) {
           code = 'redirect_blocked';
-          networkErrorCount++;
+          redirectBlockedCount++;
           failedCount++;
         } else {
           code = 'network_error';
@@ -206,6 +213,10 @@ async function runWorker({
         const elapsed = Math.max(0, performance.now() - reqStart);
         latencyHistogram.record(elapsed);
         totalRequests++;
+        firstRequestStartedAt = firstRequestStartedAt === null
+          ? reqStartEpoch
+          : Math.min(firstRequestStartedAt, reqStartEpoch);
+        lastRequestCompletedAt = Date.now();
       }
 
       if (totalRequests % 5 === 0) {
@@ -236,7 +247,10 @@ async function runWorker({
     httpErrorCount,
     timeoutCount,
     networkErrorCount,
+    redirectBlockedCount,
     cancelledCount,
+    firstRequestStartedAt,
+    lastRequestCompletedAt,
     statusCodes,
     rps: Number((totalRequests / totalElapsedSec).toFixed(2)),
     p50: latencyHistogram.getPercentile(0.50),

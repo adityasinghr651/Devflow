@@ -196,6 +196,8 @@ export class JsonStorage {
       httpErrorCount: run.httpErrorCount ?? 0,
       timeoutCount: run.timeoutCount ?? 0,
       networkErrorCount: run.networkErrorCount ?? 0,
+      redirectBlockedCount: run.redirectBlockedCount ?? 0,
+      measurementWindowSec: run.measurementWindowSec ?? null,
       cancelledCount: run.cancelledCount ?? 0,
       engine: run.engine || 'node',
       errorRate: run.errorRate !== undefined ? Number(Number(run.errorRate).toFixed(4)) : 0,

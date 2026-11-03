@@ -71,6 +71,7 @@ export const TargetsView: React.FC<TargetsViewProps> = ({
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                       <Server size={14} style={{ color: 'var(--color-blue)' }} />
                       <b style={{ color: 'var(--text-primary)' }}>{t.name}</b>
+                      {t.isDemo && <span className="env-pill">Demo data</span>}
                     </div>
                   </td>
                   <td style={{ fontFamily: 'var(--font-mono)', fontSize: '12px' }}>{t.url}</td>
