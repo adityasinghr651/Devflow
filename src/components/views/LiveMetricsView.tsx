@@ -26,7 +26,7 @@ interface LiveMetricsViewProps {
   liveMetrics: LiveMetrics;
   onStopRun: (id: string) => void;
   onNewTestClick: () => void;
-  onSimulateRun: () => void;
+  onSimulateRun?: () => void;
   fmt: (n: number) => string;
 }
 
@@ -55,28 +55,7 @@ export const LiveMetricsView: React.FC<LiveMetricsViewProps> = ({
   const [logs, setLogs] = useState<string[]>([]);
 
   // Push live telemetry data points every 900ms when running
-  useEffect(() => {
-    if (!isRunning || !activeRun?.isDemo) return;
-
-    const interval = setInterval(() => {
-      const currentP95 = activeRun.p95;
-      const noise = (Math.random() - 0.5) * 4;
-      const nextVal = Math.min(50, Math.max(10, Math.round(currentP95 * 1.3 + noise)));
-
-      setStreamPoints((prev) => [...prev.slice(1), nextVal]);
-
-      const timestamp = new Date().toLocaleTimeString();
-      const randomVU = Math.floor(Math.random() * (activeRun?.concurrency || 20)) + 1;
-      const sampleEvents = [
-        `[${timestamp}] Telemetry flush: ${Math.round(2600 + Math.random() * 400)} req/s (VU #${randomVU})`,
-        `[${timestamp}] Latency histogram: p50=8.3ms, p95=${(16 + Math.random() * 4).toFixed(1)}ms, p99=29.4ms`,
-        `[${timestamp}] HTTP connection pool active: 0 socket timeouts, 0 dropped packets`,
-      ];
-      setLogs((prev) => [sampleEvents[Math.floor(Math.random() * sampleEvents.length)], ...prev.slice(0, 14)]);
-    }, 900);
-
-    return () => clearInterval(interval);
-  }, [isRunning, activeRun]);
+  useEffect(() => { setStreamPoints([]); setLogs([]); }, [activeRun?.id]);
 
   if (!activeRun) {
     return (
@@ -88,10 +67,6 @@ export const LiveMetricsView: React.FC<LiveMetricsViewProps> = ({
             Launch a load test to stream real-time sub-millisecond metrics, throughput gauges, and latency histogram distributions.
           </p>
           <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
-            <button type="button" className="btn btn-secondary" onClick={onSimulateRun}>
-              <Zap size={14} style={{ color: 'var(--color-blue)' }} />
-              <span>Simulate Live Stream</span>
-            </button>
             <button type="button" className="btn btn-primary" onClick={onNewTestClick}>
               <Play size={14} fill="currentColor" />
               <span>Start Real Load Test</span>
@@ -145,7 +120,7 @@ export const LiveMetricsView: React.FC<LiveMetricsViewProps> = ({
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            {isRunning ? (
+            {isRunning && (
               <button
                 type="button"
                 className="btn btn-danger btn-sm"
@@ -153,16 +128,6 @@ export const LiveMetricsView: React.FC<LiveMetricsViewProps> = ({
               >
                 <Square size={13} fill="currentColor" />
                 <span>Stop Execution</span>
-              </button>
-            ) : (
-              <button
-                type="button"
-                className="btn btn-secondary btn-sm"
-                onClick={onSimulateRun}
-                title="Run new simulated stream"
-              >
-                <RotateCcw size={13} />
-                <span>Re-run Stream</span>
               </button>
             )}
 

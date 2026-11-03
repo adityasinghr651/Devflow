@@ -1,6 +1,7 @@
 import express from 'express';
 import { randomUUID } from 'node:crypto';
 import { getStorage } from '../storage/index.js';
+import { recordAuditEvent } from '../audit.js';
 import {
   hashPassword,
   verifyPassword,
@@ -46,7 +47,7 @@ authRouter.post('/auth/register', authRateLimiter, async (req, res, next) => {
       role: 'user',
     });
 
-    await storage.createAuditEvent({
+    await recordAuditEvent(storage, {
       userId: user.id,
       action: 'USER_REGISTER',
       resourceType: 'user',
@@ -76,7 +77,7 @@ authRouter.post('/auth/login', authRateLimiter, async (req, res, next) => {
     const user = await storage.getUserByEmail(normalizedEmail);
 
     if (!user) {
-      await storage.createAuditEvent({
+      await recordAuditEvent(storage, {
         action: 'USER_LOGIN_FAILED',
         details: { email: normalizedEmail, reason: 'user_not_found' },
         ipAddress: req.ip,
@@ -86,7 +87,7 @@ authRouter.post('/auth/login', authRateLimiter, async (req, res, next) => {
 
     const isValid = await verifyPassword(password, user.passwordHash);
     if (!isValid) {
-      await storage.createAuditEvent({
+      await recordAuditEvent(storage, {
         userId: user.id,
         action: 'USER_LOGIN_FAILED',
         details: { email: normalizedEmail, reason: 'invalid_password' },
@@ -102,7 +103,7 @@ authRouter.post('/auth/login', authRateLimiter, async (req, res, next) => {
       role: user.role,
     };
 
-    await storage.createAuditEvent({
+    await recordAuditEvent(storage, {
       userId: user.id,
       action: 'USER_LOGIN_SUCCESS',
       details: { email: user.email },
@@ -147,7 +148,7 @@ authRouter.post('/auth/oauth', authRateLimiter, async (req, res, next) => {
         role: 'user',
       });
 
-      await storage.createAuditEvent({
+      await recordAuditEvent(storage, {
         userId: user.id,
         action: 'USER_OAUTH_REGISTER',
         resourceType: 'user',
@@ -156,7 +157,7 @@ authRouter.post('/auth/oauth', authRateLimiter, async (req, res, next) => {
         ipAddress: req.ip,
       });
     } else {
-      await storage.createAuditEvent({
+      await recordAuditEvent(storage, {
         userId: user.id,
         action: 'USER_OAUTH_LOGIN',
         resourceType: 'user',
@@ -198,7 +199,7 @@ authRouter.get('/auth/me', authenticateToken, async (req, res, next) => {
 authRouter.post('/auth/logout', authenticateToken, async (req, res, next) => {
   try {
     const storage = getStorage();
-    await storage.createAuditEvent({
+    await recordAuditEvent(storage, {
       userId: req.user.id,
       action: 'USER_LOGOUT',
       details: { email: req.user.email },

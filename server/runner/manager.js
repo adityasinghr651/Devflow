@@ -42,7 +42,7 @@ export class RunnerManager {
     }
     this.dispatchedRuns.add(run.id);
     this.queue.push(run.id);
-    this._processNext();
+    void this._processNext();
     return run;
   }
 
@@ -85,7 +85,7 @@ export class RunnerManager {
     return { success: false, reason: 'Run not active or already in terminal state' };
   }
 
-  async _transitionState(id, newStatus, updates = {}) {
+  async _transitionState(id, newStatus, updates = {}, emitStatus = true) {
     const current = await this.storage.getRunById(id);
     if (!current) return null;
 
@@ -104,7 +104,7 @@ export class RunnerManager {
       status: newStatus,
     });
 
-    this.events.emit(`status:${id}`, { id, status: newStatus, ...updates });
+    if (emitStatus) this.events.emit(`status:${id}`, { id, status: newStatus, ...updates });
     return updated;
   }
 
@@ -114,16 +114,27 @@ export class RunnerManager {
     }
 
     const runId = this.queue.shift();
-    const run = await this.storage.getRunById(runId);
-    if (!run || TERMINAL_STATES.has(run.status)) {
-      return this._processNext();
-    }
-
     this.runningCount++;
-    this._executeRun(run).finally(() => {
+    try {
+      const run = await this.storage.getRunById(runId);
+      if (run && !TERMINAL_STATES.has(run.status)) {
+        await this._executeRun(run);
+      }
+    } catch (err) {
+      const message = String(err?.message || err || 'Runner failed before execution started').slice(0, 300);
+      console.error(`[RunnerManager] Failed to dispatch run ${runId}: ${message}`);
+      try {
+        await this._transitionState(runId, 'failed', {
+          error: `Could not start test execution: ${message}`,
+          finishedAt: new Date().toISOString(),
+        });
+      } catch (persistError) {
+        console.error(`[RunnerManager] Could not persist failed status for run ${runId}: ${persistError.message}`);
+      }
+    } finally {
       this.runningCount--;
-      this._processNext();
-    });
+      void this._processNext();
+    }
   }
 
   async _executeRun(run) {
@@ -249,7 +260,7 @@ export class RunnerManager {
       storage: this.storage,
       events: this.events,
       workerPath,
-      transitionState: (id, status, updates) => this._transitionState(id, status, { engine: 'node', ...updates }),
+      transitionState: (id, status, updates) => this._transitionState(id, status, { engine: 'node', ...updates }, false),
     });
 
     const activeEntry = this.activeRuns.get(run.id);

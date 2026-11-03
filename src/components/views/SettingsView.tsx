@@ -23,7 +23,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     <Card className="full-panel settings-panel page-animate">
       <PanelTitle
         title="Application Preferences & Environment"
-        detail="Manage user authentication session, visual theme modes, and backend engine status."
+        detail="Manage your account and choose how DevFlow looks on this device."
       />
 
       {/* User Account */}
@@ -47,9 +47,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       <div className="setting-row">
         <div>
           <b>Appearance & Theme Preference</b>
-          <p>
-            Choose between dark developer neon aesthetic, high-contrast light mode, or automatic system OS sync.
-          </p>
+            <p>Choose light, dark, or follow your system preference.</p>
         </div>
         <div className="theme-switch larger">
           <button
@@ -76,24 +74,12 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         </div>
       </div>
 
-      {/* Engine Status */}
       <div className="setting-row">
         <div>
-          <b>Telemetry & Metrics Engine</b>
-          <p>Out-of-process worker execution with O(1) bounded-memory latency histograms and real-time SSE push.</p>
+          <b>Workspace data</b>
+          <p>Targets and test runs are loaded from the connected DevFlow API when you sign in.</p>
         </div>
-        <span className="status-pill completed">
-          <i /> Phase 6.1 Active
-        </span>
-      </div>
-
-      {/* Data Storage */}
-      <div className="setting-row">
-        <div>
-          <b>Data Persistence Layer</b>
-          <p>PostgreSQL schema with strict tenant isolation and atomic transaction migrations.</p>
-        </div>
-        <span className="env-pill">PostgreSQL Engine</span>
+        <span className="env-pill">API-backed</span>
       </div>
     </Card>
   );

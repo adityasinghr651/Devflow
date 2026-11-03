@@ -234,10 +234,14 @@ export default function App() {
   const [authError, setAuthError] = useState('');
 
   // Operational State
-  const [targets, setTargets] = useState<Target[]>(DEFAULT_TARGETS);
-  const [runs, setRuns] = useState<Run[]>(DEFAULT_RUNS);
-  const [, setLoading] = useState(false);
+  const [targets, setTargets] = useState<Target[]>(() => localStorage.getItem('servertest-demo-mode') === 'true' ? DEFAULT_TARGETS : []);
+  const [runs, setRuns] = useState<Run[]>(() => localStorage.getItem('servertest-demo-mode') === 'true' ? DEFAULT_RUNS : []);
+  const [loading, setLoading] = useState(false);
+  const [dataError, setDataError] = useState('');
   const [notice, setNotice] = useState('');
+  const [targetError, setTargetError] = useState('');
+  const [targetSaving, setTargetSaving] = useState(false);
+  const [testError, setTestError] = useState('');
   const [showTarget, setShowTarget] = useState(() => typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('target_modal') === 'true');
   const [showTest, setShowTest] = useState(() => typeof window !== 'undefined' && (new URLSearchParams(window.location.search).get('test_modal') === 'true' || window.location.hash.includes('test_modal')));
   const [verifyingTarget, setVerifyingTarget] = useState<Target | null>(null);
@@ -248,16 +252,16 @@ export default function App() {
   const [query, setQuery] = useState('');
 
   // Target creation form
-  const [targetName, setTargetName] = useState('Local API');
-  const [targetUrl, setTargetUrl] = useState('http://localhost:3001');
+  const [targetName, setTargetName] = useState('Local latency demo');
+  const [targetUrl, setTargetUrl] = useState('http://127.0.0.1:5050');
   const [environment, setEnvironment] = useState('Development');
 
   // Test configuration form
-  const [testTarget, setTestTarget] = useState(DEFAULT_TARGETS[0].id);
-  const [path, setPath] = useState('/');
+  const [testTarget, setTestTarget] = useState('');
+  const [path, setPath] = useState('/slow?ms=50');
   const [method, setMethod] = useState('GET');
-  const [concurrency, setConcurrency] = useState(15);
-  const [duration, setDuration] = useState(10);
+  const [concurrency, setConcurrency] = useState(5);
+  const [duration, setDuration] = useState(5);
   const [testProfile, setTestProfile] = useState<'fixed' | 'stages'>('fixed');
   const [stages, setStages] = useState<Stage[]>([
     { target: 5, durationSec: 5 },
@@ -375,9 +379,14 @@ export default function App() {
     const r = await fetch(`${API}${route}`, { ...options, headers });
     const body = await r.json().catch(() => ({ error: 'Invalid server response' }));
     if (!r.ok) {
-      if (r.status === 401 && !route.startsWith('/auth/')) {
+      if (r.status === 401 && !['/auth/login', '/auth/register', '/auth/oauth'].includes(route)) {
         localStorage.removeItem('servertest-token');
+        localStorage.removeItem('servertest-demo-mode');
         setToken(null);
+        setUser(null);
+        setTargets([]);
+        setRuns([]);
+        setSelectedRun(null);
         setNotice('Session expired. Running in local preview mode.');
       }
       throw new Error(body.error || `Request failed (${r.status})`);
@@ -387,14 +396,17 @@ export default function App() {
 
   // Refresh server data when token is present
   async function refresh() {
-    if (!token) return;
+    if (!token) { setDataError('Sign in to load your saved targets and test runs.'); return; }
+    setLoading(true);
     try {
       const [t, r] = await Promise.all([request<Target[]>('/targets'), request<Run[]>('/runs')]);
-      if (t && t.length > 0) setTargets(t);
-      if (r && r.length > 0) setRuns(r);
-    } catch {
-      // Gracefully preserve default seed targets and runs
-    }
+      const loadedTargets = Array.isArray(t) ? t : [];
+      setTargets(loadedTargets);
+      setTestTarget((previous) => previous && loadedTargets.some((target) => target.id === previous) ? previous : loadedTargets[0]?.id || '');
+      setRuns(Array.isArray(r) ? r : []);
+      setDataError('');
+    } catch (error) { setDataError(error instanceof Error ? error.message : 'Could not load workspace data.'); }
+    finally { setLoading(false); }
   }
 
   useEffect(() => {
@@ -404,9 +416,7 @@ export default function App() {
           setUser(res.user);
           refresh();
         })
-        .catch(() => {
-          // preserve demo user if set
-        });
+        .catch((error) => { setDataError(error instanceof Error ? error.message : 'Could not validate your session.'); });
     }
   }, [token]);
 
@@ -438,12 +448,20 @@ export default function App() {
       });
 
       eventSource.addEventListener('end', (e) => {
+        let eventData: Partial<Run> = {};
         try {
-          const data = JSON.parse(e.data);
-          setSelectedRun((prev) => (prev ? { ...prev, status: data.status || 'completed' } : null));
+          eventData = JSON.parse(e.data);
+          setSelectedRun((prev) => prev ? { ...prev, ...eventData } : null);
         } catch {}
         eventSource.close();
-        refresh();
+        void Promise.all([
+          refresh(),
+          request<Run>(`/runs/${selectedRun.id}`).then((savedRun) => {
+            setSelectedRun((prev) => prev?.id === savedRun.id ? savedRun : prev);
+          }).catch((error) => {
+            setNotice(error instanceof Error ? `Run ended, but its saved results could not be reloaded: ${error.message}` : 'Run ended, but its saved results could not be reloaded.');
+          }),
+        ]);
       });
 
       eventSource.onerror = () => {
@@ -458,6 +476,8 @@ export default function App() {
 
   // 1-Click Instant Demo Authentication
   function handleDemoAuth() {
+    localStorage.removeItem('servertest-token');
+    setToken(null);
     setUser(DEMO_USER);
     localStorage.setItem('servertest-demo-mode', 'true');
     setShowAuth(false);
@@ -476,6 +496,7 @@ export default function App() {
           method: 'POST',
           body: JSON.stringify({ email: authEmail, password: authPassword, name: authName }),
         });
+        localStorage.removeItem('servertest-demo-mode');
         localStorage.setItem('servertest-token', res.token);
         setToken(res.token);
         setUser(res.user);
@@ -487,6 +508,7 @@ export default function App() {
           method: 'POST',
           body: JSON.stringify({ email: authEmail, password: authPassword }),
         });
+        localStorage.removeItem('servertest-demo-mode');
         localStorage.setItem('servertest-token', res.token);
         setToken(res.token);
         setUser(res.user);
@@ -494,18 +516,8 @@ export default function App() {
         setNotice(`Welcome back, ${res.user.name}!`);
         navigateTo('Overview');
       }
-    } catch {
-      // Graceful offline fallback
-      const fallbackUser: User = {
-        id: `usr_${Date.now()}`,
-        email: authEmail || 'engineer@company.com',
-        name: authName || 'Alex Mercer',
-        role: 'engineer',
-      };
-      setUser(fallbackUser);
-      setShowAuth(false);
-      setNotice(`Signed in locally as ${fallbackUser.name}.`);
-      navigateTo('Overview');
+    } catch (error) {
+      setAuthError(error instanceof Error ? error.message : 'Sign in failed. Check the API connection and try again.');
     } finally {
       setAuthSubmitting(false);
     }
@@ -523,24 +535,15 @@ export default function App() {
         method: 'POST',
         body: JSON.stringify({ provider, email: emailToUse.trim(), name: defaultName }),
       });
+      localStorage.removeItem('servertest-demo-mode');
       localStorage.setItem('servertest-token', res.token);
       setToken(res.token);
       setUser(res.user);
       setShowAuth(false);
       setNotice(`Signed in with ${provider === 'github' ? 'GitHub' : 'Google'} as ${res.user.email}`);
       navigateTo('Overview');
-    } catch {
-      // Offline fallback
-      const fallbackUser: User = {
-        id: `usr_${provider}_${Date.now()}`,
-        email: emailToUse,
-        name: defaultName,
-        role: 'engineer',
-      };
-      setUser(fallbackUser);
-      setShowAuth(false);
-      setNotice(`Connected with ${provider === 'github' ? 'GitHub' : 'Google'} in preview mode.`);
-      navigateTo('Overview');
+    } catch (error) {
+      setAuthError(error instanceof Error ? error.message : 'Provider sign in failed.');
     } finally {
       setAuthSubmitting(false);
     }
@@ -554,6 +557,9 @@ export default function App() {
     localStorage.removeItem('servertest-demo-mode');
     setToken(null);
     setUser(null);
+    setTargets([]);
+    setRuns([]);
+    setSelectedRun(null);
     navigateTo('Home');
     setNotice('You have been signed out.');
   }
@@ -565,41 +571,42 @@ export default function App() {
   // Target creation
   async function addTarget(e: React.FormEvent) {
     e.preventDefault();
-    const newTarget: Target = {
-      id: `tgt_${Math.random().toString(36).slice(2, 9)}`,
-      name: targetName,
-      url: targetUrl,
-      environment,
-      verified: targetUrl.includes('localhost') || targetUrl.includes('127.0.0.1'),
-      createdAt: new Date().toISOString(),
-    };
-
+    setTargetError('');
+    if (!token) {
+      setTargetError(user ? 'The demo workspace is read-only. Create or sign in to an account to save targets.' : 'Sign in or create an account before saving a target.');
+      return;
+    }
+    setTargetSaving(true);
     try {
       const t = await request<Target>('/targets', {
         method: 'POST',
         body: JSON.stringify({ name: targetName, url: targetUrl, environment }),
       });
       setTargets((p) => [t, ...p]);
-    } catch {
-      setTargets((p) => [newTarget, ...p]);
+      setTestTarget(t.id);
+    } catch (error) {
+      setTargetError(error instanceof Error ? error.message : 'Could not save target.');
+      return;
+    } finally {
+      setTargetSaving(false);
     }
 
     setShowTarget(false);
-    setNotice(`Target "${newTarget.name}" saved successfully.`);
-    setTargetName('Local API');
-    setTargetUrl('http://localhost:3001');
+    setNotice(`Target "${targetName}" saved successfully.`);
+    setTargetName('Local latency demo');
+    setTargetUrl('http://127.0.0.1:5050');
   }
 
   async function verifyDomain(targetId: string) {
     setVerifyLoading(true);
-    setTimeout(() => {
-      setTargets((p) =>
-        p.map((t) => (t.id === targetId ? { ...t, verified: true, verifiedAt: new Date().toISOString() } : t))
-      );
+    try {
+      const result = await request<{ target?: Target; verified?: boolean; error?: string }>(`/targets/${targetId}/verify`, { method: 'POST' });
+      if (result.target) setTargets((p) => p.map((t) => t.id === targetId ? result.target! : t));
+      else await refresh();
       setVerifyingTarget(null);
-      setVerifyLoading(false);
       setNotice('Domain ownership proof verified successfully!');
-    }, 600);
+    } catch (error) { setNotice(error instanceof Error ? error.message : 'Domain verification failed.'); }
+    finally { setVerifyLoading(false); }
   }
 
   // Interactive Live Test Execution (Works Online & In Offline Simulator)
@@ -693,10 +700,15 @@ export default function App() {
 
   async function launchTest(e: React.FormEvent) {
     e.preventDefault();
+    setTestError('');
+    if (!token) {
+      setTestError(user ? 'The demo workspace is read-only. Sign in to an account to run tests.' : 'Sign in to run tests against your saved targets.');
+      return;
+    }
     setStarting(true);
     const t = targets.find((x) => x.id === testTarget) || targets[0];
     if (!t) {
-      setNotice('Please select an authorized API target.');
+      setTestError('Please select an authorized API target.');
       setStarting(false);
       return;
     }
@@ -724,25 +736,27 @@ export default function App() {
       setSelectedRun(run);
       navigateTo('Test Runs');
       setNotice('Test queued. Live metrics streaming via SSE.');
-    } catch {
-      // Run interactive simulation test immediately
-      simulateLiveTest(t, payload);
+    } catch (error) {
+      setTestError(error instanceof Error ? error.message : 'Could not start test. Check the API connection.');
     } finally {
       setStarting(false);
     }
   }
 
   async function stopRun(id: string) {
+    let response: { requested: boolean; status: string };
     try {
-      await request(`/runs/${id}/cancel`, { method: 'POST' });
-    } catch {}
-    setRuns((prev) =>
-      prev.map((r) => (r.id === id ? { ...r, status: 'cancelled' } : r))
-    );
-    if (selectedRun?.id === id) {
-      setSelectedRun((prev) => (prev ? { ...prev, status: 'cancelled' } : null));
+      response = await request<{ requested: boolean; status: string }>(`/runs/${id}/cancel`, { method: 'POST' });
+    } catch (error) { setNotice(error instanceof Error ? error.message : 'Could not cancel test.'); return; }
+    try {
+      const savedRun = await request<Run>(`/runs/${id}`);
+      setRuns((prev) => prev.map((run) => run.id === id ? savedRun : run));
+      setSelectedRun((prev) => prev?.id === id ? savedRun : prev);
+    } catch (error) {
+      setNotice(error instanceof Error ? `Cancellation was requested, but run status could not be reloaded: ${error.message}` : 'Cancellation was requested, but run status could not be reloaded.');
+      return;
     }
-    setNotice(`Test ${id} was cancelled.`);
+    setNotice(response.status === 'cancelled' ? `Test ${id} was cancelled.` : `Cancellation requested for test ${id}. The worker is stopping.`);
   }
 
   function exportRun(run: Run) {
@@ -756,7 +770,7 @@ export default function App() {
   async function deleteTarget(id: string) {
     try {
       await request(`/targets/${id}`, { method: 'DELETE' });
-    } catch {}
+    } catch (error) { setNotice(error instanceof Error ? error.message : 'Could not delete target.'); return; }
     setTargets((p) => p.filter((t) => t.id !== id));
     setNotice('Target removed from platform.');
   }
@@ -813,6 +827,10 @@ export default function App() {
           environment={environment}
           setEnvironment={setEnvironment}
           addTarget={addTarget}
+          saving={targetSaving}
+          error={targetError}
+          canSave={Boolean(token)}
+          onSignIn={() => { setShowTarget(false); setAuthMode('login'); setAuthError(''); setShowAuth(true); }}
           onClose={() => setShowTarget(false)}
         />
       )}
@@ -851,8 +869,15 @@ export default function App() {
           authorized={authorized}
           setAuthorized={setAuthorized}
           starting={starting}
+          error={testError}
+          canRun={Boolean(token)}
           launchTest={launchTest}
           targets={targets}
+          onAddTarget={() => {
+            setShowTest(false);
+            if (token) { setTargetError(''); setShowTarget(true); }
+            else { setAuthMode('login'); setAuthError('Sign in or create an account to save targets and run tests.'); setShowAuth(true); }
+          }}
           onClose={() => setShowTest(false)}
         />
       )}
@@ -907,6 +932,7 @@ export default function App() {
         mobileOpen={mobileNav}
         onMobileClose={() => setMobileNav(false)}
         onNewTestClick={() => navigateTo('Create Test')}
+        connectionStatus={token ? (dataError ? 'Issue' : loading ? 'Loading' : 'Connected') : user ? 'Demo' : 'Offline'}
       />
 
       {/* Main Content Area */}
@@ -939,6 +965,7 @@ export default function App() {
               </button>
             </div>
           )}
+          {(loading || dataError) && <div className={`notice ${dataError ? 'notice-error' : ''}`} role="status">{loading ? 'Loading workspace data…' : dataError}</div>}
 
           {/* Page Heading for Dashboard Views */}
           <div className="page-heading">
@@ -1003,10 +1030,7 @@ export default function App() {
               onSelectRun={setSelectedRun}
               onShowTargetModal={() => setShowTarget(true)}
               onShowTestModal={() => setShowTest(true)}
-              onSimulateRun={() => {
-                const t = targets[0] || DEFAULT_TARGETS[0];
-                simulateLiveTest(t, { concurrency: 25, durationSec: 8, method: 'GET', path: '/api/v2/checkout' });
-              }}
+              onSimulateRun={undefined}
               setTestTarget={setTestTarget}
               fmt={fmt}
             />
@@ -1029,10 +1053,7 @@ export default function App() {
               liveMetrics={liveMetrics}
               onStopRun={stopRun}
               onNewTestClick={() => navigateTo('Create Test')}
-              onSimulateRun={() => {
-                const t = targets[0] || DEFAULT_TARGETS[0];
-                simulateLiveTest(t, { concurrency: 30, durationSec: 10, method: 'POST', path: '/api/v1/checkout' });
-              }}
+              onSimulateRun={undefined}
               fmt={fmt}
             />
           )}

@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { randomUUID } from 'node:crypto';
 import { PgStorage } from '../../server/storage/postgres-storage.js';
 import { runMigrations } from '../../server/storage/migrations/runner.js';
 
@@ -7,6 +8,10 @@ const TEST_DATABASE_URL = process.env.TEST_DATABASE_URL || 'postgresql://postgre
 
 test('PostgreSQL: Real Database Integration & Lifecycle', async (t) => {
   let storage;
+  let restartedStorage = null;
+  const testId = randomUUID();
+  const testEmail = `pg-${testId}@example.test`;
+  let testUserId = null;
 
   try {
     storage = new PgStorage(TEST_DATABASE_URL);
@@ -17,13 +22,15 @@ test('PostgreSQL: Real Database Integration & Lifecycle', async (t) => {
   }
 
   t.after(async () => {
-    if (storage) {
-      await storage.close().catch(() => {});
+    const cleanupStorage = restartedStorage || storage;
+    if (cleanupStorage) {
+      if (testUserId) {
+        await cleanupStorage.pool.query('DELETE FROM users WHERE id = $1', [testUserId]).catch(() => {});
+      }
     }
+    await restartedStorage?.close().catch(() => {});
+    await storage?.close().catch(() => {});
   });
-
-  // Clean tables before running test assertions
-  await storage.pool.query('TRUNCATE users, audit_events CASCADE;');
 
   // 1. Verify Migrations applied
   const migRes = await storage.pool.query('SELECT version FROM schema_migrations ORDER BY version ASC');
@@ -37,18 +44,19 @@ test('PostgreSQL: Real Database Integration & Lifecycle', async (t) => {
 
   // 2. User Creation & Uniqueness Constraint
   const userA = await storage.createUser({
-    email: 'pg_alice@example.com',
+    email: testEmail,
     passwordHash: '$2a$10$realhashforpgalice12345678901234567890',
     name: 'PG Alice',
     role: 'user',
   });
+  testUserId = userA.id;
   assert.ok(userA.id);
-  assert.equal(userA.email, 'pg_alice@example.com');
+  assert.equal(userA.email, testEmail);
 
   // Duplicate email should throw unique constraint violation (code 23505)
   await assert.rejects(
     async () => await storage.createUser({
-      email: 'pg_alice@example.com',
+      email: testEmail,
       passwordHash: 'another_hash',
       name: 'Duplicate Alice',
     }),
@@ -57,7 +65,7 @@ test('PostgreSQL: Real Database Integration & Lifecycle', async (t) => {
 
   // 3. Target Creation and Scoped Retrieval
   const targetA = await storage.createTarget({
-    id: '11111111-1111-1111-1111-111111111111',
+    id: randomUUID(),
     userId: userA.id,
     name: 'Alice PG Target',
     url: 'http://localhost:3000',
@@ -93,7 +101,7 @@ test('PostgreSQL: Real Database Integration & Lifecycle', async (t) => {
   // Foreign Key Constraint: Invalid user_id must be rejected (code 23503)
   await assert.rejects(
     async () => await storage.createTarget({
-      id: '22222222-2222-2222-2222-222222222222',
+      id: randomUUID(),
       userId: '00000000-0000-0000-0000-000000000000',
       name: 'Invalid Target',
       url: 'http://localhost:3000',
@@ -103,7 +111,7 @@ test('PostgreSQL: Real Database Integration & Lifecycle', async (t) => {
 
   // 4. Test Run Creation & Advanced Phase 4 Fields (Stages, Headers, Body, Timeout)
   const stagedRun = await storage.createRun({
-    id: '33333333-3333-3333-3333-333333333333',
+    id: randomUUID(),
     userId: userA.id,
     targetId: targetA.id,
     targetName: targetA.name,
@@ -132,7 +140,7 @@ test('PostgreSQL: Real Database Integration & Lifecycle', async (t) => {
   // Check constraint on duration (> 30s)
   await assert.rejects(
     async () => await storage.createRun({
-      id: '44444444-4444-4444-4444-444444444444',
+      id: randomUUID(),
       userId: userA.id,
       targetId: targetA.id,
       targetName: targetA.name,
@@ -173,10 +181,10 @@ test('PostgreSQL: Real Database Integration & Lifecycle', async (t) => {
   await storage.close();
 
   // Create new storage instance simulating a restart
-  const restartedStorage = new PgStorage(TEST_DATABASE_URL);
+  restartedStorage = new PgStorage(TEST_DATABASE_URL);
   await restartedStorage.init();
 
-  const persistedUser = await restartedStorage.getUserByEmail('pg_alice@example.com');
+  const persistedUser = await restartedStorage.getUserByEmail(testEmail);
   assert.ok(persistedUser);
   assert.equal(persistedUser.id, userA.id);
 

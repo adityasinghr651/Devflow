@@ -25,6 +25,7 @@ interface AppSidebarProps {
   mobileOpen: boolean;
   onMobileClose: () => void;
   onNewTestClick: () => void;
+  connectionStatus: string;
 }
 
 export const AppSidebar: React.FC<AppSidebarProps> = ({
@@ -35,6 +36,7 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
   mobileOpen,
   onMobileClose,
   onNewTestClick,
+  connectionStatus,
 }) => {
   // Required Sidebar items:
   // - Overview
@@ -171,8 +173,8 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
 
           <div className="sidebar-status-box">
             <span className="status-dot-active" />
-            <span>Target Engine: <b>Active</b></span>
-            <span className="sidebar-status-tag">Live SSE</span>
+            <span>Workspace API</span>
+            <span className="sidebar-status-tag">{connectionStatus}</span>
           </div>
         </div>
       </aside>

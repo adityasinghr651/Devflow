@@ -87,11 +87,19 @@ export class TestCoordinator {
       this._terminateAllWorkers('SIGKILL');
       if (!this.isTerminated) {
         this.isTerminated = true;
-        await this.transitionState(this.run.id, 'timed_out', {
+        const timeoutSummary = {
           error: 'Execution exceeded allowable maximum run duration watchdog threshold.',
           finishedAt: new Date().toISOString(),
-        }).catch(() => {});
-        this._resolveCompletion({ status: 'timed_out' });
+        };
+        try {
+          await this.transitionState(this.run.id, 'timed_out', timeoutSummary);
+          this.events?.emit(`status:${this.run.id}`, { id: this.run.id, status: 'timed_out', ...timeoutSummary });
+          this._resolveCompletion({ status: 'timed_out', ...timeoutSummary });
+        } catch (err) {
+          const message = `Test timed out, but its final status could not be saved: ${String(err?.message || err).slice(0, 200)}`;
+          this.events?.emit(`error:${this.run.id}`, message);
+          this._resolveCompletion({ status: 'failed', error: message });
+        }
       }
     }, (this.totalDurationSec * 1000) + 8000);
 
@@ -259,17 +267,21 @@ export class TestCoordinator {
 
     const cleanError = String(errorMessage || 'Worker failed unexpectedly').slice(0, 300);
 
-    if (this.events) {
-      this.events.emit(`error:${this.run.id}`, cleanError);
-    }
-
     const failedSummary = {
       error: cleanError,
       status: 'failed',
       finishedAt: new Date().toISOString(),
     };
 
-    await this.transitionState(this.run.id, 'failed', failedSummary).catch(() => {});
+    try {
+      await this.transitionState(this.run.id, 'failed', failedSummary);
+      this.events?.emit(`status:${this.run.id}`, { id: this.run.id, ...failedSummary });
+    } catch (err) {
+      failedSummary.error = `${cleanError} (also could not persist failed status: ${String(err?.message || err).slice(0, 160)})`.slice(0, 300);
+    }
+    if (this.events) {
+      this.events.emit(`error:${this.run.id}`, cleanError);
+    }
     this._resolveCompletion(failedSummary);
   }
 
@@ -378,14 +390,20 @@ export class TestCoordinator {
       progressPercent: 100,
     };
 
+    try {
+      await this.transitionState(this.run.id, finalStatus, finalSummary);
+    } catch (err) {
+      const message = `Test execution finished, but results could not be saved: ${String(err?.message || err).slice(0, 220)}`;
+      this.events?.emit(`error:${this.run.id}`, message);
+      this._resolveCompletion({ status: 'failed', error: message });
+      return;
+    }
     if (this.events) {
       if (finalStatus === 'completed') {
         this.events.emit(`complete:${this.run.id}`, finalSummary);
       }
       this.events.emit(`status:${this.run.id}`, { id: this.run.id, ...finalSummary });
     }
-
-    await this.transitionState(this.run.id, finalStatus, finalSummary).catch(() => {});
     this._resolveCompletion(finalSummary);
   }
 

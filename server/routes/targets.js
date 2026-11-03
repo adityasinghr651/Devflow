@@ -5,6 +5,7 @@ import { validateTargetPayload } from '../security/validation.js';
 import { authenticateToken } from '../security/auth.js';
 import { isLocalhostTarget, verifyTargetOwnership } from '../security/ownership.js';
 import { config } from '../config.js';
+import { recordAuditEvent } from '../audit.js';
 
 export const targetsRouter = express.Router();
 
@@ -50,7 +51,7 @@ targetsRouter.post('/targets', authenticateToken, async (req, res, next) => {
 
     const saved = await storage.createTarget(target);
 
-    await storage.createAuditEvent({
+    await recordAuditEvent(storage, {
       userId: req.user.id,
       action: 'TARGET_CREATE',
       resourceType: 'target',
@@ -93,7 +94,7 @@ targetsRouter.post('/targets/:id/verify', authenticateToken, async (req, res, ne
         req.user.id
       );
 
-      await storage.createAuditEvent({
+      await recordAuditEvent(storage, {
         userId: req.user.id,
         action: 'TARGET_VERIFIED',
         resourceType: 'target',
@@ -142,7 +143,7 @@ targetsRouter.delete('/targets/:id', authenticateToken, async (req, res, next) =
       return res.status(404).json({ error: 'Target not found.' });
     }
 
-    await storage.createAuditEvent({
+    await recordAuditEvent(storage, {
       userId: req.user.id,
       action: 'TARGET_DELETE',
       resourceType: 'target',

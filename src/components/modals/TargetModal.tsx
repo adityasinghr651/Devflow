@@ -2,6 +2,7 @@ import React from 'react';
 import { ShieldCheck } from 'lucide-react';
 import { Modal } from '../ui/Modal.tsx';
 import { Button } from '../ui/Button.tsx';
+import { CircleHelp, LogIn } from 'lucide-react';
 
 interface TargetModalProps {
   targetName: string;
@@ -11,6 +12,10 @@ interface TargetModalProps {
   environment: string;
   setEnvironment: (val: string) => void;
   addTarget: (e: React.FormEvent) => void;
+  saving: boolean;
+  error: string;
+  canSave: boolean;
+  onSignIn: () => void;
   onClose: () => void;
 }
 
@@ -22,6 +27,10 @@ export const TargetModal: React.FC<TargetModalProps> = ({
   environment,
   setEnvironment,
   addTarget,
+  saving,
+  error,
+  canSave,
+  onSignIn,
   onClose,
 }) => {
   return (
@@ -31,6 +40,11 @@ export const TargetModal: React.FC<TargetModalProps> = ({
       onClose={onClose}
     >
       <form onSubmit={addTarget} className="form-stack">
+        {!canSave && <div className="target-auth-notice">
+          <div><b>{error || 'Sign in to save this target'}</b><p>The demo workspace is read-only. Targets are saved to your account.</p></div>
+          <Button type="button" variant="secondary" onClick={onSignIn} icon={<LogIn size={14} />}>Sign in</Button>
+        </div>}
+        {error && canSave && <div className="warning-box" role="alert"><CircleHelp size={16} /><span>{error}</span></div>}
         <label>
           Target name
           <input
@@ -74,8 +88,8 @@ export const TargetModal: React.FC<TargetModalProps> = ({
           <Button type="button" variant="secondary" onClick={onClose}>
             Cancel
           </Button>
-          <Button type="submit" variant="primary" className="btn-shine">
-            Save Target
+          <Button type="submit" variant="primary" className="btn-shine" disabled={saving || !canSave}>
+            {saving ? 'Saving target…' : 'Save Target'}
           </Button>
         </div>
       </form>

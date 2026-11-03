@@ -8,6 +8,7 @@ export class JsonStorage {
     this.dataFile = path.join(dataDir, 'store.json');
     this.store = { users: [], targets: [], runs: [], auditEvents: [] };
     this.writeQueue = Promise.resolve();
+    this.mutationQueue = Promise.resolve();
     this.initialized = false;
   }
 
@@ -25,18 +26,19 @@ export class JsonStorage {
       };
     } catch (err) {
       if (err.code !== 'ENOENT') {
-        console.warn(`[Storage] Warning: Failed to parse ${this.dataFile}, creating fresh store:`, err.message);
+        throw new Error(`Could not read persisted data at ${this.dataFile}; the existing file was left untouched.`, { cause: err });
       }
-      await this._flush();
+      await this._flush(this.store);
     }
     this.initialized = true;
   }
 
-  async _flush() {
-    this.writeQueue = this.writeQueue.then(async () => {
+  async _flush(snapshot = this.store) {
+    const persist = async () => {
       await fs.mkdir(this.dataDir, { recursive: true });
       const tmp = `${this.dataFile}.${Date.now()}.${Math.random().toString(36).slice(2)}.tmp`;
-      const payload = JSON.stringify(this.store, null, 2);
+      const backup = `${this.dataFile}.${Date.now()}.${Math.random().toString(36).slice(2)}.bak`;
+      const payload = JSON.stringify(snapshot, null, 2);
       await fs.writeFile(tmp, payload, 'utf8');
 
       let renamed = false;
@@ -55,41 +57,57 @@ export class JsonStorage {
       }
 
       if (!renamed) {
-        await fs.writeFile(this.dataFile, payload, 'utf8');
-        await fs.unlink(tmp).catch(() => {});
+        let backedUp = false;
+        try {
+          await fs.rename(this.dataFile, backup);
+          backedUp = true;
+        } catch (err) {
+          if (err.code !== 'ENOENT') throw err;
+        }
+        try {
+          await fs.rename(tmp, this.dataFile);
+        } catch (err) {
+          if (backedUp) await fs.rename(backup, this.dataFile).catch(() => {});
+          throw err;
+        }
+        if (backedUp) await fs.unlink(backup);
       }
-    }).catch(err => {
-      console.error('[Storage] Error persisting to store.json:', err);
+    };
+
+    // Keep later writes usable after an earlier disk error, but propagate each
+    // failed write to the API operation that requested it.
+    const write = this.writeQueue.catch(() => {}).then(persist);
+    this.writeQueue = write;
+    return write;
+  }
+
+  async _commit(change) {
+    await this.init();
+    const operation = this.mutationQueue.catch(() => {}).then(async () => {
+      const draft = structuredClone(this.store);
+      const { value, persist = true } = change(draft);
+      if (!persist) return value;
+      await this._flush(draft);
+      this.store = draft;
+      return value === undefined ? undefined : structuredClone(value);
     });
-    return this.writeQueue;
+    this.mutationQueue = operation;
+    return operation;
   }
 
   // Users
   async createUser({ email, passwordHash, name, role = 'user' }) {
-    await this.init();
-    const existing = this.store.users.find(u => u.email.toLowerCase() === email.toLowerCase());
-    if (existing) {
-      throw new Error('Email already registered.');
-    }
-    const user = {
-      id: randomUUID(),
-      email: email.toLowerCase(),
-      passwordHash,
-      name,
-      role,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-    this.store.users.push(user);
-    await this._flush();
-    return {
-      id: user.id,
-      email: user.email,
-      name: user.name,
-      role: user.role,
-      createdAt: user.createdAt,
-      updatedAt: user.updatedAt,
-    };
+    return this._commit((draft) => {
+      const existing = draft.users.find(u => u.email.toLowerCase() === email.toLowerCase());
+      if (existing) throw new Error('Email already registered.');
+      const user = {
+        id: randomUUID(), email: email.toLowerCase(), passwordHash, name, role,
+        createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+      };
+      draft.users.push(user);
+      const { id, email: savedEmail, name: savedName, role: savedRole, createdAt, updatedAt } = user;
+      return { value: { id, email: savedEmail, name: savedName, role: savedRole, createdAt, updatedAt } };
+    });
   }
 
   async getUserByEmail(email) {
@@ -128,49 +146,36 @@ export class JsonStorage {
   }
 
   async createTarget(target) {
-    await this.init();
-    const fullTarget = {
-      id: target.id || randomUUID(),
-      userId: target.userId,
-      name: target.name,
-      url: target.url,
-      environment: target.environment || 'Development',
-      verified: Boolean(target.verified),
-      verificationToken: target.verificationToken || null,
-      verificationMethod: target.verificationMethod || null,
-      verifiedAt: target.verifiedAt || null,
-      createdAt: target.createdAt || new Date().toISOString(),
-      updatedAt: target.updatedAt || new Date().toISOString(),
-    };
-    this.store.targets.unshift(fullTarget);
-    await this._flush();
-    return JSON.parse(JSON.stringify(fullTarget));
+    return this._commit((draft) => {
+      const fullTarget = {
+        id: target.id || randomUUID(), userId: target.userId, name: target.name, url: target.url,
+        environment: target.environment || 'Development', verified: Boolean(target.verified),
+        verificationToken: target.verificationToken || null, verificationMethod: target.verificationMethod || null,
+        verifiedAt: target.verifiedAt || null, createdAt: target.createdAt || new Date().toISOString(),
+        updatedAt: target.updatedAt || new Date().toISOString(),
+      };
+      draft.targets.unshift(fullTarget);
+      return { value: fullTarget };
+    });
   }
 
   async updateTarget(id, updates, userId = null) {
-    await this.init();
-    const idx = this.store.targets.findIndex(t => t.id === id && (!userId || t.userId === userId));
-    if (idx === -1) return null;
-    this.store.targets[idx] = {
-      ...this.store.targets[idx],
-      ...JSON.parse(JSON.stringify(updates)),
-      updatedAt: new Date().toISOString(),
-    };
-    await this._flush();
-    return JSON.parse(JSON.stringify(this.store.targets[idx]));
+    return this._commit((draft) => {
+      const idx = draft.targets.findIndex(t => t.id === id && (!userId || t.userId === userId));
+      if (idx === -1) return { value: null, persist: false };
+      draft.targets[idx] = { ...draft.targets[idx], ...structuredClone(updates), updatedAt: new Date().toISOString() };
+      return { value: draft.targets[idx] };
+    });
   }
 
   async deleteTarget(id, userId = null) {
-    await this.init();
-    const prevLen = this.store.targets.length;
-    this.store.targets = this.store.targets.filter(t => !(t.id === id && (!userId || t.userId === userId)));
-    if (this.store.targets.length === prevLen) {
-      return false;
-    }
-    // Cascade delete target's runs
-    this.store.runs = this.store.runs.filter(r => r.targetId !== id);
-    await this._flush();
-    return true;
+    return this._commit((draft) => {
+      const prevLen = draft.targets.length;
+      draft.targets = draft.targets.filter(t => !(t.id === id && (!userId || t.userId === userId)));
+      if (draft.targets.length === prevLen) return { value: false, persist: false };
+      draft.runs = draft.runs.filter(r => r.targetId !== id);
+      return { value: true };
+    });
   }
 
   // Runs (scoped to userId)
@@ -189,92 +194,71 @@ export class JsonStorage {
   }
 
   async createRun(run) {
-    await this.init();
-    const fullRun = {
-      ...run,
-      id: run.id || randomUUID(),
-      httpErrorCount: run.httpErrorCount ?? 0,
-      timeoutCount: run.timeoutCount ?? 0,
-      networkErrorCount: run.networkErrorCount ?? 0,
-      redirectBlockedCount: run.redirectBlockedCount ?? 0,
-      measurementWindowSec: run.measurementWindowSec ?? null,
-      cancelledCount: run.cancelledCount ?? 0,
-      engine: run.engine || 'node',
-      errorRate: run.errorRate !== undefined ? Number(Number(run.errorRate).toFixed(4)) : 0,
-      createdAt: run.createdAt || new Date().toISOString(),
-      updatedAt: run.updatedAt || new Date().toISOString(),
-    };
-    this.store.runs.unshift(fullRun);
-    await this._flush();
-    return JSON.parse(JSON.stringify(fullRun));
+    return this._commit((draft) => {
+      const fullRun = {
+        ...run, id: run.id || randomUUID(), httpErrorCount: run.httpErrorCount ?? 0,
+        timeoutCount: run.timeoutCount ?? 0, networkErrorCount: run.networkErrorCount ?? 0,
+        redirectBlockedCount: run.redirectBlockedCount ?? 0, measurementWindowSec: run.measurementWindowSec ?? null,
+        cancelledCount: run.cancelledCount ?? 0, engine: run.engine || 'node',
+        errorRate: run.errorRate !== undefined ? Number(Number(run.errorRate).toFixed(4)) : 0,
+        createdAt: run.createdAt || new Date().toISOString(), updatedAt: run.updatedAt || new Date().toISOString(),
+      };
+      draft.runs.unshift(fullRun);
+      return { value: fullRun };
+    });
   }
 
   async updateRun(id, updates) {
-    await this.init();
-    const idx = this.store.runs.findIndex(r => r.id === id);
-    if (idx === -1) return null;
-    const cleanUpdates = { ...updates };
-    if (cleanUpdates.errorRate !== undefined) {
-      cleanUpdates.errorRate = Number(Number(cleanUpdates.errorRate).toFixed(4));
-    }
-    this.store.runs[idx] = {
-      ...this.store.runs[idx],
-      ...JSON.parse(JSON.stringify(cleanUpdates)),
-      updatedAt: new Date().toISOString(),
-    };
-    await this._flush();
-    return JSON.parse(JSON.stringify(this.store.runs[idx]));
+    return this._commit((draft) => {
+      const idx = draft.runs.findIndex(r => r.id === id);
+      if (idx === -1) return { value: null, persist: false };
+      const cleanUpdates = structuredClone(updates);
+      if (cleanUpdates.errorRate !== undefined) cleanUpdates.errorRate = Number(Number(cleanUpdates.errorRate).toFixed(4));
+      draft.runs[idx] = { ...draft.runs[idx], ...cleanUpdates, updatedAt: new Date().toISOString() };
+      return { value: draft.runs[idx] };
+    });
   }
 
   async deleteRun(id, userId = null) {
-    await this.init();
-    const prevLen = this.store.runs.length;
-    this.store.runs = this.store.runs.filter(r => !(r.id === id && (!userId || r.userId === userId)));
-    if (this.store.runs.length === prevLen) {
-      return false;
-    }
-    await this._flush();
-    return true;
+    return this._commit((draft) => {
+      const prevLen = draft.runs.length;
+      draft.runs = draft.runs.filter(r => !(r.id === id && (!userId || r.userId === userId)));
+      return draft.runs.length === prevLen ? { value: false, persist: false } : { value: true };
+    });
   }
 
   async cleanupStaleRuns() {
-    await this.init();
-    let cleaned = 0;
-    for (const r of this.store.runs) {
-      if (['queued', 'validating', 'running', 'cancelling'].includes(r.status)) {
-        r.status = 'failed';
-        r.error = 'Aborted due to unexpected server restart';
-        r.finishedAt = new Date().toISOString();
-        r.updatedAt = new Date().toISOString();
-        cleaned++;
+    return this._commit((draft) => {
+      let cleaned = 0;
+      for (const run of draft.runs) {
+        if (['queued', 'validating', 'running', 'cancelling'].includes(run.status)) {
+          run.status = 'failed';
+          run.error = 'Aborted due to unexpected server restart';
+          run.finishedAt = new Date().toISOString();
+          run.updatedAt = new Date().toISOString();
+          cleaned++;
+        }
       }
-    }
-    if (cleaned > 0) {
-      await this._flush();
-    }
-    return cleaned;
+      return { value: cleaned, persist: cleaned > 0 };
+    });
   }
 
   async createAuditEvent({ userId, action, resourceType, resourceId, details = {}, ipAddress = null }) {
-    await this.init();
-    const event = {
-      id: randomUUID(),
-      userId: userId || null,
-      action,
-      resourceType: resourceType || null,
-      resourceId: resourceId || null,
-      details,
-      ipAddress,
-      createdAt: new Date().toISOString(),
-    };
-    this.store.auditEvents.push(event);
-    await this._flush();
-    return event;
+    return this._commit((draft) => {
+      const event = {
+        id: randomUUID(), userId: userId || null, action, resourceType: resourceType || null,
+        resourceId: resourceId || null, details: structuredClone(details), ipAddress,
+        createdAt: new Date().toISOString(),
+      };
+      draft.auditEvents.push(event);
+      return { value: event };
+    });
   }
 
   getHealthInfo() {
     return {
       storage: 'local-json',
+      healthy: true,
       path: this.dataFile,
       usersCount: this.store.users.length,
       targetsCount: this.store.targets.length,

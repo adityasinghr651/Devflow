@@ -6,6 +6,7 @@ import { Button } from '../ui/Button.tsx';
 
 interface TestConfigModalProps {
   targets: Target[];
+  onAddTarget: () => void;
   testTarget: string;
   setTestTarget: (val: string) => void;
   path: string;
@@ -29,12 +30,15 @@ interface TestConfigModalProps {
   authorized: boolean;
   setAuthorized: (val: boolean) => void;
   starting: boolean;
+  error: string;
+  canRun: boolean;
   launchTest: (e: React.FormEvent) => void;
   onClose: () => void;
 }
 
 export const TestConfigModal: React.FC<TestConfigModalProps> = ({
   targets,
+  onAddTarget,
   testTarget,
   setTestTarget,
   path,
@@ -58,6 +62,8 @@ export const TestConfigModal: React.FC<TestConfigModalProps> = ({
   authorized,
   setAuthorized,
   starting,
+  error,
+  canRun,
   launchTest,
   onClose,
 }) => {
@@ -143,6 +149,15 @@ export const TestConfigModal: React.FC<TestConfigModalProps> = ({
         </div>
 
         {/* Target Endpoint Selection */}
+        {targets.length === 0 && <div className="target-auth-notice" role="status">
+          <div><b>No saved targets yet</b><p>Sign in, then add your local endpoint before launching a test.</p></div>
+          <Button type="button" variant="secondary" onClick={onAddTarget}>Add target</Button>
+        </div>}
+        {targets.length > 0 && !canRun && <div className="target-auth-notice" role="status">
+          <div><b>Demo workspace is read-only</b><p>Sign in or create an account to execute a real test.</p></div>
+          <Button type="button" variant="secondary" onClick={onAddTarget}>Sign in</Button>
+        </div>}
+        {error && <div className="warning-box" role="alert">{error}</div>}
         <label>
           Target Endpoint
           <select
@@ -446,7 +461,7 @@ export const TestConfigModal: React.FC<TestConfigModalProps> = ({
             type="submit"
             variant="primary"
             className="btn-hero-primary"
-            disabled={starting || !authorized || !testTarget}
+            disabled={starting || !authorized || !testTarget || !canRun}
             icon={<Play size={14} fill="currentColor" />}
           >
             {starting ? 'Starting Execution…' : 'Launch Load Test'}

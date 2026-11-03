@@ -202,12 +202,12 @@ export const HomeView: React.FC<HomeViewProps> = ({
               <Terminal size={14} style={{ color: 'var(--color-blue)' }} />
               <span className="target-method">POST</span>
               <span className="target-url">https://api.gateway.internal/v1/checkout</span>
-              <span className="env-pill">Production Target</span>
+              <span className="env-pill">Illustrative sample</span>
             </div>
 
             <div className="demo-controls">
               <span className="status-pill running">
-                <i /> {simRunning ? 'Live Stream Active' : 'Simulation Paused'}
+                <i /> {simRunning ? 'Demo simulation' : 'Simulation paused'}
               </span>
               <button
                 type="button"

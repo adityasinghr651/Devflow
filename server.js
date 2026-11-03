@@ -6,6 +6,7 @@ import { getRunnerManager } from './server/runner/manager.js';
 async function bootstrap() {
   const storage = getStorage();
   await storage.init();
+  const storageInfo = await storage.getHealthInfo();
 
   const runner = getRunnerManager(storage);
   await runner.startupRecovery();
@@ -14,7 +15,7 @@ async function bootstrap() {
 
   const server = app.listen(config.port, config.host, () => {
     console.log(`ServerTest API listening on http://${config.host}:${config.port}`);
-    console.log(`Storage engine: ${storage.getHealthInfo().storage}`);
+    console.log(`Storage engine: ${storageInfo.storage}`);
   });
 
   const shutdown = async (signal) => {

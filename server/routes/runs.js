@@ -5,6 +5,7 @@ import { getRunnerManager } from '../runner/manager.js';
 import { validateRunPayload, sanitizeHeadersForStorage } from '../security/validation.js';
 import { authenticateToken, verifyToken } from '../security/auth.js';
 import { config } from '../config.js';
+import { recordAuditEvent } from '../audit.js';
 
 export const runsRouter = express.Router();
 
@@ -211,7 +212,7 @@ runsRouter.post('/runs', authenticateToken, async (req, res, next) => {
 
     const saved = await storage.createRun(run);
 
-    await storage.createAuditEvent({
+    await recordAuditEvent(storage, {
       userId: req.user.id,
       action: 'RUN_CREATE',
       resourceType: 'run',
@@ -253,9 +254,12 @@ runsRouter.post('/runs/:id/cancel', authenticateToken, async (req, res, next) =>
       return res.status(409).json({ error: 'Run is already finished.' });
     }
 
-    await runner.cancelRun(runId);
+    const cancellation = await runner.cancelRun(runId);
+    if (!cancellation.success) {
+      return res.status(409).json({ error: 'Run is no longer active.', status: cancellation.status || run.status });
+    }
 
-    await storage.createAuditEvent({
+    await recordAuditEvent(storage, {
       userId: req.user.id,
       action: 'RUN_CANCEL',
       resourceType: 'run',
@@ -264,7 +268,7 @@ runsRouter.post('/runs/:id/cancel', authenticateToken, async (req, res, next) =>
       ipAddress: req.ip,
     });
 
-    res.json({ requested: true, status: 'cancelling' });
+    res.json({ requested: true, status: cancellation.status });
   } catch (err) {
     next(err);
   }

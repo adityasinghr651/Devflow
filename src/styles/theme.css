@@ -43,6 +43,10 @@
   --color-blue-glow: rgba(59, 130, 246, 0.18);
   --color-blue-bg: rgba(59, 130, 246, 0.1);
   --color-blue-border: rgba(59, 130, 246, 0.28);
+  --color-cyan: #22D3EE;
+  --color-violet: #A78BFA;
+  --color-pink: #F472B6;
+  --color-amber-pastel: #FBBF24;
 
   /* Acid Lime: #B7F500 - only for selected highlights and success indicators */
   --color-lime: #B7F500;
@@ -122,6 +126,10 @@
   --color-blue-glow: rgba(37, 99, 235, 0.15);
   --color-blue-bg: rgba(37, 99, 235, 0.08);
   --color-blue-border: rgba(37, 99, 235, 0.2);
+  --color-cyan: #0891B2;
+  --color-violet: #7C3AED;
+  --color-pink: #DB2777;
+  --color-amber-pastel: #B45309;
 
   /* Colorful Pastel Accents for Light Mode */
   --color-cyan: #06B6D4;

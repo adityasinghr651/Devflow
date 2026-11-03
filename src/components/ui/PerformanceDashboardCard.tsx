@@ -81,7 +81,7 @@ export const PerformanceDashboardCard: React.FC<PerformanceDashboardCardProps> =
               transition: 'all 0.15s ease',
             }}
           >
-            Live SSE
+            Sample latency
           </button>
           <button
             type="button"
@@ -99,7 +99,7 @@ export const PerformanceDashboardCard: React.FC<PerformanceDashboardCardProps> =
               transition: 'all 0.15s ease',
             }}
           >
-            k6 Engine
+            Sample throughput
           </button>
         </div>
       </div>

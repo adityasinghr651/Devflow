@@ -410,9 +410,12 @@ export class PgStorage {
     }
   }
 
-  getHealthInfo() {
+  async getHealthInfo() {
+    await this.init();
+    await this.pool.query('SELECT 1');
     return {
       storage: 'postgresql',
+      healthy: true,
       poolTotal: this.pool.totalCount,
       poolIdle: this.pool.idleCount,
       poolWaiting: this.pool.waitingCount,

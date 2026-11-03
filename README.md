@@ -178,14 +178,19 @@ cp .env.example .env
 Key environment configurations in `.env`:
 ```env
 # Required in Production
-PORT=4000
+API_PORT=4000
+API_HOST=127.0.0.1
 JWT_SECRET=generate-a-strong-random-32-byte-secret-here
 ALLOW_LOCAL_TARGETS=false   # Set to true only in development
 CORS_ORIGIN=http://localhost:3000
 
-# Optional PostgreSQL Connection (Migrations apply automatically on start)
+# PostgreSQL storage (migrations apply automatically; when unset, local JSON files are used)
 DATABASE_URL=postgresql://postgres:password@127.0.0.1:5432/devflow
+# Optional local JSON file directory, relative to this .env file
+DATA_DIR=./data
 ```
+
+When `DATABASE_URL` is set, the API must connect and finish migrations before it starts; it does not fall back to local JSON if PostgreSQL is unavailable. Without `DATABASE_URL`, records are durably stored in `DATA_DIR/store.json` (or the repository's `data/store.json` by default), which is local file storage rather than PostgreSQL. Check `http://127.0.0.1:4000/api/health`; its `storage` and `persistence` fields show the active backend. Environment files are discovered from the project root and parent checkout when running inside a Git worktree.
 
 ### 3. Launch DevFlow
 Open two terminals or use a process manager like PM2:
@@ -201,6 +206,8 @@ npm run server
 npm run dev
 ```
 *Open `http://localhost:3000` in your browser.*
+
+Sign in or create an account before adding targets or launching tests. The demo workspace is read-only and contains illustrative sample data.
 
 ---
 

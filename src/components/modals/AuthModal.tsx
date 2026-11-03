@@ -49,7 +49,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   return (
     <Modal
       title={authMode === 'login' ? 'Welcome Back to ServerTest' : 'Create Your Engineering Account'}
-      subtitle="Sign in with your preferred provider, or jump right into the demo workspace."
+      subtitle="Sign in to manage saved targets and tests, or browse a read-only demo workspace."
       onClose={onClose}
     >
       <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }} className="modal-animate">
@@ -94,7 +94,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     Instant Developer Access
                   </div>
                   <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                    Explore the full dashboard, live metrics, and test runner immediately.
+                    Preview the dashboard and sample runs. Saving targets and running tests requires an account.
                   </div>
                 </div>
               </div>

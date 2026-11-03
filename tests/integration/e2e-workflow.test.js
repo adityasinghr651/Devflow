@@ -7,7 +7,7 @@ import os from 'node:os';
 import { createApp } from '../../server/app.js';
 import { setStorage } from '../../server/storage/index.js';
 import { JsonStorage } from '../../server/storage/json-storage.js';
-import { getRunnerManager } from '../../server/runner/manager.js';
+import { RunnerManager } from '../../server/runner/manager.js';
 
 test('E2E: Full User-to-Results Workflow Verification', async (t) => {
   const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'servertest-e2e-workflow-'));
@@ -133,7 +133,10 @@ test('E2E: Full User-to-Results Workflow Verification', async (t) => {
   const restartedPort = restartedApiServer.address().port;
   const restartedBaseUrl = `http://127.0.0.1:${restartedPort}/api`;
 
-  const runner = getRunnerManager(storage);
+  const restartedStorage = new JsonStorage(tmpDir);
+  await restartedStorage.init();
+  setStorage(restartedStorage);
+  const runner = new RunnerManager(restartedStorage);
   await runner.startupRecovery();
 
   // Step 6: Historical Report Retrieval after restart

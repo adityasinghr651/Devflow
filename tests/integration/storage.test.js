@@ -114,3 +114,59 @@ test('Storage: Multi-user CRUD and lifecycle with JsonStorage', async () => {
   // Clean up
   await fs.rm(tmpDir, { recursive: true, force: true }).catch(() => {});
 });
+
+test('Storage: JSON records survive a fresh storage instance', async (t) => {
+  const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'servertest-storage-restart-'));
+  t.after(() => fs.rm(tmpDir, { recursive: true, force: true }));
+
+  const first = new JsonStorage(tmpDir);
+  const user = await first.createUser({ email: 'restart@example.test', passwordHash: 'hash', name: 'Restart User' });
+  const target = await first.createTarget({ userId: user.id, name: 'Restart Target', url: 'http://127.0.0.1:5050' });
+  const run = await first.createRun({
+    userId: user.id, targetId: target.id, targetName: target.name, url: `${target.url}/health`,
+    method: 'GET', concurrency: 2, durationSec: 1, status: 'completed', totalRequests: 8, p95: 51.2,
+  });
+
+  const afterRestart = new JsonStorage(tmpDir);
+  assert.equal((await afterRestart.getUserByEmail(user.email)).id, user.id);
+  assert.equal((await afterRestart.getTargets(user.id))[0].id, target.id);
+  const persistedRun = await afterRestart.getRunById(run.id, user.id);
+  assert.equal(persistedRun.status, 'completed');
+  assert.equal(persistedRun.totalRequests, 8);
+  assert.equal(persistedRun.p95, 51.2);
+});
+
+test('Storage: failed writes reject and do not expose unpersisted records', async (t) => {
+  const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'servertest-storage-write-failure-'));
+  t.after(() => fs.rm(tmpDir, { recursive: true, force: true }));
+  const storage = new JsonStorage(tmpDir);
+  await storage.init();
+
+  const blocker = path.join(tmpDir, 'not-a-directory');
+  await fs.writeFile(blocker, 'preserve');
+  storage.dataDir = blocker;
+  storage.dataFile = path.join(blocker, 'store.json');
+
+  await assert.rejects(
+    storage.createUser({ email: 'unsaved@example.test', passwordHash: 'hash', name: 'Unsaved User' }),
+    /EEXIST|not a directory/i
+  );
+  assert.equal(await storage.getUserByEmail('unsaved@example.test'), null);
+
+  storage.dataDir = tmpDir;
+  storage.dataFile = path.join(tmpDir, 'store.json');
+  const saved = await storage.createUser({ email: 'unsaved@example.test', passwordHash: 'hash', name: 'Unsaved User' });
+  assert.equal((await storage.getUserByEmail(saved.email)).id, saved.id);
+});
+
+test('Storage: malformed JSON is preserved and reported instead of replaced', async (t) => {
+  const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'servertest-storage-corrupt-'));
+  t.after(() => fs.rm(tmpDir, { recursive: true, force: true }));
+  const dataFile = path.join(tmpDir, 'store.json');
+  const originalContent = '{ invalid existing data';
+  await fs.writeFile(dataFile, originalContent, 'utf8');
+
+  const storage = new JsonStorage(tmpDir);
+  await assert.rejects(storage.init(), /existing file was left untouched/i);
+  assert.equal(await fs.readFile(dataFile, 'utf8'), originalContent);
+});

@@ -1,12 +1,12 @@
-import dotenv from 'dotenv';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-
-dotenv.config();
+import { loadEnvironment } from './environment.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const rootDir = path.resolve(__dirname, '..');
+const envFile = loadEnvironment(rootDir);
+const envDirectory = envFile ? path.dirname(envFile) : rootDir;
 
 const isProduction = process.env.NODE_ENV === 'production';
 
@@ -20,7 +20,7 @@ export const config = {
   port: Number(process.env.API_PORT || 4000),
   host: process.env.API_HOST || '127.0.0.1',
   corsOrigin: process.env.CORS_ORIGIN || 'http://localhost:3000',
-  dataDir: process.env.DATA_DIR || path.join(rootDir, 'data'),
+  dataDir: process.env.DATA_DIR ? path.resolve(envDirectory, process.env.DATA_DIR) : path.join(rootDir, 'data'),
   allowLocalTargets: process.env.ALLOW_LOCAL_TARGETS !== 'false',
   maxActiveRuns: Number(process.env.MAX_ACTIVE_RUNS || 1),
   maxConcurrency: 20,
