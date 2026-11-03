@@ -45,6 +45,7 @@ const DEFAULT_TARGETS: Target[] = [
   {
     id: 'tgt_checkout_prod',
     name: 'Payment & Checkout Gateway',
+    isDemo: true,
     url: 'https://api.gateway.internal/v1/checkout',
     environment: 'Production',
     verified: true,
@@ -55,6 +56,7 @@ const DEFAULT_TARGETS: Target[] = [
   {
     id: 'tgt_users_staging',
     name: 'User Directory API',
+    isDemo: true,
     url: 'https://staging.internal/api/v2/users',
     environment: 'Staging',
     verified: true,
@@ -65,6 +67,7 @@ const DEFAULT_TARGETS: Target[] = [
   {
     id: 'tgt_local_dev',
     name: 'Local Microservice (dev)',
+    isDemo: true,
     url: 'http://localhost:3001/health',
     environment: 'Development',
     verified: true,
@@ -613,6 +616,7 @@ export default function App() {
       durationSec: payload.durationSec || 10,
       profile: payload.profile || 'fixed',
       status: 'running',
+      isDemo: true,
       startedAt: new Date().toISOString(),
       totalRequests: 0,
       successCount: 0,

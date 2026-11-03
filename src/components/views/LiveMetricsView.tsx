@@ -49,24 +49,17 @@ export const LiveMetricsView: React.FC<LiveMetricsViewProps> = ({
   const isRunning = activeRun ? ['running', 'queued', 'validating'].includes(activeRun.status) : false;
 
   // Real-time animation buffer for live curve
-  const [streamPoints, setStreamPoints] = useState<number[]>([
-    14, 16, 15, 18, 17, 21, 19, 23, 20, 22, 24, 21, 26, 25, 27, 24, 29, 28,
-  ]);
+  const [streamPoints, setStreamPoints] = useState<number[]>([]);
 
   // Terminal event stream logs
-  const [logs, setLogs] = useState<string[]>([
-    'Worker thread cluster initialized with fixed 6,801 bucket histogram allocation',
-    'Pre-flight cryptographic safety probe verified for target endpoint',
-    'HTTP keep-alive connection pool established (concurrency: 50 VUs)',
-    'Real-time Server-Sent Events push stream connected (event: progress)',
-  ]);
+  const [logs, setLogs] = useState<string[]>([]);
 
   // Push live telemetry data points every 900ms when running
   useEffect(() => {
-    if (!isRunning) return;
+    if (!isRunning || !activeRun?.isDemo) return;
 
     const interval = setInterval(() => {
-      const currentP95 = activeRun?.p95 || 18.4;
+      const currentP95 = activeRun.p95;
       const noise = (Math.random() - 0.5) * 4;
       const nextVal = Math.min(50, Math.max(10, Math.round(currentP95 * 1.3 + noise)));
 
@@ -110,12 +103,12 @@ export const LiveMetricsView: React.FC<LiveMetricsViewProps> = ({
   }
 
   // Latency bucket estimations for Phase 6.1 visualization
-  const p95Val = activeRun.p95 || 18.4;
-  const p50Val = activeRun.p50 || p95Val * 0.45;
-  const p99Val = activeRun.p99 || p95Val * 1.6;
-  const currentRps = liveMetrics.rps || activeRun.rps || 2840;
-  const currentReqs = liveMetrics.totalRequests || activeRun.totalRequests || 85200;
-  const progressPercent = liveMetrics.progressPercent !== undefined ? liveMetrics.progressPercent : (isRunning ? 65 : 100);
+  const p95Val = activeRun.p95 > 0 ? activeRun.p95 : null;
+  const p50Val = activeRun.p50 > 0 ? activeRun.p50 : null;
+  const p99Val = activeRun.p99 > 0 ? activeRun.p99 : null;
+  const currentRps = liveMetrics.rps ?? activeRun.rps;
+  const currentReqs = liveMetrics.totalRequests ?? activeRun.totalRequests;
+  const progressPercent = liveMetrics.progressPercent ?? activeRun.progressPercent ?? 0;
 
   return (
     <div className="page-animate" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -134,6 +127,7 @@ export const LiveMetricsView: React.FC<LiveMetricsViewProps> = ({
               <span className="env-pill">
                 {activeRun.profile === 'stages' ? 'Staged Ramp-Up' : 'Fixed Concurrency'}
               </span>
+              {activeRun.isDemo && <span className="env-pill">Demo data</span>}
             </div>
 
             <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 700, color: 'var(--text-primary)' }}>
@@ -210,7 +204,7 @@ export const LiveMetricsView: React.FC<LiveMetricsViewProps> = ({
             <Gauge size={15} style={{ color: 'var(--color-blue)' }} />
           </div>
           <div className="metric-value">
-            {fmt(Math.round(currentRps))} <small style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-muted)' }}>req/s</small>
+            {currentRps > 0 ? <>{fmt(Math.round(currentRps))} <small style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-muted)' }}>req/s</small></> : 'No data yet'}
           </div>
           <div className="metric-sub">
             <span style={{ color: 'var(--color-lime)' }}>● Peak Performance</span>
@@ -223,7 +217,7 @@ export const LiveMetricsView: React.FC<LiveMetricsViewProps> = ({
             <Clock size={15} style={{ color: 'var(--color-blue)' }} />
           </div>
           <div className="metric-value">
-            {p95Val.toFixed(1)} <small style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-muted)' }}>ms</small>
+            {p95Val !== null ? <>{p95Val.toFixed(1)} <small style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-muted)' }}>ms</small></> : 'No data yet'}
           </div>
           <div className="metric-sub">
             <span>Critical SLA Threshold &lt; 200ms</span>
@@ -237,7 +231,7 @@ export const LiveMetricsView: React.FC<LiveMetricsViewProps> = ({
           </div>
           <div className="metric-value">{fmt(currentReqs)}</div>
           <div className="metric-sub">
-            <span>Success: {fmt(activeRun.successCount || currentReqs)}</span>
+            <span>Success: {fmt(activeRun.successCount)}</span>
           </div>
         </div>
 
@@ -271,14 +265,14 @@ export const LiveMetricsView: React.FC<LiveMetricsViewProps> = ({
           </div>
 
           <div style={{ display: 'flex', gap: '14px', fontSize: '12px', fontFamily: 'var(--font-mono)' }}>
-            <span>p50: <b style={{ color: 'var(--text-primary)' }}>{p50Val.toFixed(1)} ms</b></span>
-            <span>p95: <b style={{ color: 'var(--color-blue)' }}>{p95Val.toFixed(1)} ms</b></span>
-            <span>p99: <b style={{ color: 'var(--color-lime)' }}>{p99Val.toFixed(1)} ms</b></span>
+            <span>p50: <b style={{ color: 'var(--text-primary)' }}>{p50Val !== null ? `${p50Val.toFixed(1)} ms` : 'No data yet'}</b></span>
+            <span>p95: <b style={{ color: 'var(--color-blue)' }}>{p95Val !== null ? `${p95Val.toFixed(1)} ms` : 'No data yet'}</b></span>
+            <span>p99: <b style={{ color: 'var(--color-lime)' }}>{p99Val !== null ? `${p99Val.toFixed(1)} ms` : 'No data yet'}</b></span>
           </div>
         </div>
 
         {/* Histogram Bucket Visualization Bars */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '10px', marginTop: '16px' }}>
+        <div style={{ display: activeRun.isDemo ? 'grid' : 'none', gridTemplateColumns: 'repeat(6, 1fr)', gap: '10px', marginTop: '16px' }}>
           <div style={{ background: 'var(--bg-subtle)', border: '1px solid var(--border-default)', borderRadius: '8px', padding: '12px' }}>
             <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>Tier 1 (&lt;10ms)</div>
             <div style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text-primary)', marginTop: '4px' }}>64.2%</div>
@@ -317,7 +311,7 @@ export const LiveMetricsView: React.FC<LiveMetricsViewProps> = ({
         </div>
 
         {/* Live Streaming Polyline Chart */}
-        <div style={{ width: '100%', height: '140px', marginTop: '24px', position: 'relative' }}>
+        <div style={{ display: activeRun.isDemo ? 'block' : 'none', width: '100%', height: '140px', marginTop: '24px', position: 'relative' }}>
           <svg
             viewBox="0 0 800 130"
             fill="none"
@@ -366,7 +360,7 @@ export const LiveMetricsView: React.FC<LiveMetricsViewProps> = ({
 
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '8px', fontSize: '11px', color: 'var(--text-dim)', fontFamily: 'var(--font-mono)' }}>
           <span>-30s History Window</span>
-          <span>Live Tail Latency Stream: {p95Val.toFixed(1)} ms</span>
+          <span>{p95Val !== null ? `p95 latency: ${p95Val.toFixed(1)} ms` : 'No latency data yet'}</span>
         </div>
       </div>
 
@@ -379,39 +373,16 @@ export const LiveMetricsView: React.FC<LiveMetricsViewProps> = ({
           </h3>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span className="status-pill completed">200 OK</span>
-                <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Successful Responses</span>
+            {Object.entries(activeRun.statusCodes || {}).length === 0 ? (
+              <span style={{ color: 'var(--text-muted)', fontSize: '12px' }}>No response data yet</span>
+            ) : Object.entries(activeRun.statusCodes).map(([code, count]) => (
+              <div key={code} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span className="status-pill">{code}</span>
+                <b style={{ fontFamily: 'var(--font-mono)', fontSize: '13px', color: 'var(--text-primary)' }}>
+                  {fmt(count)} ({activeRun.totalRequests > 0 ? ((count / activeRun.totalRequests) * 100).toFixed(2) : '—'}{activeRun.totalRequests > 0 ? '%' : ''})
+                </b>
               </div>
-              <b style={{ fontFamily: 'var(--font-mono)', fontSize: '13px', color: 'var(--text-primary)' }}>
-                {fmt(activeRun.successCount || currentReqs)} (100.0%)
-              </b>
-            </div>
-
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span className="status-pill" style={{ color: 'var(--color-amber)', borderColor: 'rgba(245, 158, 11, 0.3)' }}>
-                  429 Too Many Requests
-                </span>
-                <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Rate Limited</span>
-              </div>
-              <b style={{ fontFamily: 'var(--font-mono)', fontSize: '13px', color: 'var(--text-dim)' }}>
-                0 (0.00%)
-              </b>
-            </div>
-
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span className="status-pill" style={{ color: 'var(--color-red)', borderColor: 'rgba(239, 68, 68, 0.3)' }}>
-                  5xx Server Errors
-                </span>
-                <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Gateway &amp; Host Drops</span>
-              </div>
-              <b style={{ fontFamily: 'var(--font-mono)', fontSize: '13px', color: (activeRun.failedCount || 0) > 0 ? 'var(--color-red)' : 'var(--text-dim)' }}>
-                {activeRun.failedCount || 0} ({formatErrorRate(activeRun.errorRate, activeRun.failedCount, activeRun.totalRequests)})
-              </b>
-            </div>
+            ))}
           </div>
         </div>
 

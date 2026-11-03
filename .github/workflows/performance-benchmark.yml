@@ -6,11 +6,13 @@ on:
       - main
       - phase-6-bounded-metrics
       - phase-7-distributed-runner
+      - 'roadmap/**'
   pull_request:
     branches:
       - main
       - phase-6-bounded-metrics
       - phase-7-distributed-runner
+      - 'roadmap/**'
   workflow_dispatch:
 
 concurrency:

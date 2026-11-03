@@ -12,12 +12,16 @@ export function formatErrorRate(
   failedCount: number = 0,
   totalRequests: number = 0
 ): string {
-  if (totalRequests === 0 || failedCount === 0) return '0.00%';
+  if (totalRequests === 0) return 'Unavailable';
+  if (failedCount === 0) return '0.00%';
   const rate =
-    typeof errorRate === 'number' && !Number.isNaN(errorRate)
+    typeof errorRate === 'number' && Number.isFinite(errorRate) && !(failedCount > 0 && errorRate <= 0)
       ? errorRate
       : (failedCount / totalRequests) * 100;
 
+  if (rate > 0 && rate < 0.0001) {
+    return `${rate.toFixed(6)}%`;
+  }
   if (rate > 0 && rate < 0.01) {
     return `${rate.toFixed(4)}%`;
   }
@@ -33,7 +37,7 @@ export function formatErrorBreakdown(
   totalRequests: number = 0,
   errorRate?: number
 ): string {
-  if (totalRequests === 0) return '0.00% (0 / 0)';
+  if (totalRequests === 0) return 'Unavailable (0 / 0)';
   const rateStr = formatErrorRate(errorRate, failedCount, totalRequests);
   return `${failedCount.toLocaleString()} / ${totalRequests.toLocaleString()} failed (${rateStr})`;
 }

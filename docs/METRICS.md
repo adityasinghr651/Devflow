@@ -2,6 +2,8 @@
 
 ## 1. Metric Definitions & Accounting Rules
 
+This section is the current metric contract. Error rates are percentages (not fractions) at the API boundary and in storage. Cancellation is tracked separately and excluded from both the error-rate denominator and latency distribution.
+
 DevFlow enforces strict mathematical and statistical purity in all measured metrics. All counters, rates, and latency percentiles adhere to the formal definitions below:
 
 | Metric | Field | Classification & Mathematical Definition |
@@ -10,11 +12,12 @@ DevFlow enforces strict mathematical and statistical purity in all measured metr
 | **Successful Requests** | `successCount` | HTTP responses with status code in the 2xx range (`200–299`, `response.ok === true`). |
 | **HTTP Errors** | `httpErrorCount` | HTTP responses with non-2xx status codes (`4xx` client errors, `5xx` server errors). |
 | **Timeouts** | `timeoutCount` | Requests terminated by the per-request watchdog timer (`AbortSignal.timeout(timeoutMs)`). |
-| **Network Errors** | `networkErrorCount` | Low-level transport failures: connection refused (`ECONNREFUSED`), socket resets (`ECONNRESET`), DNS resolution failure, or blocked redirects (`redirect_blocked`). |
+| **Network Errors** | `networkErrorCount` | Low-level transport failures: connection refused (`ECONNREFUSED`), socket resets (`ECONNRESET`), and DNS resolution failure. |
+| **Blocked Redirects** | `redirectBlockedCount` | Redirects are rejected instead of followed. This is a separate failure category. |
 | **Cancelled Requests** | `cancelledCount` | Requests intentionally aborted mid-flight due to user or coordinator cancellation (`AbortError` when `isCancelled === true`). These requests **never finished** and are therefore **excluded from latency percentiles and from the error rate denominator**. |
-| **Failed Requests** | `failedCount` | Total uncompleted/failed requests:<br>$$\text{failedCount} = \text{httpErrorCount} + \text{timeoutCount} + \text{networkErrorCount}$$ |
+| **Failed Requests** | `failedCount` | Total failed requests:<br>$$\text{failedCount} = \text{httpErrorCount} + \text{timeoutCount} + \text{networkErrorCount} + \text{redirectBlockedCount}$$ |
 | **Error Rate** | `errorRate` | Percentage of completed requests resulting in failure (0.0000% – 100.0000%):<br>$$\text{errorRate} = \begin{cases} 0 & \text{if } \text{totalRequests} = 0 \\ \frac{\text{failedCount}}{\text{totalRequests}} \times 100 & \text{otherwise} \end{cases}$$<br>*Stored in PostgreSQL as `NUMERIC(7, 4)` and in JSON with at least 4 decimal places.* |
-| **Throughput (RPS)** | `rps` | Completed requests per elapsed wall-clock second:<br>$$\text{rps} = \frac{\text{totalRequests}}{\max(\text{elapsedSec}, 0.001)}$$ |
+| **Throughput (RPS)** | `rps` | Completed requests divided by the cluster measurement window, from the earliest counted request start to the latest counted request completion across workers. Worker spawn time is excluded. The window is exposed as `measurementWindowSec`. |
 | **Percentiles** | `p50`, `p95`, `p99` | Response time percentiles computed via Nearest-Rank interpolation over the additive 6,801-bucket HDR latency histogram. |
 
 ---
@@ -61,6 +64,11 @@ If a worker process is terminated by the 1-second cancellation grace timeout, cr
 ---
 
 ## 4. Known Limitations & Scope Clarification
+
+- Existing JSON and Postgres records receive a zero default for `redirectBlockedCount` when read after migration.
+- When no request reaches a counted terminal outcome, the legacy API currently reports RPS as `0`; consumers should treat it as unavailable when `totalRequests` is zero.
+- The optional k6 adapter reports the aggregate failed count from k6's `http_req_failed` metric; it does not yet provide the per-category failure counters available from the Node engine.
+- Response-body assertions are not implemented, so response bodies are not inspected and `assertionFailure` is not currently a failure category.
 
 > [!IMPORTANT]
 > **Single-Machine Operating System Multiprocessing:**  

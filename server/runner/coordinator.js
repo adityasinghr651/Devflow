@@ -289,15 +289,16 @@ export class TestCoordinator {
     clearTimeout(this.watchdogTimeout);
     clearTimeout(this.cancellationTimeout);
 
-    const totalElapsedSec = Math.max((Date.now() - this.startTime) / 1000, 0.001);
-
     let totalRequests = 0;
     let successCount = 0;
     let failedCount = 0;
     let httpErrorCount = 0;
     let timeoutCount = 0;
     let networkErrorCount = 0;
+    let redirectBlockedCount = 0;
     let cancelledCount = 0;
+    let firstRequestStartedAt = null;
+    let lastRequestCompletedAt = null;
     const statusCodes = {};
     const partialWorkers = [];
 
@@ -310,7 +311,18 @@ export class TestCoordinator {
         httpErrorCount += Number(data.httpErrorCount) || 0;
         timeoutCount += Number(data.timeoutCount) || 0;
         networkErrorCount += Number(data.networkErrorCount) || 0;
+        redirectBlockedCount += Number(data.redirectBlockedCount) || 0;
         cancelledCount += Number(data.cancelledCount) || 0;
+        if (Number.isFinite(data.firstRequestStartedAt)) {
+          firstRequestStartedAt = firstRequestStartedAt === null
+            ? data.firstRequestStartedAt
+            : Math.min(firstRequestStartedAt, data.firstRequestStartedAt);
+        }
+        if (Number.isFinite(data.lastRequestCompletedAt)) {
+          lastRequestCompletedAt = lastRequestCompletedAt === null
+            ? data.lastRequestCompletedAt
+            : Math.max(lastRequestCompletedAt, data.lastRequestCompletedAt);
+        }
 
         if (data.statusCodes) {
           for (const [code, count] of Object.entries(data.statusCodes)) {
@@ -332,7 +344,12 @@ export class TestCoordinator {
       }
     }
 
-    const rps = Number((totalRequests / totalElapsedSec).toFixed(2));
+    const measurementWindowSec = firstRequestStartedAt !== null && lastRequestCompletedAt !== null
+      ? Math.max((lastRequestCompletedAt - firstRequestStartedAt) / 1000, 0.001)
+      : null;
+    const rps = measurementWindowSec === null
+      ? 0
+      : Number((totalRequests / measurementWindowSec).toFixed(2));
     const errorRate = totalRequests ? Number(((failedCount / totalRequests) * 100).toFixed(4)) : 0;
     const finalStatus = this.isCancelled ? 'cancelled' : 'completed';
 
@@ -343,12 +360,14 @@ export class TestCoordinator {
       httpErrorCount,
       timeoutCount,
       networkErrorCount,
+      redirectBlockedCount,
       cancelledCount,
       statusCodes,
       engine: 'node',
       partialWorkers: partialWorkers.length > 0 ? partialWorkers : undefined,
       histogramComplete: partialWorkers.length === 0,
       rps,
+      measurementWindowSec,
       p50: this.masterHistogram.getPercentile(0.50),
       p95: this.masterHistogram.getPercentile(0.95),
       p99: this.masterHistogram.getPercentile(0.99),

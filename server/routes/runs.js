@@ -204,6 +204,8 @@ runsRouter.post('/runs', authenticateToken, async (req, res, next) => {
       p95: 0,
       p99: 0,
       errorRate: 0,
+      redirectBlockedCount: 0,
+      measurementWindowSec: null,
       statusCodes: {},
     };
 

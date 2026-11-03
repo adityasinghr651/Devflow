@@ -46,6 +46,8 @@ function mapRunFromDb(row) {
     httpErrorCount: Number(row.http_error_count || 0),
     timeoutCount: Number(row.timeout_count || 0),
     networkErrorCount: Number(row.network_error_count || 0),
+    redirectBlockedCount: Number(row.redirect_blocked_count || 0),
+    measurementWindowSec: row.measurement_window_sec == null ? null : Number(row.measurement_window_sec),
     cancelledCount: Number(row.cancelled_count || 0),
     engine: row.engine || 'node',
     partialWorkers: row.partial_workers || undefined,
@@ -260,16 +262,16 @@ export class PgStorage {
         id, user_id, target_id, target_name, url, method,
         concurrency, duration_sec, profile, stages, headers, body, timeout_ms,
         worker_count, status, started_at, total_requests, success_count, failed_count,
-        http_error_count, timeout_count, network_error_count, cancelled_count,
+        http_error_count, timeout_count, network_error_count, redirect_blocked_count, cancelled_count,
         engine, partial_workers, histogram_complete,
-        rps, p50, p95, p99, error_rate, status_codes
+        rps, p50, p95, p99, error_rate, status_codes, measurement_window_sec
       ) VALUES (
         $1, $2, $3, $4, $5, $6,
         $7, $8, $9, $10, $11, $12, $13,
         $14, $15, $16, $17, $18, $19,
-        $20, $21, $22, $23,
-        $24, $25, $26,
-        $27, $28, $29, $30, $31, $32
+        $20, $21, $22, $23, $24,
+        $25, $26, $27,
+        $28, $29, $30, $31, $32, $33, $34
       ) RETURNING *
     `;
     const res = await this.pool.query(sql, [
@@ -295,6 +297,7 @@ export class PgStorage {
       run.httpErrorCount || 0,
       run.timeoutCount || 0,
       run.networkErrorCount || 0,
+      run.redirectBlockedCount || 0,
       run.cancelledCount || 0,
       run.engine || 'node',
       run.partialWorkers ? JSON.stringify(run.partialWorkers) : null,
@@ -305,6 +308,7 @@ export class PgStorage {
       run.p99 || 0,
       run.errorRate || 0,
       JSON.stringify(run.statusCodes || {}),
+      run.measurementWindowSec ?? null,
     ]);
     return mapRunFromDb(res.rows[0]);
   }
@@ -327,6 +331,8 @@ export class PgStorage {
       httpErrorCount: 'http_error_count',
       timeoutCount: 'timeout_count',
       networkErrorCount: 'network_error_count',
+      redirectBlockedCount: 'redirect_blocked_count',
+      measurementWindowSec: 'measurement_window_sec',
       cancelledCount: 'cancelled_count',
       engine: 'engine',
       partialWorkers: 'partial_workers',

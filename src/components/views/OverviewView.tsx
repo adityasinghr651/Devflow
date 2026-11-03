@@ -492,6 +492,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                       <b style={{ color: 'var(--text-primary)', fontSize: '13px' }}>
                         {target.name}
                       </b>
+                      {target.isDemo && <span className="env-pill">Demo data</span>}
                       {target.verified ? (
                         <span className="status-pill completed">
                           <i /> Verified

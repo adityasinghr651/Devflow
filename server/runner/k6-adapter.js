@@ -105,19 +105,22 @@ export async function executeK6Run({ id, url, method, concurrency, durationSec, 
 
           const totalRequests = reqs.count || 0;
           const rps = Number((reqs.rate || 0).toFixed(2));
+          const measurementWindowSec = rps > 0 ? Number((totalRequests / rps).toFixed(3)) : null;
           const p50 = Number((duration['p(50)'] || duration.med || 0).toFixed(2));
           const p95 = Number((duration['p(95)'] || 0).toFixed(2));
           const p99 = Number((duration['p(99)'] || 0).toFixed(2));
-          const errorRate = Number(((failed.rate || 0) * 100).toFixed(2));
+          const errorRate = Number(((failed.rate || 0) * 100).toFixed(4));
           const failedCount = Math.round((failed.rate || 0) * totalRequests);
           const successCount = totalRequests - failedCount;
 
           return resolve({
             status: 'completed',
+            engine: 'k6',
             totalRequests,
             successCount,
             failedCount,
             rps,
+            measurementWindowSec,
             p50,
             p95,
             p99,

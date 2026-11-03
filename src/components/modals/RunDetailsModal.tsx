@@ -38,12 +38,12 @@ export const RunDetailsModal: React.FC<RunDetailsModalProps> = ({
   const [activeTab, setActiveTab] = useState<'overview' | 'histogram' | 'codes'>('overview');
   const isRunning = ['running', 'queued', 'validating'].includes(selectedRun.status);
 
-  const p95 = selectedRun.p95 || 18.4;
-  const p50 = selectedRun.p50 || p95 * 0.45;
-  const p99 = selectedRun.p99 || p95 * 1.6;
-  const rps = liveMetrics.rps || selectedRun.rps || 2840;
-  const totalReqs = liveMetrics.totalRequests || selectedRun.totalRequests || 85200;
-  const progressPercent = liveMetrics.progressPercent !== undefined ? liveMetrics.progressPercent : (isRunning ? 60 : 100);
+  const p95 = selectedRun.p95 > 0 ? selectedRun.p95 : null;
+  const p50 = selectedRun.p50 > 0 ? selectedRun.p50 : null;
+  const p99 = selectedRun.p99 > 0 ? selectedRun.p99 : null;
+  const rps = liveMetrics.rps ?? selectedRun.rps;
+  const totalReqs = liveMetrics.totalRequests ?? selectedRun.totalRequests;
+  const progressPercent = liveMetrics.progressPercent ?? selectedRun.progressPercent ?? 0;
 
   return (
     <Modal
@@ -57,6 +57,7 @@ export const RunDetailsModal: React.FC<RunDetailsModalProps> = ({
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px', paddingBottom: '12px', borderBottom: '1px solid var(--border-subtle)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <StatusBadge status={selectedRun.status} />
+            {selectedRun.isDemo && <span className="env-pill">Demo data</span>}
             <span style={{ padding: '2px 8px', borderRadius: '4px', background: 'var(--bg-subtle)', border: '1px solid var(--border-default)', fontSize: '11px', fontFamily: 'var(--font-mono)', fontWeight: 600, color: 'var(--color-blue)' }}>
               {selectedRun.method}
             </span>
@@ -130,7 +131,7 @@ export const RunDetailsModal: React.FC<RunDetailsModalProps> = ({
               <Gauge size={14} style={{ color: 'var(--color-blue)' }} />
             </div>
             <div className="metric-value">
-              {fmt(Math.round(rps))} <small style={{ fontSize: '12px', fontWeight: 500, color: 'var(--text-muted)' }}>req/s</small>
+              {rps > 0 ? <>{fmt(Math.round(rps))} <small style={{ fontSize: '12px', fontWeight: 500, color: 'var(--text-muted)' }}>req/s</small></> : 'No data yet'}
             </div>
             <div className="metric-sub">Peak execution rate</div>
           </div>
@@ -141,7 +142,7 @@ export const RunDetailsModal: React.FC<RunDetailsModalProps> = ({
               <Clock3 size={14} style={{ color: 'var(--color-blue)' }} />
             </div>
             <div className="metric-value">
-              {p95.toFixed(1)} <small style={{ fontSize: '12px', fontWeight: 500, color: 'var(--text-muted)' }}>ms</small>
+              {p95 !== null ? <>{p95.toFixed(1)} <small style={{ fontSize: '12px', fontWeight: 500, color: 'var(--text-muted)' }}>ms</small></> : 'No data yet'}
             </div>
             <div className="metric-sub">SLA target &lt; 200ms</div>
           </div>
@@ -193,35 +194,35 @@ export const RunDetailsModal: React.FC<RunDetailsModalProps> = ({
               <div style={{ background: 'var(--bg-card)', padding: '10px', borderRadius: '6px', border: '1px solid var(--border-subtle)', textAlign: 'center' }}>
                 <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>p50 (Median)</span>
                 <div style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text-primary)', marginTop: '4px', fontFamily: 'var(--font-mono)' }}>
-                  {p50.toFixed(1)} ms
+                  {p50 !== null ? `${p50.toFixed(1)} ms` : 'No data yet'}
                 </div>
               </div>
 
               <div style={{ background: 'var(--bg-card)', padding: '10px', borderRadius: '6px', border: '1px solid var(--border-subtle)', textAlign: 'center' }}>
                 <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>p75</span>
                 <div style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text-primary)', marginTop: '4px', fontFamily: 'var(--font-mono)' }}>
-                  {(p95 * 0.72).toFixed(1)} ms
+                  Unavailable
                 </div>
               </div>
 
               <div style={{ background: 'var(--bg-card)', padding: '10px', borderRadius: '6px', border: '1px solid rgba(59, 130, 246, 0.4)', textAlign: 'center' }}>
                 <span style={{ fontSize: '11px', color: 'var(--color-blue)', fontWeight: 600 }}>p95 (SLA)</span>
                 <div style={{ fontSize: '15px', fontWeight: 700, color: 'var(--color-blue)', marginTop: '4px', fontFamily: 'var(--font-mono)' }}>
-                  {p95.toFixed(1)} ms
+                  {p95 !== null ? `${p95.toFixed(1)} ms` : 'No data yet'}
                 </div>
               </div>
 
               <div style={{ background: 'var(--bg-card)', padding: '10px', borderRadius: '6px', border: '1px solid var(--border-subtle)', textAlign: 'center' }}>
                 <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>p99 (Tail)</span>
                 <div style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text-primary)', marginTop: '4px', fontFamily: 'var(--font-mono)' }}>
-                  {p99.toFixed(1)} ms
+                  {p99 !== null ? `${p99.toFixed(1)} ms` : 'No data yet'}
                 </div>
               </div>
 
               <div style={{ background: 'var(--bg-card)', padding: '10px', borderRadius: '6px', border: '1px solid var(--border-subtle)', textAlign: 'center' }}>
                 <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>p99.9 (Max)</span>
                 <div style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text-primary)', marginTop: '4px', fontFamily: 'var(--font-mono)' }}>
-                  {(p99 * 1.4).toFixed(1)} ms
+                  Unavailable
                 </div>
               </div>
             </div>
@@ -230,7 +231,9 @@ export const RunDetailsModal: React.FC<RunDetailsModalProps> = ({
 
         {/* Tab 2: Phase 6.1 Bounded Buckets */}
         {activeTab === 'histogram' && (
+          selectedRun.isDemo ? (
           <div style={{ background: 'var(--bg-subtle)', border: '1px solid var(--border-default)', borderRadius: '8px', padding: '16px' }}>
+            <span className="env-pill">Demo data</span>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
               <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
                 5-Tier Logarithmic Memory Allocation
@@ -289,6 +292,9 @@ export const RunDetailsModal: React.FC<RunDetailsModalProps> = ({
               </div>
             </div>
           </div>
+          ) : (
+            <div className="empty-state-clean">Histogram distribution unavailable for this run.</div>
+          )
         )}
 
         {/* Tab 3: HTTP Codes & Error Breakdown */}

@@ -1,0 +1,2 @@
+ALTER TABLE test_runs
+  ADD COLUMN IF NOT EXISTS redirect_blocked_count INTEGER NOT NULL DEFAULT 0;
