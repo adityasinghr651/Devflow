@@ -1,0 +1,34 @@
+name: Bug report
+description: Report a reproducible problem in DevFlow
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: Before submitting, remove passwords, tokens, database URLs, and other private data from logs.
+  - type: textarea
+    id: summary
+    attributes:
+      label: What happened?
+      description: Describe the problem and what you expected instead.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: Include the page, action, target type, and configuration needed to reproduce it.
+      placeholder: 1. Start the API and UI…
+    validations:
+      required: true
+  - type: input
+    id: runtime
+    attributes:
+      label: Node.js version and operating system
+      placeholder: Node 22.12.0, Windows 11
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant redacted logs or screenshots
+      render: text

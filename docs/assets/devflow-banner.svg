@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 300" role="img" aria-labelledby="title desc">
+  <title id="title">DevFlow local load testing</title>
+  <desc id="desc">A local browser dashboard configures a test, sends requests through worker processes to an HTTP service, and receives measured results.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0b1220"/>
+      <stop offset="1" stop-color="#111c31"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#38bdf8"/>
+      <stop offset="1" stop-color="#818cf8"/>
+    </linearGradient>
+    <pattern id="grid" width="28" height="28" patternUnits="userSpaceOnUse">
+      <path d="M28 0H0V28" fill="none" stroke="#94a3b8" stroke-opacity=".08" stroke-width="1"/>
+    </pattern>
+  </defs>
+  <rect width="1200" height="300" rx="22" fill="url(#bg)"/>
+  <rect width="1200" height="300" rx="22" fill="url(#grid)"/>
+  <path d="M0 244C205 190 322 292 540 233s395-67 660-2" fill="none" stroke="url(#accent)" stroke-opacity=".22" stroke-width="2"/>
+  <g font-family="Inter,Segoe UI,Arial,sans-serif">
+    <text x="64" y="80" fill="#e2e8f0" font-size="14" font-weight="700" letter-spacing="3">LOCAL HTTP LOAD TESTING</text>
+    <text x="64" y="137" fill="#fff" font-size="46" font-weight="750">DevFlow</text>
+    <text x="64" y="174" fill="#b7c5d8" font-size="18">Configure a workload. Measure a service. Keep the results.</text>
+    <text x="64" y="229" fill="#7dd3fc" font-size="13" font-weight="600">SELF-HOSTED</text>
+    <circle cx="151" cy="225" r="2.5" fill="#64748b"/>
+    <text x="165" y="229" fill="#7dd3fc" font-size="13" font-weight="600">SINGLE-HOST WORKERS</text>
+    <circle cx="330" cy="225" r="2.5" fill="#64748b"/>
+    <text x="344" y="229" fill="#7dd3fc" font-size="13" font-weight="600">LIVE METRICS</text>
+  </g>
+  <g font-family="Inter,Segoe UI,Arial,sans-serif" text-anchor="middle">
+    <g transform="translate(670 79)">
+      <rect width="142" height="72" rx="12" fill="#14243a" stroke="#334155"/>
+      <circle cx="24" cy="24" r="5" fill="#38bdf8"/>
+      <text x="76" y="29" fill="#e2e8f0" font-size="14" font-weight="650">Configure</text>
+      <text x="76" y="51" fill="#94a3b8" font-size="11">Browser UI</text>
+    </g>
+    <g transform="translate(860 79)">
+      <rect width="142" height="72" rx="12" fill="#14243a" stroke="#334155"/>
+      <circle cx="24" cy="24" r="5" fill="#818cf8"/>
+      <text x="76" y="29" fill="#e2e8f0" font-size="14" font-weight="650">Generate</text>
+      <text x="76" y="51" fill="#94a3b8" font-size="11">Node workers</text>
+    </g>
+    <g transform="translate(1050 79)">
+      <rect width="104" height="72" rx="12" fill="#14243a" stroke="#334155"/>
+      <circle cx="24" cy="24" r="5" fill="#34d399"/>
+      <text x="68" y="29" fill="#e2e8f0" font-size="14" font-weight="650">Measure</text>
+      <text x="52" y="51" fill="#94a3b8" font-size="11">HTTP target</text>
+    </g>
+    <path d="M816 115h36m-8-6 8 6-8 6M1006 115h36m-8-6 8 6-8 6" fill="none" stroke="#7dd3fc" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M1120 167v38H742v-40" fill="none" stroke="#818cf8" stroke-opacity=".72" stroke-width="1.5" stroke-dasharray="5 5"/>
+    <text x="923" y="225" fill="#a5b4fc" font-size="11">Results and live progress return to the UI</text>
+  </g>
+</svg>
