@@ -1,0 +1,46 @@
+# ServerTest Benchmark Baseline Management
+
+This directory maintains the version-controlled performance baselines for ServerTest's automated CI/CD performance regression detection.
+
+## Structure
+- `baseline-linux.json`: Baseline metrics measured on GitHub Actions virtualized runners (`ubuntu-latest`, 2 vCPUs).
+- `baseline-win32.json`: Baseline metrics measured on local Windows workstations (12 CPUs).
+- `baseline.json`: Canonical reference baseline used as default fallback.
+
+## Baseline Schema
+Each baseline file contains:
+- `version`: Dataset format version (currently `"1.0"`).
+- `profile`: Benchmark workload profile (`"ci"` for fast 10s tests; `"matrix"` for full 30s soak tests).
+- `timestamp`: ISO 8601 generation timestamp.
+- `environment`: Host platform (`linux`, `win32`, `darwin`), CPU architecture, core count, total RAM, and CI flag.
+- `warmup`: Results from an initial warm-up run to ensure V8 JIT and OS socket caches are primed.
+- `benchmarks`: Array of benchmark levels (concurrency, duration, achieved RPS, p50, p95, p99, and error rate).
+
+## Environment Compatibility Policy
+To prevent false-positive regression alerts caused by running benchmarks on disparate hardware (e.g. comparing a 12-core local workstation against a 2-core GitHub Actions VM):
+1. The comparator automatically checks that the current benchmark platform matches the baseline platform.
+2. In CI (`ubuntu-latest`), `tools/compare-benchmarks.js` resolves and enforces `baseline-linux.json`.
+3. On Windows workstations, it resolves and enforces `baseline-win32.json`.
+4. Blind cross-platform comparisons will throw an error unless explicitly permitted via `--allow-cross-env`.
+
+## Deliberate Update & Review Procedure
+Baselines must **never** be updated automatically or silently. To update a baseline after intentional performance optimizations:
+
+1. **Local Workstation Baseline:**
+   ```bash
+   npm run bench:baseline
+   ```
+   This generates a fresh `benchmarks/baseline.json` and updates `benchmarks/baseline-<platform>.json`.
+
+2. **Hosted CI Baseline:**
+   Trigger the GitHub Actions workflow manually via `workflow_dispatch` with `update_baseline: true`, or run:
+   ```bash
+   node tools/run-benchmark.js --ci --save-baseline --baseline benchmarks/baseline-linux.json
+   ```
+
+3. **Peer Review:**
+   Review the Git diff for the baseline file in the pull request:
+   - Confirm throughput increases or stays within tolerance.
+   - Confirm p95 and p99 latency decreases or stays within tolerance.
+   - Confirm zero error rate.
+

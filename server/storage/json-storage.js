@@ -193,6 +193,12 @@ export class JsonStorage {
     const fullRun = {
       ...run,
       id: run.id || randomUUID(),
+      httpErrorCount: run.httpErrorCount ?? 0,
+      timeoutCount: run.timeoutCount ?? 0,
+      networkErrorCount: run.networkErrorCount ?? 0,
+      cancelledCount: run.cancelledCount ?? 0,
+      engine: run.engine || 'node',
+      errorRate: run.errorRate !== undefined ? Number(Number(run.errorRate).toFixed(4)) : 0,
       createdAt: run.createdAt || new Date().toISOString(),
       updatedAt: run.updatedAt || new Date().toISOString(),
     };
@@ -205,9 +211,13 @@ export class JsonStorage {
     await this.init();
     const idx = this.store.runs.findIndex(r => r.id === id);
     if (idx === -1) return null;
+    const cleanUpdates = { ...updates };
+    if (cleanUpdates.errorRate !== undefined) {
+      cleanUpdates.errorRate = Number(Number(cleanUpdates.errorRate).toFixed(4));
+    }
     this.store.runs[idx] = {
       ...this.store.runs[idx],
-      ...JSON.parse(JSON.stringify(updates)),
+      ...JSON.parse(JSON.stringify(cleanUpdates)),
       updatedAt: new Date().toISOString(),
     };
     await this._flush();
@@ -229,7 +239,7 @@ export class JsonStorage {
     await this.init();
     let cleaned = 0;
     for (const r of this.store.runs) {
-      if (['queued', 'validating', 'running'].includes(r.status)) {
+      if (['queued', 'validating', 'running', 'cancelling'].includes(r.status)) {
         r.status = 'failed';
         r.error = 'Aborted due to unexpected server restart';
         r.finishedAt = new Date().toISOString();

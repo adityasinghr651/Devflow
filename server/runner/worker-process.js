@@ -5,18 +5,10 @@
  * Supports fixed concurrency and staged ramp-up / steady / ramp-down workloads.
  */
 import { validateTargetUrl } from '../security/ssrf.js';
+import { LatencyHistogram } from './latency-histogram.js';
 
 let isCancelled = false;
 const abortController = new AbortController();
-
-function calculatePercentile(sortedValues, percentile) {
-  if (!sortedValues.length) return 0;
-  const index = Math.min(
-    sortedValues.length - 1,
-    Math.max(0, Math.ceil(percentile * sortedValues.length) - 1)
-  );
-  return Number(sortedValues[index].toFixed(2));
-}
 
 function getStagedConcurrency(elapsedSec, stages) {
   let accumSec = 0;
@@ -46,6 +38,7 @@ function getStagedConcurrency(elapsedSec, stages) {
 
 async function runWorker({
   id,
+  workerIndex = 0,
   url,
   method,
   concurrency,
@@ -63,6 +56,7 @@ async function runWorker({
     if (process.send) {
       process.send({
         type: 'error',
+        workerIndex,
         error: `Runtime security check failed: ${preCheck.error}`,
       });
     }
@@ -76,19 +70,23 @@ async function runWorker({
     : durationSec;
 
   const peakConcurrency = hasStages
-    ? Math.max(...stages.map(s => s.target), 1)
-    : concurrency;
+    ? Math.max(...stages.map(s => s.target), 0)
+    : Math.max(0, concurrency);
 
   const deadline = Date.now() + totalDurationSec * 1000;
   const startTime = Date.now();
-  const latencies = [];
+  const latencyHistogram = new LatencyHistogram();
   const statusCodes = {};
   let totalRequests = 0;
   let successCount = 0;
   let failedCount = 0;
+  let httpErrorCount = 0;
+  let timeoutCount = 0;
+  let networkErrorCount = 0;
+  let cancelledCount = 0;
 
   let lastProgressReport = Date.now();
-  let currentActiveConcurrency = hasStages ? (stages[0]?.target || 1) : concurrency;
+  let currentActiveConcurrency = hasStages ? (stages[0]?.target || 0) : concurrency;
   let currentStageIndex = 0;
 
   // Prepare normalized request headers
@@ -109,15 +107,20 @@ async function runWorker({
 
     const elapsedSec = Math.max((now - startTime) / 1000, 0.001);
     const rps = Number((totalRequests / elapsedSec).toFixed(2));
-    const errorRate = totalRequests ? Number(((failedCount / totalRequests) * 100).toFixed(2)) : 0;
+    const errorRate = totalRequests ? Number(((failedCount / totalRequests) * 100).toFixed(4)) : 0;
 
     if (process.send) {
       process.send({
         type: 'progress',
+        workerIndex,
         data: {
           totalRequests,
           successCount,
           failedCount,
+          httpErrorCount,
+          timeoutCount,
+          networkErrorCount,
+          cancelledCount,
           rps,
           errorRate,
           statusCodes: { ...statusCodes },
@@ -148,6 +151,7 @@ async function runWorker({
 
       const reqStart = performance.now();
       let code = 'network_error';
+      let isAbortedReq = false;
 
       try {
         const timeoutSignal = AbortSignal.timeout(timeoutMs);
@@ -171,21 +175,38 @@ async function runWorker({
         if (response.ok) {
           successCount++;
         } else {
+          httpErrorCount++;
           failedCount++;
         }
       } catch (err) {
-        failedCount++;
-        if (err.name === 'TimeoutError') {
-          code = 'timeout';
-        } else if (err.name === 'AbortError' && isCancelled) {
+        if (err.name === 'AbortError' && isCancelled) {
           code = 'cancelled';
+          cancelledCount++;
+          isAbortedReq = true;
+        } else if (err.name === 'TimeoutError') {
+          code = 'timeout';
+          timeoutCount++;
+          failedCount++;
+        } else if (err.name === 'TypeError' && (err.cause?.message?.includes('redirect') || err.message?.includes('redirect'))) {
+          code = 'redirect_blocked';
+          networkErrorCount++;
+          failedCount++;
+        } else {
+          code = 'network_error';
+          networkErrorCount++;
+          failedCount++;
         }
       }
 
-      const elapsed = Math.max(0, performance.now() - reqStart);
-      latencies.push(elapsed);
       statusCodes[code] = (statusCodes[code] || 0) + 1;
-      totalRequests++;
+
+      // Cancelled in-flight requests must NOT be recorded in latency histogram
+      // and must NOT be in totalRequests (denominator for error rate).
+      if (!isAbortedReq) {
+        const elapsed = Math.max(0, performance.now() - reqStart);
+        latencyHistogram.record(elapsed);
+        totalRequests++;
+      }
 
       if (totalRequests % 5 === 0) {
         sendProgress();
@@ -193,38 +214,55 @@ async function runWorker({
     }
   }
 
-  // Launch slots up to peak concurrency
-  await Promise.all(
-    Array.from({ length: peakConcurrency }, (_, idx) => workerSlot(idx))
-  );
+  // Launch slots up to peak concurrency or idle wait if 0 concurrency assigned
+  if (peakConcurrency === 0) {
+    while (Date.now() < deadline && !isCancelled) {
+      await new Promise(r => setTimeout(r, 100));
+      sendProgress();
+    }
+  } else {
+    await Promise.all(
+      Array.from({ length: peakConcurrency }, (_, idx) => workerSlot(idx))
+    );
+  }
 
   const totalElapsedSec = Math.max((Date.now() - startTime) / 1000, 0.001);
-  latencies.sort((a, b) => a - b);
 
   const finalSummary = {
+    workerIndex,
     totalRequests,
     successCount,
     failedCount,
+    httpErrorCount,
+    timeoutCount,
+    networkErrorCount,
+    cancelledCount,
     statusCodes,
     rps: Number((totalRequests / totalElapsedSec).toFixed(2)),
-    p50: calculatePercentile(latencies, 0.50),
-    p95: calculatePercentile(latencies, 0.95),
-    p99: calculatePercentile(latencies, 0.99),
-    errorRate: totalRequests ? Number(((failedCount / totalRequests) * 100).toFixed(2)) : 0,
+    p50: latencyHistogram.getPercentile(0.50),
+    p95: latencyHistogram.getPercentile(0.95),
+    p99: latencyHistogram.getPercentile(0.99),
+    errorRate: totalRequests ? Number(((failedCount / totalRequests) * 100).toFixed(4)) : 0,
     status: isCancelled ? 'cancelled' : 'completed',
     finishedAt: new Date().toISOString(),
     currentConcurrency: 0,
     progressPercent: 100,
+    histogram: latencyHistogram.toJSON(),
   };
 
   if (process.send) {
+    const exitTimeout = setTimeout(() => process.exit(0), 1000);
     process.send({
       type: 'complete',
+      workerIndex,
       data: finalSummary,
+    }, () => {
+      clearTimeout(exitTimeout);
+      process.exit(0);
     });
+  } else {
+    process.exit(0);
   }
-
-  process.exit(0);
 }
 
 process.on('message', message => {
@@ -247,5 +285,5 @@ process.on('message', message => {
 process.on('SIGTERM', () => {
   isCancelled = true;
   abortController.abort();
-  setTimeout(() => process.exit(0), 500);
+  process.exit(143);
 });

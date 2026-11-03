@@ -1,10 +1,10 @@
-import { fork } from 'node:child_process';
 import { EventEmitter } from 'node:events';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { config } from '../config.js';
 import { getStorage } from '../storage/index.js';
 import { isK6Available, executeK6Run } from './k6-adapter.js';
+import { TestCoordinator } from './coordinator.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -58,6 +58,16 @@ export class RunnerManager {
 
     const active = this.activeRuns.get(id);
     if (active) {
+      if (active.type === 'starting') {
+        if (typeof active.cancel === 'function') {
+          active.cancel();
+        }
+        await this._transitionState(id, 'cancelled', {
+          finishedAt: new Date().toISOString(),
+        });
+        return { success: true, status: 'cancelled' };
+      }
+      await this._transitionState(id, 'cancelling');
       if (typeof active.cancel === 'function') {
         active.cancel();
       }
@@ -81,6 +91,11 @@ export class RunnerManager {
 
     if (TERMINAL_STATES.has(current.status)) {
       console.warn(`[RunnerManager] Disallowed transition: cannot transition from terminal state '${current.status}' to '${newStatus}' for run ${id}.`);
+      return current;
+    }
+
+    if (current.status === 'cancelling' && !['cancelled', 'failed', 'timed_out'].includes(newStatus)) {
+      console.warn(`[RunnerManager] Disallowed transition: cannot transition from 'cancelling' to '${newStatus}' for run ${id}.`);
       return current;
     }
 
@@ -112,33 +127,93 @@ export class RunnerManager {
   }
 
   async _executeRun(run) {
-    // Transition: queued -> validating
-    await this._transitionState(run.id, 'validating');
+    // If run was already cancelled or is in terminal state, do not execute
+    const initial = await this.storage.getRunById(run.id);
+    if (!initial || TERMINAL_STATES.has(initial.status) || initial.status === 'cancelling') {
+      return;
+    }
 
-    // Transition: validating -> running
-    await this._transitionState(run.id, 'running', {
-      startedAt: new Date().toISOString(),
+    // Register active run entry early so cancelRun can hook into it
+    let cancelDelegate = null;
+    let isEarlyCancelled = false;
+
+    this.activeRuns.set(run.id, {
+      type: 'starting',
+      cancel: () => {
+        isEarlyCancelled = true;
+        if (cancelDelegate) {
+          cancelDelegate();
+        }
+      },
     });
 
-    const hasK6 = await isK6Available(config.k6Bin);
+    try {
+      const beforeVal = await this.storage.getRunById(run.id);
+      if (!beforeVal || TERMINAL_STATES.has(beforeVal.status) || beforeVal.status === 'cancelling' || isEarlyCancelled) {
+        if (beforeVal && (beforeVal.status === 'cancelling' || isEarlyCancelled) && !TERMINAL_STATES.has(beforeVal.status)) {
+          await this._transitionState(run.id, 'cancelled', { finishedAt: new Date().toISOString() });
+        }
+        return;
+      }
 
-    if (hasK6 && run.profile !== 'stages') {
-      return this._executeWithK6(run);
-    } else {
-      return this._executeWithNodeWorker(run);
+      // Transition: queued -> validating
+      const valState = await this._transitionState(run.id, 'validating');
+      if (!valState || TERMINAL_STATES.has(valState.status) || valState.status === 'cancelling' || isEarlyCancelled) {
+        if (valState && (valState.status === 'cancelling' || isEarlyCancelled) && !TERMINAL_STATES.has(valState.status)) {
+          await this._transitionState(run.id, 'cancelled', {
+            finishedAt: new Date().toISOString(),
+          });
+        }
+        return;
+      }
+
+      const beforeRun = await this.storage.getRunById(run.id);
+      if (!beforeRun || TERMINAL_STATES.has(beforeRun.status) || beforeRun.status === 'cancelling' || isEarlyCancelled) {
+        if (beforeRun && (beforeRun.status === 'cancelling' || isEarlyCancelled) && !TERMINAL_STATES.has(beforeRun.status)) {
+          await this._transitionState(run.id, 'cancelled', { finishedAt: new Date().toISOString() });
+        }
+        return;
+      }
+
+      // Transition: validating -> running
+      const runState = await this._transitionState(run.id, 'running', {
+        startedAt: new Date().toISOString(),
+      });
+      if (!runState || TERMINAL_STATES.has(runState.status) || runState.status === 'cancelling' || isEarlyCancelled) {
+        if (runState && (runState.status === 'cancelling' || isEarlyCancelled) && !TERMINAL_STATES.has(runState.status)) {
+          await this._transitionState(run.id, 'cancelled', {
+            finishedAt: new Date().toISOString(),
+          });
+        }
+        return;
+      }
+
+      const enginePref = (process.env.RUNNER_ENGINE || config.runnerEngine || 'auto').toLowerCase();
+      const canUseK6 = enginePref !== 'node' && (enginePref === 'k6' || (await isK6Available(config.k6Bin)));
+
+      if (canUseK6 && run.profile !== 'stages' && (!run.workerCount || run.workerCount === 1)) {
+        return await this._executeWithK6(run, fn => { cancelDelegate = fn; });
+      } else {
+        return await this._executeWithCoordinator(run, fn => { cancelDelegate = fn; });
+      }
+    } finally {
+      this.activeRuns.delete(run.id);
     }
   }
 
-  async _executeWithK6(run) {
+  async _executeWithK6(run, registerCancelFn) {
     let cancelCallback = null;
     const cancelPromise = new Promise(resolve => {
       cancelCallback = resolve;
     });
 
-    this.activeRuns.set(run.id, {
-      type: 'k6',
-      cancel: () => cancelCallback && cancelCallback(),
-    });
+    const activeEntry = this.activeRuns.get(run.id);
+    if (activeEntry) {
+      activeEntry.type = 'k6';
+    }
+    if (registerCancelFn) {
+      registerCancelFn(() => cancelCallback && cancelCallback());
+    }
 
     try {
       const summary = await executeK6Run(
@@ -157,119 +232,36 @@ export class RunnerManager {
 
       await this._transitionState(run.id, summary.status || 'completed', {
         ...summary,
+        engine: 'k6',
         finishedAt: new Date().toISOString(),
       });
     } catch (err) {
       await this._transitionState(run.id, 'failed', {
         error: String(err.message || err).slice(0, 300),
+        engine: 'k6',
         finishedAt: new Date().toISOString(),
       });
-    } finally {
-      this.activeRuns.delete(run.id);
     }
   }
 
-  async _executeWithNodeWorker(run) {
-    return new Promise((resolve) => {
-      const child = fork(workerPath, [], {
-        stdio: ['ignore', 'inherit', 'inherit', 'ipc'],
-      });
-
-      const totalDurationSec = run.profile === 'stages' && Array.isArray(run.stages) && run.stages.length > 0
-        ? run.stages.reduce((acc, s) => acc + s.durationSec, 0)
-        : run.durationSec;
-
-      // Hard watchdog timer: duration + 8s buffer
-      const watchdogTimeout = setTimeout(async () => {
-        console.warn(`[RunnerManager] Watchdog timeout triggered for run ${run.id}. Terminating worker.`);
-        try { child.kill('SIGKILL'); } catch {}
-        await this._transitionState(run.id, 'timed_out', {
-          error: 'Execution exceeded allowable maximum run duration watchdog threshold.',
-          finishedAt: new Date().toISOString(),
-        }).catch(() => {});
-      }, (totalDurationSec * 1000) + 8000);
-
-      const cancel = () => {
-        try {
-          child.send({ type: 'cancel' });
-          setTimeout(() => {
-            try { child.kill('SIGTERM'); } catch {}
-          }, 1000);
-        } catch {}
-      };
-
-      this.activeRuns.set(run.id, {
-        type: 'node-worker',
-        child,
-        cancel,
-        timeoutId: watchdogTimeout,
-      });
-
-      child.on('message', async (msg) => {
-        if (!msg) return;
-
-        if (msg.type === 'progress' && msg.data) {
-          this.events.emit(`progress:${run.id}`, msg.data);
-          await this.storage.updateRun(run.id, msg.data).catch(() => {});
-        } else if (msg.type === 'complete' && msg.data) {
-          clearTimeout(watchdogTimeout);
-          this.events.emit(`complete:${run.id}`, msg.data);
-          const finalStatus = msg.data.status || 'completed';
-          await this._transitionState(run.id, finalStatus, msg.data).catch(() => {});
-        } else if (msg.type === 'error') {
-          clearTimeout(watchdogTimeout);
-          this.events.emit(`error:${run.id}`, msg.error);
-          await this._transitionState(run.id, 'failed', {
-            error: String(msg.error).slice(0, 300),
-            finishedAt: new Date().toISOString(),
-          }).catch(() => {});
-        }
-      });
-
-      child.on('error', async (err) => {
-        clearTimeout(watchdogTimeout);
-        this.events.emit(`error:${run.id}`, err.message);
-        await this._transitionState(run.id, 'failed', {
-          error: `Subprocess error: ${err.message}`.slice(0, 300),
-          finishedAt: new Date().toISOString(),
-        }).catch(() => {});
-      });
-
-      child.on('exit', async (code, signal) => {
-        clearTimeout(watchdogTimeout);
-        this.activeRuns.delete(run.id);
-
-        const currentRun = await this.storage.getRunById(run.id);
-        if (currentRun && !TERMINAL_STATES.has(currentRun.status)) {
-          const finalStatus = signal === 'SIGTERM' || signal === 'SIGINT'
-            ? 'cancelled'
-            : code === 0 ? 'completed' : 'failed';
-          await this._transitionState(run.id, finalStatus, {
-            finishedAt: new Date().toISOString(),
-          }).catch(() => {});
-        }
-
-        resolve();
-      });
-
-      // Send start message via IPC
-      child.send({
-        type: 'start',
-        payload: {
-          id: run.id,
-          url: run.url,
-          method: run.method,
-          concurrency: run.concurrency,
-          durationSec: run.durationSec,
-          profile: run.profile,
-          stages: run.stages,
-          headers: run.headers,
-          body: run.body,
-          timeoutMs: run.timeoutMs || config.requestTimeoutMs || 5000,
-          allowLocalTargets: config.allowLocalTargets,
-        },
-      });
+  async _executeWithCoordinator(run, registerCancelFn) {
+    const coordinator = new TestCoordinator(run, {
+      storage: this.storage,
+      events: this.events,
+      workerPath,
+      transitionState: (id, status, updates) => this._transitionState(id, status, { engine: 'node', ...updates }),
     });
+
+    const activeEntry = this.activeRuns.get(run.id);
+    if (activeEntry) {
+      activeEntry.type = 'coordinator';
+      activeEntry.coordinator = coordinator;
+    }
+    if (registerCancelFn) {
+      registerCancelFn(() => coordinator.cancel());
+    }
+
+    await coordinator.start();
   }
 }
 

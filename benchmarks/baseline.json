@@ -1,0 +1,78 @@
+{
+  "version": "1.0",
+  "profile": "ci",
+  "timestamp": "2026-10-31T18:48:29.293Z",
+  "environment": {
+    "node": "v22.14.0",
+    "platform": "win32",
+    "arch": "x64",
+    "cpus": 12,
+    "memoryMB": 7518,
+    "isCi": false
+  },
+  "warmup": {
+    "testId": "warmup-1793472481834",
+    "label": "Warmup Run",
+    "isWarmup": true,
+    "timestamp": "2026-10-31T18:48:04.973Z",
+    "endpoint": "http://127.0.0.1:5050/health",
+    "concurrency": 2,
+    "configuredDurationSec": 3,
+    "actualDurationSec": 3.13,
+    "achievedRps": 1688,
+    "totalRequests": 5064,
+    "successCount": 5064,
+    "failedCount": 0,
+    "errorRate": 0,
+    "p50": 0.9,
+    "p95": 1.58,
+    "p99": 4.68,
+    "statusCodes": {
+      "200": 5064
+    }
+  },
+  "benchmarks": [
+    {
+      "testId": "bench-vu1-1793472485976",
+      "label": "1 VU",
+      "isWarmup": false,
+      "timestamp": "2026-10-31T18:48:16.147Z",
+      "endpoint": "http://127.0.0.1:5050/health",
+      "concurrency": 1,
+      "configuredDurationSec": 10,
+      "actualDurationSec": 10.17,
+      "achievedRps": 1281.6,
+      "totalRequests": 12816,
+      "successCount": 12816,
+      "failedCount": 0,
+      "errorRate": 0,
+      "p50": 0.59,
+      "p95": 0.85,
+      "p99": 1.46,
+      "statusCodes": {
+        "200": 12816
+      }
+    },
+    {
+      "testId": "bench-vu10-1793472497159",
+      "label": "10 VU",
+      "isWarmup": false,
+      "timestamp": "2026-10-31T18:48:28.278Z",
+      "endpoint": "http://127.0.0.1:5050/health",
+      "concurrency": 10,
+      "configuredDurationSec": 10,
+      "actualDurationSec": 11.12,
+      "achievedRps": 1831.5,
+      "totalRequests": 19826,
+      "successCount": 19826,
+      "failedCount": 0,
+      "errorRate": 0,
+      "p50": 3.05,
+      "p95": 6.52,
+      "p99": 10.33,
+      "statusCodes": {
+        "200": 19826
+      }
+    }
+  ]
+}

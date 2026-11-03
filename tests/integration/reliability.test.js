@@ -168,14 +168,16 @@ test('Reliability: Worker process crash recovery transitions to failed', async (
   await storage.createRun(run);
   await runner.enqueueRun(run);
 
-  // Wait 300ms for child process to launch
-  await new Promise(r => setTimeout(r, 300));
+  // Wait 400ms for child process to launch
+  await new Promise(r => setTimeout(r, 400));
 
   const active = runner.activeRuns.get('crash-active-run');
-  assert.ok(active && active.child);
+  assert.ok(active, 'Active run must exist');
+  const childWorker = active.coordinator ? active.coordinator.workers[0]?.child : active.child;
+  assert.ok(childWorker && childWorker.pid, 'Child worker process must be active');
 
   // Simulate abrupt process crash / kill
-  active.child.kill('SIGKILL');
+  childWorker.kill('SIGKILL');
 
   // Poll until run status transitions
   let finalRun = null;

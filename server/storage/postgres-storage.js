@@ -36,17 +36,25 @@ function mapRunFromDb(row) {
     headers: row.headers || {},
     body: row.body || null,
     timeoutMs: Number(row.timeout_ms || 5000),
+    workerCount: Number(row.worker_count || 1),
     status: row.status,
     startedAt: row.started_at ? new Date(row.started_at).toISOString() : new Date().toISOString(),
     finishedAt: row.finished_at ? new Date(row.finished_at).toISOString() : undefined,
     totalRequests: Number(row.total_requests || 0),
     successCount: Number(row.success_count || 0),
     failedCount: Number(row.failed_count || 0),
+    httpErrorCount: Number(row.http_error_count || 0),
+    timeoutCount: Number(row.timeout_count || 0),
+    networkErrorCount: Number(row.network_error_count || 0),
+    cancelledCount: Number(row.cancelled_count || 0),
+    engine: row.engine || 'node',
+    partialWorkers: row.partial_workers || undefined,
+    histogramComplete: row.histogram_complete ?? true,
     rps: Number(Number(row.rps || 0).toFixed(2)),
     p50: Number(Number(row.p50 || 0).toFixed(2)),
     p95: Number(Number(row.p95 || 0).toFixed(2)),
     p99: Number(Number(row.p99 || 0).toFixed(2)),
-    errorRate: Number(Number(row.error_rate || 0).toFixed(2)),
+    errorRate: Number(Number(row.error_rate || 0).toFixed(4)),
     statusCodes: row.status_codes || {},
     error: row.error || undefined,
   };
@@ -251,13 +259,17 @@ export class PgStorage {
       INSERT INTO test_runs (
         id, user_id, target_id, target_name, url, method,
         concurrency, duration_sec, profile, stages, headers, body, timeout_ms,
-        status, started_at, total_requests, success_count, failed_count, rps,
-        p50, p95, p99, error_rate, status_codes
+        worker_count, status, started_at, total_requests, success_count, failed_count,
+        http_error_count, timeout_count, network_error_count, cancelled_count,
+        engine, partial_workers, histogram_complete,
+        rps, p50, p95, p99, error_rate, status_codes
       ) VALUES (
         $1, $2, $3, $4, $5, $6,
         $7, $8, $9, $10, $11, $12, $13,
         $14, $15, $16, $17, $18, $19,
-        $20, $21, $22, $23, $24
+        $20, $21, $22, $23,
+        $24, $25, $26,
+        $27, $28, $29, $30, $31, $32
       ) RETURNING *
     `;
     const res = await this.pool.query(sql, [
@@ -274,11 +286,19 @@ export class PgStorage {
       JSON.stringify(run.headers || {}),
       run.body || null,
       run.timeoutMs || 5000,
+      run.workerCount || 1,
       run.status || 'queued',
       run.startedAt || new Date(),
       run.totalRequests || 0,
       run.successCount || 0,
       run.failedCount || 0,
+      run.httpErrorCount || 0,
+      run.timeoutCount || 0,
+      run.networkErrorCount || 0,
+      run.cancelledCount || 0,
+      run.engine || 'node',
+      run.partialWorkers ? JSON.stringify(run.partialWorkers) : null,
+      run.histogramComplete ?? true,
       run.rps || 0,
       run.p50 || 0,
       run.p95 || 0,
@@ -304,6 +324,13 @@ export class PgStorage {
       totalRequests: 'total_requests',
       successCount: 'success_count',
       failedCount: 'failed_count',
+      httpErrorCount: 'http_error_count',
+      timeoutCount: 'timeout_count',
+      networkErrorCount: 'network_error_count',
+      cancelledCount: 'cancelled_count',
+      engine: 'engine',
+      partialWorkers: 'partial_workers',
+      histogramComplete: 'histogram_complete',
       rps: 'rps',
       p50: 'p50',
       p95: 'p95',
@@ -316,7 +343,11 @@ export class PgStorage {
     for (const [key, col] of Object.entries(mapping)) {
       if (updates[key] !== undefined) {
         fields.push(`${col} = $${idx++}`);
-        values.push(key === 'statusCodes' ? JSON.stringify(updates[key]) : updates[key]);
+        if (key === 'statusCodes' || key === 'partialWorkers') {
+          values.push(JSON.stringify(updates[key]));
+        } else {
+          values.push(updates[key]);
+        }
       }
     }
 
@@ -354,7 +385,7 @@ export class PgStorage {
           error = 'Aborted due to unexpected server restart',
           finished_at = NOW(),
           updated_at = NOW()
-      WHERE status IN ('queued', 'validating', 'running')
+      WHERE status IN ('queued', 'validating', 'running', 'cancelling')
     `);
     return res.rowCount;
   }
