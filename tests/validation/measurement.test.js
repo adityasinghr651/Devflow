@@ -71,14 +71,23 @@ test('V1 fast API totals, status counts, rate and metadata are consistent', asyn
   assert.equal(result.environmentMetadata.workerCount, 1);
 });
 
-test('V2 50ms API latency and throughput are within measured-tolerance range', async t => {
+test('V2 50ms API latency and throughput match a compatible measured baseline', async t => {
   const { storage, runner, baseUrl } = await fixture(t);
   const run = await startRun(storage, runner, baseUrl, { path: '/fixed?delayMs=50' });
   const result = await waitForTerminal(storage, run);
   assert.equal(result.status, 'completed');
+  assert.ok(result.totalRequests > 0, 'controlled latency run should complete requests');
+  assert.ok(result.p50 >= 45 && result.p50 <= 250, `p50=${result.p50}ms is inconsistent with a 50ms controlled delay`);
   const reportNames = (await fs.readdir(path.resolve('benchmarks/results'))).filter(name => name.startsWith('variance-study-') && name.endsWith('.json')).sort();
   assert.ok(reportNames.length > 0, 'run tools/variance-study.js before measuring timing tolerance');
-  const variance = JSON.parse(await fs.readFile(path.resolve('benchmarks/results', reportNames.at(-1)), 'utf8')).byWorkerCount['1'];
+  const report = JSON.parse(await fs.readFile(path.resolve('benchmarks/results', reportNames.at(-1)), 'utf8'));
+  // Checked-in measurements are host-specific. Keep the deterministic delay sanity
+  // check everywhere, but compare tight variance only when the platform matches.
+  if (report.environment?.platform !== process.platform || report.environment?.arch !== process.arch) {
+    assert.ok(result.rps > 0, `expected positive throughput, got ${result.rps}`);
+    return;
+  }
+  const variance = report.byWorkerCount['1'];
   const latencyTolerance = Math.max(1, 3 * variance.p50.standardDeviation);
   // Five measured standard deviations allow occasional local CPU scheduling noise while
   // still bounding throughput tightly around the controlled target's empirical baseline.
