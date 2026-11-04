@@ -41,10 +41,14 @@ export const config = {
     : process.env.ALLOW_LOCAL_TARGETS === 'true',
   maxActiveRuns: Number(process.env.MAX_ACTIVE_RUNS || 1),
   maxConcurrency: 20,
-  maxDurationSec: 30,
+  maxDurationSec: positiveInteger('MAX_DURATION_SEC', 30),
+  maxRunsStoredPerUser: positiveInteger('MAX_RUNS_STORED_PER_USER', 1000),
   runnerEngine: (process.env.RUNNER_ENGINE || 'auto').toLowerCase(),
   k6Bin: process.env.K6_BIN || 'k6',
   requestTimeoutMs: Number(process.env.REQUEST_TIMEOUT_MS || 5000),
+  workerStartupTimeoutMs: positiveInteger('WORKER_STARTUP_TIMEOUT_MS', 30000),
+  workerNoProgressTimeoutMs: positiveInteger('WORKER_NO_PROGRESS_TIMEOUT_MS', 15000),
+  workerMemoryMb: positiveInteger('WORKER_MEMORY_MB', 512),
   databaseUrl: process.env.DATABASE_URL || '',
   jwtSecret,
   jwtExpiresIn: process.env.JWT_EXPIRES_IN || '24h',
@@ -56,3 +60,7 @@ export const config = {
   dbPoolMin: Number(process.env.DB_POOL_MIN || 2),
   dbPoolMax: Number(process.env.DB_POOL_MAX || 10),
 };
+
+if (config.maxDurationSec > 3600) {
+  throw new Error('FATAL: MAX_DURATION_SEC cannot exceed 3600.');
+}

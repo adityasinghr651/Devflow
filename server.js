@@ -19,18 +19,26 @@ async function bootstrap() {
 
   const shutdown = async (signal) => {
     console.log(`[ServerTest] Received ${signal}, shutting down gracefully...`);
-    server.close(async () => {
-      console.log('[ServerTest] HTTP server closed.');
-      if (typeof storage.close === 'function') {
-        await storage.close();
-        console.log('[ServerTest] Database connections closed.');
-      }
-      process.exit(0);
-    });
+    const serverClosed = new Promise(resolve => server.close(resolve));
+    const outcome = await runner.shutdown(8000);
+    if (outcome.timedOut) console.error(JSON.stringify({ level: 'error', event: 'shutdown_timeout', timeoutMs: 8000 }));
+    await serverClosed;
+    if (typeof storage.close === 'function') await storage.close();
+    console.log('[ServerTest] Graceful shutdown complete.');
+    process.exit(outcome.timedOut ? 1 : 0);
   };
 
-  process.on('SIGINT', () => shutdown('SIGINT'));
-  process.on('SIGTERM', () => shutdown('SIGTERM'));
+  let shuttingDown = false;
+  const handleShutdown = signal => {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    shutdown(signal).catch(err => {
+      console.error(JSON.stringify({ level: 'error', event: 'shutdown_failed', message: err.message }));
+      process.exit(1);
+    });
+  };
+  process.on('SIGINT', () => handleShutdown('SIGINT'));
+  process.on('SIGTERM', () => handleShutdown('SIGTERM'));
 }
 
 bootstrap().catch(err => {

@@ -13,6 +13,8 @@
     "bench:compare": "node tools/compare-benchmarks.js",
     "bench:baseline": "node tools/run-benchmark.js --ci --save-baseline",
     "bench:scaling": "node tools/run-worker-scaling-benchmark.js",
+    "soak": "node tools/soak-test.js",
+    "soak:ci": "node tools/soak-test.js --ci",
     "bench:cross-validate": "node tools/cross-validate.js",
     "test": "node --test --test-concurrency=1 tests/**/*.test.js",
     "test:validation": "node --test tests/validation/*.test.js",

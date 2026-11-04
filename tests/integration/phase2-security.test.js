@@ -75,6 +75,10 @@ test('Phase 2: security headers, body size, quota enforcement, stream tickets, a
   assert.equal(allowedOrigin.headers.get('access-control-allow-origin'), 'http://localhost:3000');
   assert.equal(allowedOrigin.headers.get('x-frame-options'), 'DENY');
   assert.equal(allowedOrigin.headers.get('x-content-type-options'), 'nosniff');
+  assert.ok(allowedOrigin.headers.get('x-request-id'));
+  const ready = await fetch(`${api}/ready`);
+  assert.equal(ready.status, 200);
+  assert.equal((await ready.json()).status, 'ready');
   const deniedOrigin = await fetch(`${api}/health`, { headers: { Origin: 'https://attacker.example' } });
   assert.equal(deniedOrigin.headers.get('access-control-allow-origin'), null);
   const oversized = await fetch(`${api}/auth/register`, {

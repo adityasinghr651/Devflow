@@ -22,6 +22,7 @@ export class RunnerManager {
     this.runningCount = 0;
     this.dispatchedRuns = new Set();
     this.executionInputs = new Map();
+    this.executionPromises = new Set();
     this.events = new EventEmitter();
     this.events.setMaxListeners(200);
   }
@@ -31,6 +32,33 @@ export class RunnerManager {
     if (cleaned > 0) {
       console.log(`[RunnerManager] Startup recovery: cleaned up ${cleaned} stale active runs.`);
     }
+  }
+
+  async shutdown(timeoutMs = 8000) {
+    for (const runId of [...this.queue]) await this.cancelRun(runId);
+    for (const [runId, active] of this.activeRuns) {
+      if (active.type === 'starting' || active.type === 'k6' || active.type === 'coordinator') {
+        const run = await this.storage.getRunById(runId);
+        if (!run || TERMINAL_STATES.has(run.status)) continue;
+        await this._transitionState(runId, 'cancelling');
+        active.cancel?.();
+      }
+    }
+    const pending = Promise.allSettled([...this.executionPromises]);
+    let timer;
+    const timedOut = await Promise.race([
+      pending.then(() => false),
+      new Promise(resolve => { timer = setTimeout(() => resolve(true), timeoutMs); }),
+    ]);
+    clearTimeout(timer);
+    if (timedOut) {
+      for (const active of this.activeRuns.values()) {
+        if (active.coordinator) active.coordinator._terminateAllWorkers('SIGKILL');
+        active.cancel?.();
+      }
+      await Promise.race([pending, new Promise(resolve => setTimeout(resolve, 1000))]);
+    }
+    return { timedOut };
   }
 
   getEngineName() {
@@ -50,6 +78,11 @@ export class RunnerManager {
   }
 
   async cancelRun(id) {
+    const current = await this.storage.getRunById(id);
+    if (current && TERMINAL_STATES.has(current.status)) {
+      return { success: false, reason: 'Run not active or already in terminal state' };
+    }
+
     const qIdx = this.queue.indexOf(id);
     if (qIdx !== -1) {
       this.queue.splice(qIdx, 1);
@@ -139,7 +172,10 @@ export class RunnerManager {
     const executionRun = executionInput ? { ...run, ...executionInput } : run;
 
     this.runningCount++;
-    this._executeRun(executionRun).finally(() => {
+    const execution = this._executeRun(executionRun);
+    this.executionPromises.add(execution);
+    execution.finally(() => {
+      this.executionPromises.delete(execution);
       this.runningCount--;
       this._processNext();
     });

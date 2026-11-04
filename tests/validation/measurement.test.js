@@ -21,7 +21,8 @@ async function fixture(t) {
     for (const run of await storage.getRuns()) {
       if (['queued', 'validating', 'running', 'cancelling'].includes(run.status)) await runner.cancelRun(run.id).catch(() => {});
     }
-    await storage.writeQueue;
+    await runner.shutdown(3000);
+    await storage.close();
     await new Promise(resolve => server.close(resolve));
     await fs.rm(tempDir, { recursive: true, force: true });
   });

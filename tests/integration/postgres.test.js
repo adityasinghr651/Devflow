@@ -2,6 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { PgStorage } from '../../server/storage/postgres-storage.js';
 import { runMigrations } from '../../server/storage/migrations/runner.js';
+import { config } from '../../server/config.js';
+import { randomUUID } from 'node:crypto';
 
 const TEST_DATABASE_URL = process.env.TEST_DATABASE_URL || 'postgresql://postgres:root@127.0.0.1:5432/servertest_test';
 
@@ -129,7 +131,7 @@ test('PostgreSQL: Real Database Integration & Lifecycle', async (t) => {
   assert.equal(stagedRun.body, '{"test":true}');
   assert.equal(stagedRun.timeoutMs, 4000);
 
-  // Check constraint on duration (> 30s)
+  // Check constraint on duration (> hard ceiling)
   await assert.rejects(
     async () => await storage.createRun({
       id: '44444444-4444-4444-4444-444444444444',
@@ -139,7 +141,7 @@ test('PostgreSQL: Real Database Integration & Lifecycle', async (t) => {
       url: 'http://localhost:3000/api/health',
       method: 'GET',
       concurrency: 5,
-      durationSec: 60, // Exceeds CHECK (duration_sec <= 30)
+      durationSec: 3601, // Exceeds CHECK (duration_sec <= 3600)
       status: 'queued',
     }),
     (err) => err.code === '23514' || /check/i.test(err.message)
@@ -194,6 +196,25 @@ test('PostgreSQL: Real Database Integration & Lifecycle', async (t) => {
   assert.equal(persistedRun.profile, 'stages');
   assert.equal(persistedRun.stages.length, 2);
   assert.equal(persistedRun.headers['Authorization'], '[REDACTED]');
+
+  const previousRetention = config.maxRunsStoredPerUser;
+  config.maxRunsStoredPerUser = 2;
+  const retainedIds = [];
+  try {
+    for (let index = 0; index < 3; index++) {
+      const retained = await restartedStorage.createRun({
+        id: randomUUID(), userId: userA.id, targetId: targetA.id, targetName: targetA.name,
+        url: 'http://localhost:3000', method: 'GET', concurrency: 1,
+        durationSec: 1, status: 'completed', startedAt: new Date(Date.now() + index * 1000),
+      });
+      retainedIds.push(retained.id);
+    }
+    assert.equal(await restartedStorage.getRunById(retainedIds[0], userA.id), null);
+    assert.ok(await restartedStorage.getRunById(retainedIds[1], userA.id));
+    assert.ok(await restartedStorage.getRunById(retainedIds[2], userA.id));
+  } finally {
+    config.maxRunsStoredPerUser = previousRetention;
+  }
 
   // 6. Cascade Deletion Behavior
   // Deleting userA should cascade delete targetA and stagedRun

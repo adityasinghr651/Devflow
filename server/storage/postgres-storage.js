@@ -1,5 +1,6 @@
 import pg from 'pg';
 import { runMigrations } from './migrations/runner.js';
+import { config } from '../config.js';
 
 const { Pool } = pg;
 
@@ -317,6 +318,10 @@ export class PgStorage {
       run.assertionFailureCount || 0,
       run.environmentMetadata ? JSON.stringify(run.environmentMetadata) : null,
     ]);
+    await this.pool.query(`DELETE FROM test_runs WHERE user_id = $1 AND id IN (
+      SELECT id FROM test_runs WHERE user_id = $1 AND status IN ('completed', 'failed', 'cancelled', 'timed_out')
+      ORDER BY started_at DESC OFFSET $2
+    )`, [run.userId, config.maxRunsStoredPerUser]);
     return mapRunFromDb(res.rows[0]);
   }
 
@@ -380,7 +385,14 @@ export class PgStorage {
     `;
 
     const res = await this.pool.query(sql, values);
-    return mapRunFromDb(res.rows[0]);
+    const updated = mapRunFromDb(res.rows[0]);
+    if (updated && ['completed', 'failed', 'cancelled', 'timed_out'].includes(updated.status)) {
+      await this.pool.query(`DELETE FROM test_runs WHERE user_id = $1 AND id IN (
+        SELECT id FROM test_runs WHERE user_id = $1 AND status IN ('completed', 'failed', 'cancelled', 'timed_out')
+        ORDER BY started_at DESC OFFSET $2
+      )`, [updated.userId, config.maxRunsStoredPerUser]);
+    }
+    return updated;
   }
 
   async deleteRun(id, userId) {
@@ -443,5 +455,10 @@ export class PgStorage {
       poolIdle: this.pool.idleCount,
       poolWaiting: this.pool.waitingCount,
     };
+  }
+
+  async checkHealth() {
+    await this.pool.query('SELECT 1');
+    return true;
   }
 }

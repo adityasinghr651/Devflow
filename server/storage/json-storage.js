@@ -1,6 +1,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
+import { config } from '../config.js';
 
 export class JsonStorage {
   constructor(dataDir) {
@@ -208,6 +209,7 @@ export class JsonStorage {
       updatedAt: run.updatedAt || new Date().toISOString(),
     };
     this.store.runs.unshift(fullRun);
+    this._pruneTerminalRuns(fullRun.userId);
     await this._flush();
     return JSON.parse(JSON.stringify(fullRun));
   }
@@ -225,8 +227,17 @@ export class JsonStorage {
       ...JSON.parse(JSON.stringify(cleanUpdates)),
       updatedAt: new Date().toISOString(),
     };
+    if (['completed', 'failed', 'cancelled', 'timed_out'].includes(this.store.runs[idx].status)) {
+      this._pruneTerminalRuns(this.store.runs[idx].userId);
+    }
     await this._flush();
     return JSON.parse(JSON.stringify(this.store.runs[idx]));
+  }
+
+  _pruneTerminalRuns(userId) {
+    const terminal = this.store.runs.filter(item => item.userId === userId && ['completed', 'failed', 'cancelled', 'timed_out'].includes(item.status));
+    const excessIds = new Set(terminal.slice(config.maxRunsStoredPerUser).map(item => item.id));
+    if (excessIds.size) this.store.runs = this.store.runs.filter(item => !excessIds.has(item.id));
   }
 
   async deleteRun(id, userId = null) {
@@ -292,5 +303,14 @@ export class JsonStorage {
       targetsCount: this.store.targets.length,
       runsCount: this.store.runs.length,
     };
+  }
+
+  async checkHealth() {
+    await this.init();
+    return true;
+  }
+
+  async close() {
+    await this.writeQueue;
   }
 }

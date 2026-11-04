@@ -167,6 +167,8 @@ async function runWorker({
     reqHeaders['Content-Type'] = 'application/json';
   }
 
+  sendProgress(true);
+
   function sendProgress(force = false) {
     const now = Date.now();
     if (!force && now - lastProgressReport < 350) return;
@@ -199,6 +201,7 @@ async function runWorker({
           currentStageIndex: hasStages ? currentStageIndex : null,
           elapsedSec: Number(elapsedSec.toFixed(1)),
           progressPercent: Math.min(100, Number(((elapsedSec / totalDurationSec) * 100).toFixed(1))),
+          heapUsedBytes: process.memoryUsage().heapUsed,
         },
       });
     }
@@ -224,15 +227,18 @@ async function runWorker({
       const reqStartEpoch = Date.now();
       let code = 'network_error';
       let isAbortedReq = false;
+      const requestController = new AbortController();
+      const abortForRun = () => requestController.abort();
+      abortController.signal.addEventListener('abort', abortForRun, { once: true });
+      const requestTimeout = setTimeout(() => {
+        requestController.abort(new DOMException('Request timed out.', 'TimeoutError'));
+      }, timeoutMs);
 
       try {
-        const timeoutSignal = AbortSignal.timeout(timeoutMs);
-        const combinedSignal = AbortSignal.any([abortController.signal, timeoutSignal]);
-
         const fetchOptions = {
           method,
           headers: reqHeaders,
-          signal: combinedSignal,
+          signal: requestController.signal,
           redirect: 'error',
         };
 
@@ -276,6 +282,9 @@ async function runWorker({
           networkErrorCount++;
           failedCount++;
         }
+      } finally {
+        clearTimeout(requestTimeout);
+        abortController.signal.removeEventListener('abort', abortForRun);
       }
 
       statusCodes[code] = (statusCodes[code] || 0) + 1;
@@ -292,9 +301,7 @@ async function runWorker({
         lastRequestCompletedAt = Date.now();
       }
 
-      if (totalRequests % 5 === 0) {
-        sendProgress();
-      }
+      sendProgress();
     }
   }
 

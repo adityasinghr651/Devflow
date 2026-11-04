@@ -31,6 +31,8 @@ test('Metrics Correctness: Comprehensive audit against controlled test target', 
   const runner = new RunnerManager(storage);
 
   t.after(async () => {
+    await runner.shutdown(3000);
+    await storage.close();
     await new Promise(resolve => targetServer.close(resolve));
     await fs.rm(tmpDir, { recursive: true, force: true }).catch(() => {});
   });

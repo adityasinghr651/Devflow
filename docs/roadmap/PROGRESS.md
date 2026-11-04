@@ -1,6 +1,6 @@
 # Roadmap Progress
 
-Current phase: 3   Last updated: 2026-11-04T10:46:41Z   Branch: roadmap/phase-2-security   HEAD: 7c0072f
+Current phase: 3   Last updated: 2026-11-04T12:22:07Z   Branch: roadmap/phase-3-reliability   HEAD: 888ab51
 
 ## Phase table
 
@@ -9,7 +9,7 @@ Current phase: 3   Last updated: 2026-11-04T10:46:41Z   Branch: roadmap/phase-2-
 | 0 | done | PASS; see known limitations | [evidence/phase-0.md](evidence/phase-0.md) |
 | 1 | done | PASS; V1–V6 passed five times, all standard checks passed, 3 full-suite passes, no leaked processes | [evidence/phase-1.md](evidence/phase-1.md) |
 | 2 | done | PASS; lint/build, all 30 files, three full-suite passes, audit clean | [evidence/phase-2.md](evidence/phase-2.md) |
-| 3 | in-progress | started from Phase 2 gate PASS | [evidence/phase-3.md](evidence/phase-3.md) |
+| 3 | done | PASS; real 30-minute soak, PostgreSQL, chaos, lint/build, 28 files, 3 full-suite passes | [evidence/phase-3.md](evidence/phase-3.md) |
 | 4 | todo | not run | — |
 | 5 | todo | not run | — |
 | 6 | skipped | not approved in runbook | — |
@@ -35,6 +35,25 @@ Current phase: 3   Last updated: 2026-11-04T10:46:41Z   Branch: roadmap/phase-2-
 - [x] T1.4 Ran DevFlow vs autocannon on loopback; k6 is marked NOT RUN because it is not installed. Evidence in [phase-1](evidence/phase-1.md#t14--cross-tool-comparison).
 - [x] T1.5 Ran 10 samples each for 1 and 2 workers; mean, sample SD, and CV for RPS and p95 recorded with raw reports. Evidence in [phase-1](evidence/phase-1.md#t15--variance-study).
 - [x] T1.6 Persisted and displayed host/runtime, runner version/commit, engine, and worker count metadata. Evidence in [phase-1](evidence/phase-1.md#t16--environment-metadata).
+
+- [x] T2.1 Production JWT secret, target safety default, CORS, JSON limit, and security headers hardened.
+- [x] T2.2 Auth rate limiting, password policy, generic login errors, and expiry verification implemented.
+- [x] T2.3 Tenant isolation exercised; SSE uses short-lived one-use tickets.
+- [x] T2.4 Secret header values are redacted from persisted/report data; raw execution lifetime is documented.
+- [x] T2.5 SSRF matrix, runtime DNS recheck, and redirect denial covered.
+- [x] T2.6 Active, daily, and VU-second quotas return 429 with Retry-After.
+- [x] T2.7 JSON/Postgres audit storage and owner-scoped reads implemented.
+- [x] T2.8 Body, number, prototype key, CRLF, and forbidden header validation covered.
+- [x] T2.9 Production audit CI and Dependabot configured; npm audit reported zero vulnerabilities.
+- [x] T3.1 Startup reconciliation verified with a real server SIGKILL/restart test.
+- [x] T3.2 Graceful runner shutdown cancels active workers, persists terminal state, and reaps PIDs; Windows signal delivery limitation and Linux CI coverage are documented.
+- [x] T3.3 Real local PostgreSQL migration/idempotency/retention tests pass; PostgreSQL service CI job added.
+- [x] T3.4 Readiness check, request IDs, structured request/worker logs, and operations documentation added.
+- [x] T3.5 Startup/no-progress watchdogs, worker heap cap, and IPC payload validation covered by tests.
+- [x] T3.6 30-minute loopback soak passed on the third attempt; failed memory-cap attempts and final CSV are preserved.
+- [x] T3.7 All four worker indexes and server SIGKILL/restart are covered; PostgreSQL pool outage/recovery test passes.
+- [x] T3.8 Per-user terminal retention is implemented and verified in JSON and local PostgreSQL tests.
+- [x] T3.1–T3.8 Phase 3 complete; gate evidence is recorded in [phase-3 evidence](evidence/phase-3.md)
 
 ## Decision log
 
@@ -62,4 +81,8 @@ Current phase: 3   Last updated: 2026-11-04T10:46:41Z   Branch: roadmap/phase-2-
 - The optional k6 adapter does not expose the Node engine's per-category failure counters; the adapter's aggregate failure count is retained and its scope is documented in `docs/METRICS.md`. k6 was not installed, so that path is NOT VERIFIED.
 - For zero completed requests, legacy API/storage fields still use zero for RPS and latency percentiles; consumers should treat them as unavailable when `totalRequests` is zero. This compatibility behavior is documented in `docs/METRICS.md`.
 - Benchmark workers and the test target share one Windows host; this does not verify multi-machine or production-scale behavior.
+
+
+
+
 

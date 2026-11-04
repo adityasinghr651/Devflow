@@ -1,0 +1,35 @@
+{
+  "status": "completed",
+  "durationSec": 1800,
+  "sampleIntervalSec": 10,
+  "samples": 181,
+  "warmupSec": 300,
+  "passCriterion": "After 300 seconds warm-up, coordinator and worker RSS spread must each be <= max(50 MiB, 20% of median RSS), and worker heap spread <= max(64 MiB, 25% of median heap). File descriptors and event-loop lag are also recorded.",
+  "coordinatorRssWarmupMedianMb": 56.078125,
+  "coordinatorRssWarmupSpreadMb": 27.72265625,
+  "coordinatorRssCriterionPassed": true,
+  "workerRssWarmupMedianMb": 89.0390625,
+  "workerRssWarmupSpreadMb": 1.796875,
+  "workerRssCriterionPassed": true,
+  "workerRssObserved": true,
+  "workerHeapUsedMbWarmupMedian": 19.776565551757812,
+  "workerHeapUsedMbWarmupSpread": 20.035804748535156,
+  "workerHeapCriterionPassed": true,
+  "environment": {
+    "node": "v22.14.0",
+    "platform": "win32",
+    "release": "10.0.26300",
+    "cpu": "AMD Ryzen 5 5600H with Radeon Graphics         ",
+    "logicalCores": 12,
+    "totalMemoryBytes": 7883554816,
+    "runnerPid": 3504
+  },
+  "csv": "soak-2026-11-04T11-32-40-350Z.csv",
+  "workload": {
+    "target": "self-started 127.0.0.1 /health",
+    "method": "GET",
+    "concurrency": 2,
+    "workerCount": 1,
+    "engine": "node"
+  }
+}
