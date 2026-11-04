@@ -260,7 +260,11 @@ test('Reliability: Killing each worker index fails the run and reaps its sibling
       assert.equal((await storage.getRunById(id)).status, 'failed');
       for (const pid of pids) {
         let alive = true;
-        try { process.kill(pid, 0); } catch { alive = false; }
+        const reapDeadline = Date.now() + 2000;
+        while (alive && Date.now() < reapDeadline) {
+          try { process.kill(pid, 0); await new Promise(resolve => setTimeout(resolve, 25)); }
+          catch (error) { if (error.code === 'ESRCH') alive = false; else throw error; }
+        }
         assert.equal(alive, false, `worker pid ${pid} was reaped`);
       }
     }
