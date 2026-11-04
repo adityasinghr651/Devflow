@@ -1,6 +1,15 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
+import { config } from '../config.js';
+
+const TERMINAL_RUNS = new Set(['completed', 'failed', 'cancelled', 'timed_out']);
+
+function pruneTerminalRuns(draft, userId) {
+  const terminal = draft.runs.filter(run => run.userId === userId && TERMINAL_RUNS.has(run.status));
+  const excess = new Set(terminal.slice(config.maxRunsStoredPerUser).map(run => run.id));
+  if (excess.size) draft.runs = draft.runs.filter(run => !excess.has(run.id));
+}
 
 export class JsonStorage {
   constructor(dataDir) {
@@ -200,10 +209,13 @@ export class JsonStorage {
         timeoutCount: run.timeoutCount ?? 0, networkErrorCount: run.networkErrorCount ?? 0,
         redirectBlockedCount: run.redirectBlockedCount ?? 0, measurementWindowSec: run.measurementWindowSec ?? null,
         cancelledCount: run.cancelledCount ?? 0, engine: run.engine || 'node',
+        assertions: run.assertions || undefined, assertionFailureCount: run.assertionFailureCount ?? 0,
+        environmentMetadata: run.environmentMetadata || undefined,
         errorRate: run.errorRate !== undefined ? Number(Number(run.errorRate).toFixed(4)) : 0,
         createdAt: run.createdAt || new Date().toISOString(), updatedAt: run.updatedAt || new Date().toISOString(),
       };
       draft.runs.unshift(fullRun);
+      pruneTerminalRuns(draft, fullRun.userId);
       return { value: fullRun };
     });
   }
@@ -215,6 +227,7 @@ export class JsonStorage {
       const cleanUpdates = structuredClone(updates);
       if (cleanUpdates.errorRate !== undefined) cleanUpdates.errorRate = Number(Number(cleanUpdates.errorRate).toFixed(4));
       draft.runs[idx] = { ...draft.runs[idx], ...cleanUpdates, updatedAt: new Date().toISOString() };
+      if (TERMINAL_RUNS.has(draft.runs[idx].status)) pruneTerminalRuns(draft, draft.runs[idx].userId);
       return { value: draft.runs[idx] };
     });
   }
@@ -255,6 +268,15 @@ export class JsonStorage {
     });
   }
 
+  async getAuditEvents(userId, limit = 100) {
+    await this.init();
+    const boundedLimit = Math.max(1, Math.min(500, Number(limit) || 100));
+    return JSON.parse(JSON.stringify(this.store.auditEvents
+      .filter(event => event.userId === userId)
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+      .slice(0, boundedLimit)));
+  }
+
   getHealthInfo() {
     return {
       storage: 'local-json',
@@ -264,5 +286,10 @@ export class JsonStorage {
       targetsCount: this.store.targets.length,
       runsCount: this.store.runs.length,
     };
+  }
+
+  async close() {
+    await this.mutationQueue.catch(() => {});
+    await this.writeQueue.catch(() => {});
   }
 }

@@ -4,6 +4,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
 import { JsonStorage } from '../../server/storage/json-storage.js';
+import { config } from '../../server/config.js';
 
 test('Storage: Multi-user CRUD and lifecycle with JsonStorage', async () => {
   const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'servertest-storage-test-'));
@@ -113,6 +114,25 @@ test('Storage: Multi-user CRUD and lifecycle with JsonStorage', async () => {
 
   // Clean up
   await fs.rm(tmpDir, { recursive: true, force: true }).catch(() => {});
+});
+
+test('Storage: terminal run retention prunes oldest records per user only', async () => {
+  const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'devflow-retention-'));
+  const storage = new JsonStorage(tmpDir);
+  const previousLimit = config.maxRunsStoredPerUser;
+  config.maxRunsStoredPerUser = 2;
+  try {
+    await storage.init();
+    for (const [userId, id] of [['u1', 'old'], ['u1', 'middle'], ['u2', 'other']]) {
+      await storage.createRun({ id, userId, targetId: 't', targetName: 'local', url: 'http://127.0.0.1', method: 'GET', concurrency: 1, durationSec: 1, status: 'completed' });
+    }
+    await storage.createRun({ id: 'new', userId: 'u1', targetId: 't', targetName: 'local', url: 'http://127.0.0.1', method: 'GET', concurrency: 1, durationSec: 1, status: 'completed' });
+    assert.deepEqual((await storage.getRuns('u1')).map(run => run.id), ['new', 'middle']);
+    assert.equal((await storage.getRuns('u2')).length, 1);
+  } finally {
+    config.maxRunsStoredPerUser = previousLimit;
+    await fs.rm(tmpDir, { recursive: true, force: true });
+  }
 });
 
 test('Storage: JSON records survive a fresh storage instance', async (t) => {

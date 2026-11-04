@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { validateTargetPayload, validateRunPayload } from '../../server/security/validation.js';
+import { sanitizeHeadersForStorage, validateTargetPayload, validateRunPayload } from '../../server/security/validation.js';
 
 test('Validation: Target payload validation', async () => {
   const missingName = await validateTargetPayload({ name: '', url: 'http://localhost:3000' });
@@ -60,4 +60,45 @@ test('Validation: Run payload bounds enforcement', () => {
   assert.equal(valid.data.url, 'http://localhost:3001/health');
   assert.equal(valid.data.method, 'GET');
 });
+
+test('Validation: response assertions use a strict bounded shape and safe JSON path subset', () => {
+  const target = { id: 't-1', name: 'Test Target', url: 'http://localhost:3001' };
+  const valid = validateRunPayload({
+    authorized: true,
+    assertions: { status: 200, bodyContains: 'ok', jsonPath: [{ path: 'errors', op: 'notExists' }, { path: 'data.items[0].id', op: 'equals', equals: 7 }] },
+  }, target);
+  assert.equal(valid.valid, true);
+  assert.deepEqual(valid.data.assertions, {
+    status: 200,
+    bodyContains: 'ok',
+    jsonPath: [{ path: 'errors', op: 'notExists' }, { path: 'data.items[0].id', op: 'equals', equals: 7 }],
+  });
+
+  for (const assertions of [
+    { eval: 'process.exit()' },
+    { bodyContains: 'x'.repeat(257) },
+    { jsonPath: [{ path: 'errors.constructor', op: 'exists' }] },
+    { jsonPath: [{ path: 'errors', op: 'eval' }] },
+    { jsonPath: [{ path: 'x..y', op: 'exists' }] },
+  ]) {
+    assert.equal(validateRunPayload({ authorized: true, assertions }, target).valid, false);
+  }
+});
+
+test('Validation: sensitive headers redact and transport-controlled headers are rejected', () => {
+  const safe = sanitizeHeadersForStorage({
+    Authorization: 'Bearer real-secret', Cookie: 'session=real-secret',
+    'Proxy-Authorization': 'Basic real-secret', 'X-Api-Key': 'real-secret',
+    'X-Password': 'real-secret', 'X-Token-Value': 'real-secret', 'X-Secret-Value': 'real-secret',
+  });
+  assert.ok(Object.values(safe).every(value => value === '[REDACTED]'));
+  const target = { id: 't-1', name: 'Test Target', url: 'http://localhost:3001' };
+  for (const header of ['Host', 'Content-Length', 'Connection', 'Transfer-Encoding']) {
+    const result = validateRunPayload({ authorized: true, headers: { [header]: 'x' } }, target);
+    assert.equal(result.valid, false, `${header} must be rejected`);
+  }
+  const protoKeys = JSON.parse('{"__proto__":"polluted"}');
+  assert.equal(validateRunPayload({ authorized: true, headers: protoKeys }, target).valid, false);
+});
+
 

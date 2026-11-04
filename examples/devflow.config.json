@@ -1,0 +1,9 @@
+{
+  "targetId": "replace-with-target-id",
+  "path": "/health",
+  "method": "GET",
+  "concurrency": 5,
+  "durationSec": 10,
+  "workerCount": 1,
+  "authorized": true
+}

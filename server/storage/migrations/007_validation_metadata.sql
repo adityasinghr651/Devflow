@@ -1,0 +1,4 @@
+ALTER TABLE test_runs
+  ADD COLUMN IF NOT EXISTS assertions JSONB,
+  ADD COLUMN IF NOT EXISTS assertion_failure_count INTEGER NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS environment_metadata JSONB;

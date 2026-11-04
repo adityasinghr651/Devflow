@@ -1,5 +1,6 @@
 import pg from 'pg';
 import { runMigrations } from './migrations/runner.js';
+import { config } from '../config.js';
 
 const { Pool } = pg;
 
@@ -50,6 +51,9 @@ function mapRunFromDb(row) {
     measurementWindowSec: row.measurement_window_sec == null ? null : Number(row.measurement_window_sec),
     cancelledCount: Number(row.cancelled_count || 0),
     engine: row.engine || 'node',
+    assertions: row.assertions || undefined,
+    assertionFailureCount: Number(row.assertion_failure_count || 0),
+    environmentMetadata: row.environment_metadata || undefined,
     partialWorkers: row.partial_workers || undefined,
     histogramComplete: row.histogram_complete ?? true,
     rps: Number(Number(row.rps || 0).toFixed(2)),
@@ -264,14 +268,15 @@ export class PgStorage {
         worker_count, status, started_at, total_requests, success_count, failed_count,
         http_error_count, timeout_count, network_error_count, redirect_blocked_count, cancelled_count,
         engine, partial_workers, histogram_complete,
-        rps, p50, p95, p99, error_rate, status_codes, measurement_window_sec
+        rps, p50, p95, p99, error_rate, status_codes, measurement_window_sec,
+        assertions, assertion_failure_count, environment_metadata
       ) VALUES (
         $1, $2, $3, $4, $5, $6,
         $7, $8, $9, $10, $11, $12, $13,
         $14, $15, $16, $17, $18, $19,
         $20, $21, $22, $23, $24,
         $25, $26, $27,
-        $28, $29, $30, $31, $32, $33, $34
+        $28, $29, $30, $31, $32, $33, $34, $35, $36, $37
       ) RETURNING *
     `;
     const res = await this.pool.query(sql, [
@@ -309,7 +314,14 @@ export class PgStorage {
       run.errorRate || 0,
       JSON.stringify(run.statusCodes || {}),
       run.measurementWindowSec ?? null,
+      run.assertions ? JSON.stringify(run.assertions) : null,
+      run.assertionFailureCount || 0,
+      run.environmentMetadata ? JSON.stringify(run.environmentMetadata) : null,
     ]);
+    await this.pool.query(`DELETE FROM test_runs WHERE user_id = $1 AND id IN (
+      SELECT id FROM test_runs WHERE user_id = $1 AND status IN ('completed', 'failed', 'cancelled', 'timed_out')
+      ORDER BY started_at DESC OFFSET $2
+    )`, [run.userId, config.maxRunsStoredPerUser]);
     return mapRunFromDb(res.rows[0]);
   }
 
@@ -333,6 +345,9 @@ export class PgStorage {
       networkErrorCount: 'network_error_count',
       redirectBlockedCount: 'redirect_blocked_count',
       measurementWindowSec: 'measurement_window_sec',
+      assertions: 'assertions',
+      assertionFailureCount: 'assertion_failure_count',
+      environmentMetadata: 'environment_metadata',
       cancelledCount: 'cancelled_count',
       engine: 'engine',
       partialWorkers: 'partial_workers',
@@ -349,7 +364,7 @@ export class PgStorage {
     for (const [key, col] of Object.entries(mapping)) {
       if (updates[key] !== undefined) {
         fields.push(`${col} = $${idx++}`);
-        if (key === 'statusCodes' || key === 'partialWorkers') {
+        if (['statusCodes', 'partialWorkers', 'assertions', 'environmentMetadata'].includes(key)) {
           values.push(JSON.stringify(updates[key]));
         } else {
           values.push(updates[key]);
@@ -370,7 +385,14 @@ export class PgStorage {
     `;
 
     const res = await this.pool.query(sql, values);
-    return mapRunFromDb(res.rows[0]);
+    const updated = mapRunFromDb(res.rows[0]);
+    if (updated && ['completed', 'failed', 'cancelled', 'timed_out'].includes(updated.status)) {
+      await this.pool.query(`DELETE FROM test_runs WHERE user_id = $1 AND id IN (
+        SELECT id FROM test_runs WHERE user_id = $1 AND status IN ('completed', 'failed', 'cancelled', 'timed_out')
+        ORDER BY started_at DESC OFFSET $2
+      )`, [updated.userId, config.maxRunsStoredPerUser]);
+    }
+    return updated;
   }
 
   async deleteRun(id, userId) {
@@ -410,15 +432,33 @@ export class PgStorage {
     }
   }
 
-  async getHealthInfo() {
+  async getAuditEvents(userId, limit = 100) {
     await this.init();
-    await this.pool.query('SELECT 1');
+    const boundedLimit = Math.max(1, Math.min(500, Number(limit) || 100));
+    const result = await this.pool.query(
+      `SELECT id, user_id, action, resource_type, resource_id, details, ip_address, created_at
+       FROM audit_events WHERE user_id = $1 ORDER BY created_at DESC LIMIT $2`,
+      [userId, boundedLimit],
+    );
+    return result.rows.map(row => ({
+      id: row.id, userId: row.user_id, action: row.action,
+      resourceType: row.resource_type, resourceId: row.resource_id,
+      details: row.details || {}, ipAddress: row.ip_address,
+      createdAt: row.created_at.toISOString(),
+    }));
+  }
+
+  getHealthInfo() {
     return {
       storage: 'postgresql',
-      healthy: true,
       poolTotal: this.pool.totalCount,
       poolIdle: this.pool.idleCount,
       poolWaiting: this.pool.waitingCount,
     };
+  }
+
+  async checkHealth() {
+    await this.pool.query('SELECT 1');
+    return true;
   }
 }

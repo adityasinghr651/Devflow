@@ -5,6 +5,7 @@ import { config } from '../config.js';
 import { getStorage } from '../storage/index.js';
 import { isK6Available, executeK6Run } from './k6-adapter.js';
 import { TestCoordinator } from './coordinator.js';
+import { getEnvironmentMetadata } from '../environment.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -20,6 +21,8 @@ export class RunnerManager {
     this.maxActive = config.maxActiveRuns || 1;
     this.runningCount = 0;
     this.dispatchedRuns = new Set();
+    this.executionInputs = new Map();
+    this.executionPromises = new Set();
     this.events = new EventEmitter();
     this.events.setMaxListeners(200);
   }
@@ -31,6 +34,33 @@ export class RunnerManager {
     }
   }
 
+  async shutdown(timeoutMs = 8000) {
+    for (const runId of [...this.queue]) await this.cancelRun(runId);
+    for (const [runId, active] of this.activeRuns) {
+      if (active.type === 'starting' || active.type === 'k6' || active.type === 'coordinator') {
+        const run = await this.storage.getRunById(runId);
+        if (!run || TERMINAL_STATES.has(run.status)) continue;
+        await this._transitionState(runId, 'cancelling');
+        active.cancel?.();
+      }
+    }
+    const pending = Promise.allSettled([...this.executionPromises]);
+    let timer;
+    const timedOut = await Promise.race([
+      pending.then(() => false),
+      new Promise(resolve => { timer = setTimeout(() => resolve(true), timeoutMs); }),
+    ]);
+    clearTimeout(timer);
+    if (timedOut) {
+      for (const active of this.activeRuns.values()) {
+        if (active.coordinator) active.coordinator._terminateAllWorkers('SIGKILL');
+        active.cancel?.();
+      }
+      await Promise.race([pending, new Promise(resolve => setTimeout(resolve, 1000))]);
+    }
+    return { timedOut };
+  }
+
   getEngineName() {
     return this.useK6 ? 'k6-subprocess' : 'node-subprocess-worker';
   }
@@ -40,6 +70,7 @@ export class RunnerManager {
       console.warn(`[RunnerManager] Run ${run.id} is already dispatched. Ignoring duplicate enqueue.`);
       return run;
     }
+    this.executionInputs.set(run.id, { headers: run.headers || {} });
     this.dispatchedRuns.add(run.id);
     this.queue.push(run.id);
     void this._processNext();
@@ -47,9 +78,15 @@ export class RunnerManager {
   }
 
   async cancelRun(id) {
+    const current = await this.storage.getRunById(id);
+    if (current && TERMINAL_STATES.has(current.status)) {
+      return { success: false, reason: 'Run not active or already in terminal state' };
+    }
+
     const qIdx = this.queue.indexOf(id);
     if (qIdx !== -1) {
       this.queue.splice(qIdx, 1);
+      this.executionInputs.delete(id);
       await this._transitionState(id, 'cancelled', {
         finishedAt: new Date().toISOString(),
       });
@@ -104,6 +141,16 @@ export class RunnerManager {
       status: newStatus,
     });
 
+    if (TERMINAL_STATES.has(newStatus) && !TERMINAL_STATES.has(current.status)) {
+      await this.storage.createAuditEvent?.({
+        userId: current.userId,
+        action: 'RUN_FINISH',
+        resourceType: 'run',
+        resourceId: id,
+        details: { status: newStatus },
+      })?.catch(() => {});
+    }
+
     if (emitStatus) this.events.emit(`status:${id}`, { id, status: newStatus, ...updates });
     return updated;
   }
@@ -114,12 +161,9 @@ export class RunnerManager {
     }
 
     const runId = this.queue.shift();
-    this.runningCount++;
+    let run;
     try {
-      const run = await this.storage.getRunById(runId);
-      if (run && !TERMINAL_STATES.has(run.status)) {
-        await this._executeRun(run);
-      }
+      run = await this.storage.getRunById(runId);
     } catch (err) {
       const message = String(err?.message || err || 'Runner failed before execution started').slice(0, 300);
       console.error(`[RunnerManager] Failed to dispatch run ${runId}: ${message}`);
@@ -131,10 +175,34 @@ export class RunnerManager {
       } catch (persistError) {
         console.error(`[RunnerManager] Could not persist failed status for run ${runId}: ${persistError.message}`);
       }
-    } finally {
+      void this._processNext();
+      return;
+    }
+    if (!run || TERMINAL_STATES.has(run.status)) {
+      this.executionInputs.delete(runId);
+      return this._processNext();
+    }
+
+    const executionInput = this.executionInputs.get(runId);
+    this.executionInputs.delete(runId);
+    const executionRun = executionInput ? { ...run, ...executionInput } : run;
+
+    this.runningCount++;
+    const execution = this._executeRun(executionRun);
+    this.executionPromises.add(execution);
+    void execution.catch(async err => {
+      const message = String(err?.message || err || 'Runner execution failed').slice(0, 300);
+      console.error(`[RunnerManager] Run ${runId} failed unexpectedly: ${message}`);
+      try {
+        await this._transitionState(runId, 'failed', { error: message, finishedAt: new Date().toISOString() });
+      } catch (persistError) {
+        console.error(`[RunnerManager] Could not persist failed status for run ${runId}: ${persistError.message}`);
+      }
+    }).finally(() => {
+      this.executionPromises.delete(execution);
       this.runningCount--;
       void this._processNext();
-    }
+    });
   }
 
   async _executeRun(run) {
@@ -200,7 +268,16 @@ export class RunnerManager {
       }
 
       const enginePref = (process.env.RUNNER_ENGINE || config.runnerEngine || 'auto').toLowerCase();
-      const canUseK6 = enginePref !== 'node' && (enginePref === 'k6' || (await isK6Available(config.k6Bin)));
+      const hasAssertions = run.assertions && Object.keys(run.assertions).length > 0;
+      const canUseK6 = !hasAssertions && enginePref !== 'node' && (enginePref === 'k6' || (await isK6Available(config.k6Bin)));
+
+      const engine = canUseK6 && run.profile !== 'stages' && (!run.workerCount || run.workerCount === 1)
+        ? 'k6' : 'node';
+      await this.storage.updateRun(run.id, {
+        engine,
+        workerCount: run.workerCount || 1,
+        environmentMetadata: getEnvironmentMetadata(engine, run.workerCount || 1),
+      });
 
       if (canUseK6 && run.profile !== 'stages' && (!run.workerCount || run.workerCount === 1)) {
         return await this._executeWithK6(run, fn => { cancelDelegate = fn; });

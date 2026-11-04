@@ -49,11 +49,18 @@ export function isPrivateIPv6(ip) {
     if (net.isIPv4(mapped)) {
       return isPrivateIPv4(mapped);
     }
+    const mappedHex = mapped.match(/^([0-9a-f]{1,4}):([0-9a-f]{1,4})$/);
+    if (mappedHex) {
+      const high = Number.parseInt(mappedHex[1], 16);
+      const low = Number.parseInt(mappedHex[2], 16);
+      const ipv4 = [high >> 8, high & 255, low >> 8, low & 255].join('.');
+      return isPrivateIPv4(ipv4);
+    }
   }
   return false;
 }
 
-export async function validateTargetUrl(rawUrl, { allowLocalTargets = true } = {}) {
+export async function validateTargetUrl(rawUrl, { allowLocalTargets = true, lookup = dns.lookup } = {}) {
   let parsed;
   try {
     parsed = new URL(rawUrl);
@@ -69,7 +76,7 @@ export async function validateTargetUrl(rawUrl, { allowLocalTargets = true } = {
     return { valid: false, error: 'URLs containing credentials are not allowed.' };
   }
 
-  const hostname = parsed.hostname.toLowerCase();
+  const hostname = parsed.hostname.toLowerCase().replace(/^\[|\]$/g, '').replace(/\.$/, '');
 
   // Block cloud metadata hostnames explicitly
   if (
@@ -115,7 +122,7 @@ export async function validateTargetUrl(rawUrl, { allowLocalTargets = true } = {
   // Domain name: Resolve DNS to verify all destination IPs
   let records;
   try {
-    records = await dns.lookup(hostname, { all: true, verbatim: true });
+    records = await lookup(hostname, { all: true, verbatim: true });
   } catch (err) {
     return { valid: false, error: 'Target hostname could not be resolved.' };
   }

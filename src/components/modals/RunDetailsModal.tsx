@@ -53,6 +53,14 @@ export const RunDetailsModal: React.FC<RunDetailsModalProps> = ({
       wide
     >
       <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }} className="modal-animate">
+        {selectedRun.environmentMetadata && (
+          <div style={{ background: 'var(--bg-subtle)', border: '1px solid var(--border-default)', borderRadius: '8px', padding: '10px 14px', color: 'var(--text-secondary)', fontSize: '12px' }}>
+            <b style={{ color: 'var(--text-primary)' }}>Run environment</b>
+            <span> · {selectedRun.environmentMetadata.engine} engine · {selectedRun.environmentMetadata.workerCount} worker(s) · Node {selectedRun.environmentMetadata.nodeVersion}</span>
+            <div>{selectedRun.environmentMetadata.platform} {selectedRun.environmentMetadata.osRelease} ({selectedRun.environmentMetadata.architecture}) · {selectedRun.environmentMetadata.cpuModel} ({selectedRun.environmentMetadata.logicalCpuCores} logical cores) · {(selectedRun.environmentMetadata.totalMemoryBytes / (1024 ** 3)).toFixed(1)} GiB</div>
+            <div>Runner {selectedRun.environmentMetadata.runnerVersion} · commit {selectedRun.environmentMetadata.runnerCommit}</div>
+          </div>
+        )}
         {/* Top Header Badge Row */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px', paddingBottom: '12px', borderBottom: '1px solid var(--border-subtle)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -231,7 +239,9 @@ export const RunDetailsModal: React.FC<RunDetailsModalProps> = ({
 
         {/* Tab 2: Phase 6.1 Bounded Buckets */}
         {activeTab === 'histogram' && (
+          selectedRun.isDemo ? (
           <div style={{ background: 'var(--bg-subtle)', border: '1px solid var(--border-default)', borderRadius: '8px', padding: '16px' }}>
+            <span className="env-pill">Demo data</span>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
@@ -315,6 +325,9 @@ export const RunDetailsModal: React.FC<RunDetailsModalProps> = ({
               </div>
             </div>
           </div>
+          ) : (
+            <div className="empty-state-clean">Histogram distribution unavailable for this run.</div>
+          )
         )}
 
         {/* Tab 3: HTTP Codes & Error Breakdown */}

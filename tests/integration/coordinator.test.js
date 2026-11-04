@@ -22,13 +22,16 @@ test('Coordinator: 1-worker backward-compatible execution', async (t) => {
   await new Promise(resolve => mockServer.listen(0, '127.0.0.1', resolve));
   const port = mockServer.address().port;
   const targetUrl = `http://127.0.0.1:${port}/test`;
+  let runner;
 
   t.after(async () => {
+    await runner?.shutdown(3000);
+    await storage.close();
     await new Promise(resolve => mockServer.close(resolve));
     await fs.rm(tmpDir, { recursive: true, force: true }).catch(() => {});
   });
 
-  const runner = new RunnerManager(storage);
+  runner = new RunnerManager(storage);
 
   const runRecord = {
     id: 'coord-run-1w',
@@ -97,13 +100,16 @@ test('Coordinator: 2-worker distributed execution with unified metrics', async (
   await new Promise(resolve => mockServer.listen(0, '127.0.0.1', resolve));
   const port = mockServer.address().port;
   const targetUrl = `http://127.0.0.1:${port}/distributed`;
+  let runner;
 
   t.after(async () => {
+    await runner?.shutdown(3000);
+    await storage.close();
     await new Promise(resolve => mockServer.close(resolve));
     await fs.rm(tmpDir, { recursive: true, force: true }).catch(() => {});
   });
 
-  const runner = new RunnerManager(storage);
+  runner = new RunnerManager(storage);
 
   const runRecord = {
     id: 'coord-run-2w',
@@ -179,13 +185,16 @@ test('Coordinator: Cancellation across multiple workers', async (t) => {
   await new Promise(resolve => mockServer.listen(0, '127.0.0.1', resolve));
   const port = mockServer.address().port;
   const targetUrl = `http://127.0.0.1:${port}/cancel-test`;
+  let runner;
 
   t.after(async () => {
+    await runner?.shutdown(3000);
+    await storage.close();
     await new Promise(resolve => mockServer.close(resolve));
     await fs.rm(tmpDir, { recursive: true, force: true }).catch(() => {});
   });
 
-  const runner = new RunnerManager(storage);
+  runner = new RunnerManager(storage);
 
   const runRecord = {
     id: 'coord-run-cancel',
@@ -245,12 +254,15 @@ test('Coordinator: Worker failure stops siblings and fails run safely', async (t
   const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'devflow-coord-fail-'));
   const storage = new JsonStorage(tmpDir);
   await storage.init();
+  let runner;
 
   t.after(async () => {
+    await runner?.shutdown(3000);
+    await storage.close();
     await fs.rm(tmpDir, { recursive: true, force: true }).catch(() => {});
   });
 
-  const runner = new RunnerManager(storage);
+  runner = new RunnerManager(storage);
 
   // Point to a non-existent port to trigger connection error on execution
   const runRecord = {

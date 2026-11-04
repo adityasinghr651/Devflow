@@ -55,6 +55,7 @@ export class TestCoordinator {
     this.isTerminated = false;
     this.watchdogTimeout = null;
     this.cancellationTimeout = null;
+    this.workerHealthInterval = null;
     this.startTime = null;
     this.lastProgressEmit = 0;
 
@@ -87,21 +88,23 @@ export class TestCoordinator {
       this._terminateAllWorkers('SIGKILL');
       if (!this.isTerminated) {
         this.isTerminated = true;
-        const timeoutSummary = {
+        await this.transitionState(this.run.id, 'timed_out', {
           error: 'Execution exceeded allowable maximum run duration watchdog threshold.',
           finishedAt: new Date().toISOString(),
-        };
-        try {
-          await this.transitionState(this.run.id, 'timed_out', timeoutSummary);
-          this.events?.emit(`status:${this.run.id}`, { id: this.run.id, status: 'timed_out', ...timeoutSummary });
-          this._resolveCompletion({ status: 'timed_out', ...timeoutSummary });
-        } catch (err) {
-          const message = `Test timed out, but its final status could not be saved: ${String(err?.message || err).slice(0, 200)}`;
-          this.events?.emit(`error:${this.run.id}`, message);
-          this._resolveCompletion({ status: 'failed', error: message });
-        }
+        }).catch(() => {});
+        this._resolveCompletion({ status: 'timed_out' });
       }
     }, (this.totalDurationSec * 1000) + 8000);
+
+    this.workerHealthInterval = setInterval(() => {
+      if (this.isTerminated) return;
+      const now = Date.now();
+      const noProgressLimit = Math.max(config.workerNoProgressTimeoutMs, Number(this.run.timeoutMs || config.requestTimeoutMs || 5000) + 1000);
+      const stalled = this.workers.find(worker => worker.state === 'running' &&
+        now - (worker.lastProgressAt || worker.startedAt) >
+          (worker.lastProgressAt ? noProgressLimit : config.workerStartupTimeoutMs));
+      if (stalled) this._handleWorkerFailure(stalled.id, `Worker ${stalled.id} exceeded its startup or progress timeout.`);
+    }, 1000);
 
     // Initialize worker descriptors and spawn child processes
     for (let i = 0; i < slices.length; i++) {
@@ -110,10 +113,11 @@ export class TestCoordinator {
 
       try {
         child = this.forkFn(this.workerPath, [], {
+          execArgv: [`--max-old-space-size=${config.workerMemoryMb}`],
           stdio: ['ignore', 'inherit', 'inherit', 'ipc'],
         });
       } catch (err) {
-        console.error(`[TestCoordinator] Failed to spawn worker ${i} for run ${this.run.id}:`, err);
+      console.error(JSON.stringify({ level: 'error', event: 'worker_spawn_failed', runId: this.run.id, workerIndex: i }));
         this._handleWorkerFailure(i, `Failed to spawn worker process: ${err.message}`);
         return this._completionPromise;
       }
@@ -124,6 +128,8 @@ export class TestCoordinator {
         state: 'running',
         summary: null,
         exitCode: null,
+        startedAt: Date.now(),
+        lastProgressAt: null,
       };
       this.workers.push(workerDesc);
 
@@ -142,6 +148,7 @@ export class TestCoordinator {
             method: this.run.method,
             headers: this.run.headers,
             body: this.run.body,
+            assertions: this.run.assertions,
             timeoutMs: this.run.timeoutMs || config.requestTimeoutMs || 5000,
             allowLocalTargets: config.allowLocalTargets,
           },
@@ -183,6 +190,15 @@ export class TestCoordinator {
     if (!msg || this.isTerminated) return;
 
     if (msg.type === 'progress' && msg.data) {
+      if (typeof msg.data !== 'object' || !this._validWorkerPayload(msg.data)) {
+        this._handleWorkerFailure(workerIndex, `Worker ${workerIndex} sent an invalid progress payload.`);
+        return;
+      }
+      const worker = this.workers[workerIndex];
+      if (worker) {
+        worker.lastProgressAt = Date.now();
+        worker.heapUsedBytes = msg.data.heapUsedBytes;
+      }
       const aggregated = this.progressAggregator.updateWorker(workerIndex, msg.data);
       const now = Date.now();
       if (now - this.lastProgressEmit >= 300) {
@@ -196,8 +212,13 @@ export class TestCoordinator {
       }
     } else if (msg.type === 'complete' && msg.data) {
       const worker = this.workers[workerIndex];
-      if (worker && worker.state !== 'completed') {
-        worker.state = 'completed';
+      if (!this._validWorkerPayload(msg.data)) {
+        this._handleWorkerFailure(workerIndex, `Worker ${workerIndex} sent an invalid completion payload.`);
+        return;
+      }
+      if (worker && !worker.summary) {
+        // Keep the worker active until its OS process exits. The completion IPC can
+        // arrive before process.exit(0), and shutdown must not resolve in that gap.
         worker.summary = msg.data;
         if (msg.data.histogram) {
           try {
@@ -211,6 +232,20 @@ export class TestCoordinator {
     } else if (msg.type === 'error') {
       this._handleWorkerFailure(workerIndex, msg.error || 'Worker encountered unspecified error');
     }
+  }
+
+  _validWorkerPayload(data) {
+    const counters = ['totalRequests', 'successCount', 'failedCount', 'httpErrorCount', 'timeoutCount', 'networkErrorCount', 'redirectBlockedCount', 'assertionFailureCount', 'cancelledCount'];
+    if (counters.some(key => data[key] !== undefined && (!Number.isFinite(data[key]) || data[key] < 0))) return false;
+    if (data.heapUsedBytes !== undefined && (!Number.isFinite(data.heapUsedBytes) || data.heapUsedBytes < 0)) return false;
+    if (data.histogram !== undefined) {
+      const histogram = data.histogram;
+      const buckets = histogram?.buckets;
+      if (histogram?.bucketCount !== 6801 || !Array.isArray(buckets) || buckets.length !== 6801 || buckets.some(value => !Number.isInteger(value) || value < 0)) return false;
+      if (!Number.isFinite(histogram.totalCount) || histogram.totalCount < 0 || !Number.isFinite(histogram.sumLatency) || histogram.sumLatency < 0) return false;
+      if (histogram.exactSamples !== null && (!Array.isArray(histogram.exactSamples) || histogram.exactSamples.length > 1024 || histogram.exactSamples.some(value => !Number.isFinite(value) || value < 0))) return false;
+    }
+    return true;
   }
 
   /**
@@ -261,11 +296,17 @@ export class TestCoordinator {
 
     clearTimeout(this.watchdogTimeout);
     clearTimeout(this.cancellationTimeout);
+    clearInterval(this.workerHealthInterval);
 
     // Stop all other running workers immediately
     this._terminateAllWorkers('SIGTERM');
 
     const cleanError = String(errorMessage || 'Worker failed unexpectedly').slice(0, 300);
+    console.error(JSON.stringify({ level: 'error', event: 'worker_failed', runId: this.run.id, workerIndex: failedWorkerIndex }));
+
+    if (this.events) {
+      this.events.emit(`error:${this.run.id}`, cleanError);
+    }
 
     const failedSummary = {
       error: cleanError,
@@ -273,15 +314,7 @@ export class TestCoordinator {
       finishedAt: new Date().toISOString(),
     };
 
-    try {
-      await this.transitionState(this.run.id, 'failed', failedSummary);
-      this.events?.emit(`status:${this.run.id}`, { id: this.run.id, ...failedSummary });
-    } catch (err) {
-      failedSummary.error = `${cleanError} (also could not persist failed status: ${String(err?.message || err).slice(0, 160)})`.slice(0, 300);
-    }
-    if (this.events) {
-      this.events.emit(`error:${this.run.id}`, cleanError);
-    }
+    await this.transitionState(this.run.id, 'failed', failedSummary).catch(() => {});
     this._resolveCompletion(failedSummary);
   }
 
@@ -300,6 +333,7 @@ export class TestCoordinator {
     this.isTerminated = true;
     clearTimeout(this.watchdogTimeout);
     clearTimeout(this.cancellationTimeout);
+    clearInterval(this.workerHealthInterval);
 
     let totalRequests = 0;
     let successCount = 0;
@@ -308,6 +342,7 @@ export class TestCoordinator {
     let timeoutCount = 0;
     let networkErrorCount = 0;
     let redirectBlockedCount = 0;
+    let assertionFailureCount = 0;
     let cancelledCount = 0;
     let firstRequestStartedAt = null;
     let lastRequestCompletedAt = null;
@@ -324,6 +359,7 @@ export class TestCoordinator {
         timeoutCount += Number(data.timeoutCount) || 0;
         networkErrorCount += Number(data.networkErrorCount) || 0;
         redirectBlockedCount += Number(data.redirectBlockedCount) || 0;
+        assertionFailureCount += Number(data.assertionFailureCount) || 0;
         cancelledCount += Number(data.cancelledCount) || 0;
         if (Number.isFinite(data.firstRequestStartedAt)) {
           firstRequestStartedAt = firstRequestStartedAt === null
@@ -373,6 +409,7 @@ export class TestCoordinator {
       timeoutCount,
       networkErrorCount,
       redirectBlockedCount,
+      assertionFailureCount,
       cancelledCount,
       statusCodes,
       engine: 'node',
@@ -393,20 +430,15 @@ export class TestCoordinator {
       progressPercent: 100,
     };
 
-    try {
-      await this.transitionState(this.run.id, finalStatus, finalSummary);
-    } catch (err) {
-      const message = `Test execution finished, but results could not be saved: ${String(err?.message || err).slice(0, 220)}`;
-      this.events?.emit(`error:${this.run.id}`, message);
-      this._resolveCompletion({ status: 'failed', error: message });
-      return;
-    }
+    await this.transitionState(this.run.id, finalStatus, finalSummary).catch(() => {});
+
     if (this.events) {
       if (finalStatus === 'completed') {
         this.events.emit(`complete:${this.run.id}`, finalSummary);
       }
       this.events.emit(`status:${this.run.id}`, { id: this.run.id, ...finalSummary });
     }
+
     this._resolveCompletion(finalSummary);
   }
 

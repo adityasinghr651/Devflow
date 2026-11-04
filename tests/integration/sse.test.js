@@ -84,8 +84,15 @@ test('SSE Integration: Live metrics stream endpoint', async (t) => {
   });
   assert.equal(crossUserRes.status, 404);
 
-  // 3. Connect via query parameter ?token= (used by browser EventSource)
-  const queryParamRes = await fetch(`${baseUrl}/runs/${activeRun.id}/events?token=${tokenA}`);
+  // Long-lived JWTs are rejected in URLs; EventSource uses a single-use ticket.
+  const legacyTokenRes = await fetch(`${baseUrl}/runs/${activeRun.id}/events?token=${tokenA}`);
+  assert.equal(legacyTokenRes.status, 401);
+  const ticketResponse = await fetch(`${baseUrl}/runs/${activeRun.id}/events-ticket`, {
+    method: 'POST', headers: { Authorization: `Bearer ${tokenA}` },
+  });
+  assert.equal(ticketResponse.status, 200);
+  const { ticket } = await ticketResponse.json();
+  const queryParamRes = await fetch(`${baseUrl}/runs/${activeRun.id}/events?ticket=${ticket}`);
   assert.equal(queryParamRes.status, 200);
   assert.equal(queryParamRes.headers.get('content-type'), 'text/event-stream');
   assert.equal(queryParamRes.headers.get('cache-control'), 'no-cache, no-transform');
@@ -99,6 +106,8 @@ test('SSE Integration: Live metrics stream endpoint', async (t) => {
   assert.ok(firstChunk.includes('event: snapshot'));
   assert.ok(firstChunk.includes('"id":"run-live-1"'));
   await reader.cancel(); // Close client connection
+  const replayedTicketRes = await fetch(`${baseUrl}/runs/${activeRun.id}/events?ticket=${ticket}`);
+  assert.equal(replayedTicketRes.status, 401, 'Stream tickets must be single-use');
 
   // 4. Live progress events forwarded through runner manager EventEmitter
   const liveRes = await fetch(`${baseUrl}/runs/${activeRun.id}/events`, {

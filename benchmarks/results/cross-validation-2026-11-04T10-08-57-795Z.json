@@ -1,0 +1,142 @@
+{
+  "label": "newly verified local cross-tool comparison",
+  "createdAt": "2026-11-04T10:08:57.795Z",
+  "environment": {
+    "platform": "win32",
+    "release": "10.0.26300",
+    "arch": "x64",
+    "node": "v22.14.0"
+  },
+  "workload": {
+    "target": "http://127.0.0.1:55535/fixed?delayMs=10",
+    "method": "GET",
+    "concurrency": 4,
+    "durationSec": 5,
+    "delayMs": 10
+  },
+  "tools": {
+    "devflow": {
+      "status": "completed",
+      "engine": "node",
+      "totalRequests": 1269,
+      "rps": 253.14,
+      "p50": 15.62,
+      "p95": 16.39,
+      "p99": 17.38,
+      "windowSec": 5.013
+    },
+    "autocannon": {
+      "status": "completed",
+      "totalRequests": 1288,
+      "rps": 257.61,
+      "p50": 15,
+      "p95": null,
+      "p99": 16,
+      "raw": {
+        "url": "http://127.0.0.1:55535/fixed?delayMs=10",
+        "connections": 4,
+        "sampleInt": 1000,
+        "pipelining": 1,
+        "duration": 5.06,
+        "samples": 5,
+        "start": "2026-11-04T10:08:52.730Z",
+        "finish": "2026-11-04T10:08:57.786Z",
+        "errors": 0,
+        "timeouts": 0,
+        "mismatches": 0,
+        "non2xx": 0,
+        "resets": 0,
+        "1xx": 0,
+        "2xx": 1288,
+        "3xx": 0,
+        "4xx": 0,
+        "5xx": 0,
+        "statusCodeStats": {
+          "200": {
+            "count": 1288
+          }
+        },
+        "latency": {
+          "average": 15.11,
+          "mean": 15.11,
+          "stddev": 0.88,
+          "min": 13,
+          "max": 27,
+          "p0_001": 13,
+          "p0_01": 13,
+          "p0_1": 13,
+          "p1": 14,
+          "p2_5": 14,
+          "p10": 14,
+          "p25": 15,
+          "p50": 15,
+          "p75": 15,
+          "p90": 16,
+          "p97_5": 16,
+          "p99": 16,
+          "p99_9": 27,
+          "p99_99": 27,
+          "p99_999": 27,
+          "totalCount": 1288
+        },
+        "requests": {
+          "average": 257.61,
+          "mean": 257.61,
+          "stddev": 3.2,
+          "min": 252,
+          "max": 260,
+          "total": 1288,
+          "p0_001": 252,
+          "p0_01": 252,
+          "p0_1": 252,
+          "p1": 252,
+          "p2_5": 252,
+          "p10": 252,
+          "p25": 256,
+          "p50": 260,
+          "p75": 260,
+          "p90": 260,
+          "p97_5": 260,
+          "p99": 260,
+          "p99_9": 260,
+          "p99_99": 260,
+          "p99_999": 260,
+          "sent": 1292
+        },
+        "throughput": {
+          "average": 106643.2,
+          "mean": 106643.2,
+          "stddev": 1302.46,
+          "min": 104328,
+          "max": 107640,
+          "total": 533232,
+          "p0_001": 104383,
+          "p0_01": 104383,
+          "p0_1": 104383,
+          "p1": 104383,
+          "p2_5": 104383,
+          "p10": 104383,
+          "p25": 106047,
+          "p50": 107647,
+          "p75": 107647,
+          "p90": 107647,
+          "p97_5": 107647,
+          "p99": 107647,
+          "p99_9": 107647,
+          "p99_99": 107647,
+          "p99_999": 107647
+        }
+      }
+    },
+    "k6": {
+      "status": "NOT RUN (not installed)"
+    }
+  },
+  "gaps": {
+    "rpsPercent": -1.74,
+    "p50Ms": 0.62,
+    "p95Ms": null,
+    "p99Ms": 1.38
+  },
+  "interpretation": "These tools do not match definitions exactly: DevFlow reports its measured first-request-start to last-response-completion window and merged worker histogram; autocannon reports its run duration and client-side latency histogram. Client and process overhead, target scheduling, and percentile implementation contribute to gaps. This one-host loopback comparison is not an equivalence or production-scale claim."
+}

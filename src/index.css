@@ -3,6 +3,23 @@
 @import './styles/components.css';
 @import './styles/redesign.css';
 
+.regression-comparison { display: grid; gap: 16px; }
+.regression-run-meta { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px 16px; border: 1px solid var(--border-default); border-radius: var(--radius-md); background: var(--bg-subtle); }
+.regression-run-meta > div { display: grid; gap: 4px; min-width: 0; }
+.regression-run-meta span, .regression-run-meta code { color: var(--text-secondary); font-size: 12px; overflow-wrap: anywhere; }
+.regression-verdict { display: grid; gap: 4px; padding: 16px; border: 1px solid var(--border-default); border-radius: var(--radius-md); background: var(--bg-card); }
+.regression-verdict > span { color: var(--text-secondary); font-size: 11px; text-transform: uppercase; letter-spacing: .06em; }
+.regression-verdict > strong { font-size: 20px; }
+.regression-verdict > small, .regression-metric-card small { color: var(--text-secondary); font-size: 11px; overflow-wrap: anywhere; }
+.regression-metric-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.regression-metric-card { display: grid; gap: 6px; min-width: 0; padding: 14px; border: 1px solid var(--border-default); border-radius: var(--radius-md); background: var(--bg-surface); }
+.regression-metric-card > span { color: var(--text-secondary); font-size: 12px; }
+.regression-metric-card > strong { font-size: 17px; }
+.regression-metric-status { text-transform: capitalize; }
+.compare-warning { margin: 0; padding: 12px 14px; border: 1px solid var(--color-amber); border-radius: var(--radius-md); color: var(--text-primary); background: color-mix(in srgb, var(--color-amber) 10%, var(--bg-surface)); }
+.compare-note { margin: 0; color: var(--text-secondary); font-size: 12px; }
+@media (max-width: 700px) { .regression-metric-grid { grid-template-columns: 1fr; } .regression-run-meta { align-items: flex-start; flex-direction: column; } }
+
 /* ==========================================================================
    Global Resets & Typography
    ========================================================================== */

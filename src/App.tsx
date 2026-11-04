@@ -430,47 +430,55 @@ export default function App() {
     }
 
     if (token) {
-      const sseUrl = `${API}/runs/${selectedRun.id}/events?token=${encodeURIComponent(token)}`;
-      const eventSource = new EventSource(sseUrl);
+      let cancelled = false;
+      let eventSource: EventSource | null = null;
+      request<{ ticket: string }>(`/runs/${selectedRun.id}/events-ticket`, { method: 'POST' })
+        .then(({ ticket }) => {
+          if (cancelled) return;
+          const sseUrl = `${API}/runs/${selectedRun.id}/events?ticket=${encodeURIComponent(ticket)}`;
+          eventSource = new EventSource(sseUrl);
 
-      eventSource.addEventListener('progress', (e) => {
-        try {
-          const data = JSON.parse(e.data);
-          setLiveMetrics({
-            concurrency: data.currentConcurrency,
-            progressPercent: data.progressPercent,
-            rps: data.rps,
-            totalRequests: data.totalRequests,
-            errorRate: data.errorRate,
-            statusCodes: data.statusCodes,
+          eventSource.addEventListener('progress', (e) => {
+            try {
+              const data = JSON.parse(e.data);
+              setLiveMetrics({
+                concurrency: data.currentConcurrency,
+                progressPercent: data.progressPercent,
+                rps: data.rps,
+                totalRequests: data.totalRequests,
+                errorRate: data.errorRate,
+                statusCodes: data.statusCodes,
+              });
+              setSelectedRun((prev) => (prev ? { ...prev, ...data } : null));
+            } catch {}
           });
-          setSelectedRun((prev) => (prev ? { ...prev, ...data } : null));
-        } catch {}
-      });
 
-      eventSource.addEventListener('end', (e) => {
-        let eventData: Partial<Run> = {};
-        try {
-          eventData = JSON.parse(e.data);
-          setSelectedRun((prev) => prev ? { ...prev, ...eventData } : null);
-        } catch {}
-        eventSource.close();
-        void Promise.all([
-          refresh(),
-          request<Run>(`/runs/${selectedRun.id}`).then((savedRun) => {
-            setSelectedRun((prev) => prev?.id === savedRun.id ? savedRun : prev);
-          }).catch((error) => {
-            setNotice(error instanceof Error ? `Run ended, but its saved results could not be reloaded: ${error.message}` : 'Run ended, but its saved results could not be reloaded.');
-          }),
-        ]);
-      });
+          eventSource.addEventListener('end', (e) => {
+            let eventData: Partial<Run> = {};
+            try {
+              eventData = JSON.parse(e.data);
+              setSelectedRun((prev) => prev ? { ...prev, ...eventData } : null);
+            } catch {}
+            eventSource?.close();
+            void Promise.all([
+              refresh(),
+              request<Run>(`/runs/${selectedRun.id}`).then((savedRun) => {
+                setSelectedRun((prev) => prev?.id === savedRun.id ? savedRun : prev);
+              }).catch((error) => {
+                setNotice(error instanceof Error ? `Run ended, but its saved results could not be reloaded: ${error.message}` : 'Run ended, but its saved results could not be reloaded.');
+              }),
+            ]);
+          });
 
-      eventSource.onerror = () => {
-        eventSource.close();
-      };
+          eventSource.onerror = () => eventSource?.close();
+        })
+        .catch((error) => {
+          if (!cancelled) setNotice(error instanceof Error ? error.message : 'Could not connect to live run metrics.');
+        });
 
       return () => {
-        eventSource.close();
+        cancelled = true;
+        eventSource?.close();
       };
     }
   }, [selectedRun?.id, token]);
@@ -1017,7 +1025,7 @@ export default function App() {
           )}
 
           {page === 'Comparisons' && (
-            <ComparisonsView completed={completed} />
+            <ComparisonsView completed={completed} token={token} />
           )}
 
           {page === 'Documentation' && <DocsView />}

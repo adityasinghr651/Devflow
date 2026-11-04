@@ -1,0 +1,38 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: devflow
+      POSTGRES_USER: devflow
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U devflow -d devflow"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+  api:
+    build: .
+    env_file: .env
+    environment:
+      API_HOST: 0.0.0.0
+      API_PORT: 4000
+      DATABASE_URL: postgresql://devflow:${POSTGRES_PASSWORD}@postgres:5432/devflow
+      DATA_DIR: /app/data
+    ports: ["4000:4000"]
+    volumes: ["devflow_data:/app/data"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    read_only: true
+    tmpfs: [/tmp]
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+    ports: ["3000:80"]
+    depends_on: [api]
+volumes:
+  postgres_data:
+  devflow_data:

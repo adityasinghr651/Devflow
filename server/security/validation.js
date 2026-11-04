@@ -3,14 +3,14 @@ import { isLocalhostTarget } from './ownership.js';
 
 const ALLOWED_ENVIRONMENTS = ['Development', 'Staging', 'Production', 'Local'];
 const ALLOWED_METHODS = ['GET', 'POST', 'PUT', 'DELETE', 'HEAD', 'PATCH'];
-const SENSITIVE_HEADER_KEYS = new Set(['authorization', 'cookie', 'set-cookie', 'x-api-key', 'token', 'secret', 'password']);
+const SENSITIVE_HEADER_KEYS = new Set(['authorization', 'proxy-authorization', 'cookie', 'set-cookie', 'token', 'secret', 'password']);
 
 export function sanitizeHeadersForStorage(headers = {}) {
   if (!headers || typeof headers !== 'object') return {};
   const sanitized = {};
   for (const [k, v] of Object.entries(headers)) {
     const lower = k.toLowerCase();
-    if (SENSITIVE_HEADER_KEYS.has(lower) || lower.includes('token') || lower.includes('key') || lower.includes('secret')) {
+    if (SENSITIVE_HEADER_KEYS.has(lower) || /token|secret|key|password/i.test(lower)) {
       sanitized[k] = '[REDACTED]';
     } else {
       sanitized[k] = String(v);
@@ -60,6 +60,7 @@ export function validateRunPayload(payload, target, limits = {}) {
     body,
     timeoutMs = 5000,
     workerCount = 1,
+    assertions,
     authorized,
   } = payload || {};
 
@@ -197,6 +198,29 @@ export function validateRunPayload(payload, target, limits = {}) {
     };
   }
 
+  const safeAssertions = {};
+  if (assertions !== undefined) {
+    if (!assertions || typeof assertions !== 'object' || Array.isArray(assertions) || Object.keys(assertions).some(key => !['status', 'bodyContains', 'jsonPath'].includes(key))) {
+      return { valid: false, statusCode: 400, error: 'Assertions must contain only status, bodyContains, or jsonPath.' };
+    }
+    if (assertions.status !== undefined) {
+      if (!Number.isInteger(assertions.status) || assertions.status < 100 || assertions.status > 599) return { valid: false, statusCode: 400, error: 'Assertion status must be an HTTP status code from 100 to 599.' };
+      safeAssertions.status = assertions.status;
+    }
+    if (assertions.bodyContains !== undefined) {
+      if (typeof assertions.bodyContains !== 'string' || assertions.bodyContains.length > 256) return { valid: false, statusCode: 400, error: 'bodyContains must be a string of at most 256 characters.' };
+      safeAssertions.bodyContains = assertions.bodyContains;
+    }
+    if (assertions.jsonPath !== undefined) {
+      if (!Array.isArray(assertions.jsonPath) || assertions.jsonPath.length > 10) return { valid: false, statusCode: 400, error: 'jsonPath must be an array of at most 10 assertions.' };
+      for (const item of assertions.jsonPath) {
+        if (!item || typeof item !== 'object' || Object.keys(item).some(key => !['path', 'op', 'equals'].includes(key)) || typeof item.path !== 'string' || !/^[A-Za-z_$][A-Za-z0-9_$]*(\.[A-Za-z_$][A-Za-z0-9_$]*|\[\d+\])*$/.test(item.path) || item.path.length > 128 || item.path.split(/[.\[\]]+/).some(token => ['__proto__', 'prototype', 'constructor'].includes(token)) || !['equals', 'exists', 'notExists'].includes(item.op) || (item.op === 'equals' && !Object.hasOwn(item, 'equals'))) return { valid: false, statusCode: 400, error: 'Each jsonPath assertion needs a safe path and equals, exists, or notExists operator.' };
+        safeAssertions.jsonPath ||= [];
+        safeAssertions.jsonPath.push({ path: item.path, op: item.op, ...(item.op === 'equals' ? { equals: item.equals } : {}) });
+      }
+    }
+  }
+
   // Validate custom headers
   const safeHeaders = {};
   if (headers && typeof headers === 'object' && !Array.isArray(headers)) {
@@ -209,6 +233,12 @@ export function validateRunPayload(payload, target, limits = {}) {
       };
     }
     for (const [k, v] of Object.entries(headers)) {
+      if (['__proto__', 'prototype', 'constructor'].includes(k.toLowerCase())) {
+        return { valid: false, statusCode: 400, error: 'Header name is not permitted.' };
+      }
+      if (['host', 'content-length', 'connection', 'transfer-encoding'].includes(k.toLowerCase())) {
+        return { valid: false, statusCode: 400, error: `Header '${k}' is controlled by the runner and cannot be overridden.` };
+      }
       if (!/^[a-zA-Z0-9_-]+$/.test(k) || k.length > 64) {
         return {
           valid: false,
@@ -293,6 +323,7 @@ export function validateRunPayload(payload, target, limits = {}) {
       body: safeBody,
       timeoutMs: finalTimeout,
       workerCount: safeWorkerCount,
+      assertions: Object.keys(safeAssertions).length ? safeAssertions : undefined,
     },
   };
 }

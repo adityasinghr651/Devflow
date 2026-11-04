@@ -379,7 +379,9 @@ test('Failure Injection & Reliability: Complete fault matrix verification', asyn
     const { id: runId } = await createRes.json();
 
     // 1. Connect Client 1 to SSE
-    const sseRes1 = await fetch(`${apiBaseUrl}/runs/${runId}/events?token=${token}`);
+    const ticket1Response = await fetch(`${apiBaseUrl}/runs/${runId}/events-ticket`, { method: 'POST', headers: { Authorization: `Bearer ${token}` } });
+    const { ticket: ticket1 } = await ticket1Response.json();
+    const sseRes1 = await fetch(`${apiBaseUrl}/runs/${runId}/events?ticket=${ticket1}`);
     assert.equal(sseRes1.status, 200);
     const reader1 = sseRes1.body.getReader();
 
@@ -400,7 +402,9 @@ test('Failure Injection & Reliability: Complete fault matrix verification', asyn
     assert.equal(listenersAfterDisconnect, 0, 'All listeners must be cleaned up on client disconnect');
 
     // 3. Client 2 reconnects to same run
-    const sseRes2 = await fetch(`${apiBaseUrl}/runs/${runId}/events?token=${token}`);
+    const ticket2Response = await fetch(`${apiBaseUrl}/runs/${runId}/events-ticket`, { method: 'POST', headers: { Authorization: `Bearer ${token}` } });
+    const { ticket: ticket2 } = await ticket2Response.json();
+    const sseRes2 = await fetch(`${apiBaseUrl}/runs/${runId}/events?ticket=${ticket2}`);
     assert.equal(sseRes2.status, 200);
     const reader2 = sseRes2.body.getReader();
     const decoder = new TextDecoder();

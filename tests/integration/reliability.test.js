@@ -5,6 +5,7 @@ import path from 'node:path';
 import os from 'node:os';
 import { JsonStorage } from '../../server/storage/json-storage.js';
 import { RunnerManager } from '../../server/runner/manager.js';
+import { createTestTargetServer } from '../../tools/test-target.js';
 
 test('Reliability: Startup recovery cleans up orphaned active runs', async () => {
   const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'servertest-recovery-test-'));
@@ -196,6 +197,79 @@ test('Reliability: Worker process crash recovery transitions to failed', async (
   assert.ok(finalRun.finishedAt);
 
   await fs.rm(tmpDir, { recursive: true, force: true }).catch(() => {});
+});
+
+test('Reliability: Graceful runner shutdown cancels active workers and persists terminal state', async () => {
+  const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'devflow-shutdown-'));
+  const storage = new JsonStorage(tmpDir);
+  const target = createTestTargetServer();
+  await new Promise(resolve => target.listen(0, '127.0.0.1', resolve));
+  const url = `http://127.0.0.1:${target.address().port}/hang`;
+  try {
+    await storage.init();
+    await storage.createRun({ id: 'shutdown-run', userId: 'u', targetId: 't', targetName: 'local', url, method: 'GET', concurrency: 1, durationSec: 20, timeoutMs: 30000, status: 'queued' });
+    const runner = new RunnerManager(storage);
+    await runner.enqueueRun(await storage.getRunById('shutdown-run'));
+    const deadline = Date.now() + 3000;
+    while (!runner.activeRuns.get('shutdown-run')?.coordinator && Date.now() < deadline) {
+      await new Promise(resolve => setTimeout(resolve, 25));
+    }
+    const coordinator = runner.activeRuns.get('shutdown-run')?.coordinator;
+    assert.ok(coordinator, 'worker coordinator started');
+    const pids = coordinator.getWorkerPids();
+    const outcome = await runner.shutdown(3000);
+    assert.equal(outcome.timedOut, false);
+    const finalRun = await storage.getRunById('shutdown-run');
+    assert.equal(finalRun.status, 'cancelled');
+    assert.ok(finalRun.finishedAt);
+    for (const pid of pids) {
+      let alive = true;
+      try { process.kill(pid, 0); } catch { alive = false; }
+      assert.equal(alive, false, `shutdown reaped worker pid ${pid}`);
+    }
+  } finally {
+    await new Promise(resolve => target.close(resolve));
+    await storage.writeQueue;
+    await fs.rm(tmpDir, { recursive: true, force: true }).catch(() => {});
+  }
+});
+
+test('Reliability: Killing each worker index fails the run and reaps its siblings', async () => {
+  const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'devflow-worker-chaos-'));
+  const storage = new JsonStorage(tmpDir);
+  const target = createTestTargetServer();
+  await new Promise(resolve => target.listen(0, '127.0.0.1', resolve));
+  const runner = new RunnerManager(storage);
+  try {
+    await storage.init();
+    for (let workerIndex = 0; workerIndex < 4; workerIndex++) {
+      const id = `worker-chaos-${workerIndex}`;
+      await storage.createRun({ id, userId: 'u', targetId: 't', targetName: 'local', url: `http://127.0.0.1:${target.address().port}/health`, method: 'GET', concurrency: 4, workerCount: 4, durationSec: 10, status: 'queued' });
+      await runner.enqueueRun(await storage.getRunById(id));
+      const deadline = Date.now() + 3000;
+      while (!runner.activeRuns.get(id)?.coordinator && Date.now() < deadline) await new Promise(resolve => setTimeout(resolve, 20));
+      const coordinator = runner.activeRuns.get(id)?.coordinator;
+      assert.ok(coordinator, `coordinator started for injected worker ${workerIndex}`);
+      const pids = coordinator.getWorkerPids();
+      assert.equal(pids.length, 4);
+      coordinator.workers[workerIndex].child.kill('SIGKILL');
+      await Promise.race([
+        Promise.all([...runner.executionPromises]),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('worker chaos run did not terminate')), 5000)),
+      ]);
+      assert.equal((await storage.getRunById(id)).status, 'failed');
+      for (const pid of pids) {
+        let alive = true;
+        try { process.kill(pid, 0); } catch { alive = false; }
+        assert.equal(alive, false, `worker pid ${pid} was reaped`);
+      }
+    }
+  } finally {
+    await runner.shutdown(3000);
+    await new Promise(resolve => target.close(resolve));
+    await storage.writeQueue;
+    await fs.rm(tmpDir, { recursive: true, force: true }).catch(() => {});
+  }
 });
 
 

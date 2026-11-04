@@ -31,6 +31,8 @@ test('Metrics Correctness: Comprehensive audit against controlled test target', 
   const runner = new RunnerManager(storage);
 
   t.after(async () => {
+    await runner.shutdown(3000);
+    await storage.close();
     await new Promise(resolve => targetServer.close(resolve));
     await fs.rm(tmpDir, { recursive: true, force: true }).catch(() => {});
   });
@@ -239,8 +241,14 @@ test('Metrics Correctness: Comprehensive audit against controlled test target', 
     await storage.createRun(runRecord);
     await runner.enqueueRun(runRecord);
 
-    // Wait 400ms for several requests to complete
-    await new Promise(res => setTimeout(res, 400));
+    // Wait for persisted request progress instead of relying on a fixed startup delay.
+    const progressDeadline = Date.now() + 5000;
+    let inProgress = await storage.getRunById(runId);
+    while (inProgress.totalRequests === 0 && Date.now() < progressDeadline) {
+      await new Promise(res => setTimeout(res, 50));
+      inProgress = await storage.getRunById(runId);
+    }
+    assert.ok(inProgress.totalRequests > 0, 'Run should persist completed request progress before cancellation');
 
     // Cancel the run
     const cancelResult = await runner.cancelRun(runId);
@@ -332,7 +340,9 @@ test('Metrics Correctness: Comprehensive audit against controlled test target', 
     const runId = createdRun.id;
 
     // Connect to SSE stream
-    const sseRes = await fetch(`${apiBaseUrl}/runs/${runId}/events?token=${token}`);
+    const ticketResponse = await fetch(`${apiBaseUrl}/runs/${runId}/events-ticket`, { method: 'POST', headers: { Authorization: `Bearer ${token}` } });
+    const { ticket } = await ticketResponse.json();
+    const sseRes = await fetch(`${apiBaseUrl}/runs/${runId}/events?ticket=${ticket}`);
     assert.equal(sseRes.status, 200);
 
     const reader = sseRes.body.getReader();
@@ -766,6 +776,8 @@ test('Metrics Correctness: Comprehensive audit against controlled test target', 
         statusCodes: { '200': 999 },
       },
     });
+    // A completion summary alone does not mean the child process has exited.
+    coord._handleWorkerExit(0, 0, null);
 
     // Worker 1 was cancelled/killed before sending complete summary
     coord.isCancelled = true;

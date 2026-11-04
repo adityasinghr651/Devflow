@@ -1,0 +1,21 @@
+{
+  "status": "completed",
+  "durationSec": 120,
+  "sampleIntervalSec": 10,
+  "samples": 13,
+  "passCriterion": "After 30 seconds warm-up, coordinator RSS spread must be <= max(50 MiB, 20% of median RSS). File descriptors and event-loop lag are recorded for inspection.",
+  "coordinatorRssWarmupMedianMb": 56.3203125,
+  "coordinatorRssWarmupSpreadMb": 0.68359375,
+  "coordinatorRssCriterionPassed": true,
+  "workerRssObserved": true,
+  "environment": {
+    "node": "v22.14.0",
+    "platform": "win32",
+    "release": "10.0.26300",
+    "cpu": "AMD Ryzen 5 5600H with Radeon Graphics         ",
+    "logicalCores": 12,
+    "totalMemoryBytes": 7883554816,
+    "runnerPid": 10308
+  },
+  "csv": "soak-2026-11-04T10-54-21-606Z.csv"
+}

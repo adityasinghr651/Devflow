@@ -286,6 +286,8 @@ Issues and focused pull requests are welcome. Start with a small bug fix, a test
 
 See [`docs/roadmap/PROGRESS.md`](docs/roadmap/PROGRESS.md) for the recorded roadmap phase status and evidence. Planned work is not described here as implemented functionality.
 
+The statistical comparison behavior and its noise thresholds are described in [`docs/REGRESSION_DETECTION.md`](docs/REGRESSION_DETECTION.md).
+
 ## License
 
 There is currently no `LICENSE` file in this repository. Until a license is added by the project owner, the repository's reuse and contribution terms are unspecified. Please do not assume an open-source license from the code or README wording.

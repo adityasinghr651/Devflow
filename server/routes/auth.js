@@ -36,7 +36,7 @@ authRouter.post('/auth/register', authRateLimiter, async (req, res, next) => {
 
     const existing = await storage.getUserByEmail(normalizedEmail);
     if (existing) {
-      return res.status(409).json({ error: 'Email is already registered.' });
+      return res.status(409).json({ error: 'Unable to register with these details.' });
     }
 
     const passwordHash = await hashPassword(password);
@@ -58,6 +58,17 @@ authRouter.post('/auth/register', authRateLimiter, async (req, res, next) => {
 
     const token = generateToken(user);
     res.status(201).json({ user, token });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// GET /api/audit-events — authenticated users can read only their own events.
+authRouter.get('/audit-events', authenticateToken, async (req, res, next) => {
+  try {
+    const storage = getStorage();
+    const events = await storage.getAuditEvents(req.user.id, req.query.limit);
+    res.json(events);
   } catch (err) {
     next(err);
   }

@@ -20,3 +20,13 @@ healthRouter.get('/health', async (_req, res, next) => {
   }
 });
 
+healthRouter.get('/ready', async (_req, res) => {
+  const storage = getStorage();
+  try {
+    await storage.checkHealth?.();
+    res.json({ status: 'ready', storage: storage.getHealthInfo?.().storage || 'local-json' });
+  } catch {
+    res.status(503).json({ status: 'not_ready' });
+  }
+});
+

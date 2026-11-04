@@ -58,3 +58,49 @@ test('SSRF: validateTargetUrl localhost handling', async () => {
   assert.match(blocked.error, /Localhost targets are disabled/);
 });
 
+test('SSRF: bypass variants, injectable DNS, Unicode hostnames and rebinding are blocked safely', async () => {
+  const blockedUrls = [
+    'http://2130706433/',
+    'http://0x7f000001/',
+    'http://0177.0.0.1/',
+    'http://127.0.0.1./',
+    'http://localhost./',
+    'http://[::1]/',
+    'http://[::ffff:127.0.0.1]/',
+    'http://[::ffff:7f00:1]/',
+    'http://0.0.0.0/',
+    'http://169.254.169.254/',
+    'http://good@127.0.0.1/',
+  ];
+  for (const url of blockedUrls) {
+    const result = await validateTargetUrl(url, { allowLocalTargets: false, lookup: async () => [{ address: '8.8.8.8', family: 4 }] });
+    assert.equal(result.valid, false, `${url} should be blocked`);
+  }
+
+  const privateDns = await validateTargetUrl('https://example.test/', {
+    allowLocalTargets: false,
+    lookup: async () => [{ address: '192.168.4.10', family: 4 }],
+  });
+  assert.equal(privateDns.valid, false);
+  assert.match(privateDns.error, /restricted IP/);
+
+  const unicode = await validateTargetUrl('https://例え.テスト/', {
+    allowLocalTargets: false,
+    lookup: async hostname => {
+      assert.match(hostname, /xn--/);
+      return [{ address: '8.8.8.8', family: 4 }];
+    },
+  });
+  assert.equal(unicode.valid, true);
+
+  let resolutionCount = 0;
+  const rebindResolver = async () => {
+    resolutionCount++;
+    return [{ address: resolutionCount === 1 ? '93.184.216.34' : '127.0.0.1', family: 4 }];
+  };
+  assert.equal((await validateTargetUrl('https://rebind.test/', { allowLocalTargets: false, lookup: rebindResolver })).valid, true);
+  const runtimeCheck = await validateTargetUrl('https://rebind.test/', { allowLocalTargets: false, lookup: rebindResolver });
+  assert.equal(runtimeCheck.valid, false, 'worker pre-flight recheck must block the changed private DNS answer');
+  assert.equal(isPrivateIPv6('::ffff:7f00:1'), true);
+});
+

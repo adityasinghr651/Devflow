@@ -6,6 +6,68 @@
  */
 import { validateTargetUrl } from '../security/ssrf.js';
 import { LatencyHistogram } from './latency-histogram.js';
+import { isDeepStrictEqual } from 'node:util';
+
+const MAX_ASSERTION_BODY_BYTES = 64 * 1024;
+
+async function readBoundedBody(response) {
+  if (!response.body) return { text: '', tooLarge: false };
+  const reader = response.body.getReader();
+  const chunks = [];
+  let bytes = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      bytes += value.byteLength;
+      if (bytes > MAX_ASSERTION_BODY_BYTES) {
+        await reader.cancel().catch(() => {});
+        return { text: '', tooLarge: true };
+      }
+      chunks.push(Buffer.from(value));
+    }
+    return { text: Buffer.concat(chunks).toString('utf8'), tooLarge: false };
+  } finally {
+    reader.releaseLock();
+  }
+}
+
+function lookupJsonPath(value, path) {
+  const tokens = path.match(/[A-Za-z_$][A-Za-z0-9_$]*|\d+/g) || [];
+  let current = value;
+  for (const token of tokens) {
+    const key = /^\d+$/.test(token) ? Number(token) : token;
+    if (current === null || current === undefined || !Object.hasOwn(Object(current), key)) return { exists: false };
+    current = current[key];
+  }
+  return { exists: true, value: current };
+}
+
+async function responseAssertionsPass(response, assertions = {}) {
+  const configured = assertions.status !== undefined || assertions.bodyContains !== undefined || (assertions.jsonPath?.length || 0) > 0;
+  if (!configured) {
+    await response.body?.cancel().catch(() => {});
+    return true;
+  }
+  if (assertions.status !== undefined && response.status !== assertions.status) {
+    await response.body?.cancel().catch(() => {});
+    return false;
+  }
+  const { text, tooLarge } = await readBoundedBody(response);
+  if (tooLarge) return false;
+  if (assertions.bodyContains !== undefined && !text.includes(assertions.bodyContains)) return false;
+  if (assertions.jsonPath?.length) {
+    let json;
+    try { json = JSON.parse(text); } catch { return false; }
+    for (const assertion of assertions.jsonPath) {
+      const result = lookupJsonPath(json, assertion.path);
+      if (assertion.op === 'exists' && !result.exists) return false;
+      if (assertion.op === 'notExists' && result.exists) return false;
+      if (assertion.op === 'equals' && (!result.exists || !isDeepStrictEqual(result.value, assertion.equals))) return false;
+    }
+  }
+  return true;
+}
 
 let isCancelled = false;
 const abortController = new AbortController();
@@ -48,6 +110,7 @@ async function runWorker({
   headers = {},
   body = null,
   timeoutMs = 5000,
+  assertions = {},
   allowLocalTargets = true,
 }) {
   // Pre-flight runtime destination verification against DNS rebinding / TOCTOU
@@ -84,6 +147,7 @@ async function runWorker({
   let timeoutCount = 0;
   let networkErrorCount = 0;
   let redirectBlockedCount = 0;
+  let assertionFailureCount = 0;
   let cancelledCount = 0;
   let firstRequestStartedAt = null;
   let lastRequestCompletedAt = null;
@@ -102,6 +166,8 @@ async function runWorker({
   if (body && !reqHeaders['Content-Type'] && !reqHeaders['content-type']) {
     reqHeaders['Content-Type'] = 'application/json';
   }
+
+  sendProgress(true);
 
   function sendProgress(force = false) {
     const now = Date.now();
@@ -124,6 +190,7 @@ async function runWorker({
           timeoutCount,
           networkErrorCount,
           redirectBlockedCount,
+          assertionFailureCount,
           cancelledCount,
           firstRequestStartedAt,
           lastRequestCompletedAt,
@@ -134,6 +201,7 @@ async function runWorker({
           currentStageIndex: hasStages ? currentStageIndex : null,
           elapsedSec: Number(elapsedSec.toFixed(1)),
           progressPercent: Math.min(100, Number(((elapsedSec / totalDurationSec) * 100).toFixed(1))),
+          heapUsedBytes: process.memoryUsage().heapUsed,
         },
       });
     }
@@ -159,15 +227,18 @@ async function runWorker({
       const reqStartEpoch = Date.now();
       let code = 'network_error';
       let isAbortedReq = false;
+      const requestController = new AbortController();
+      const abortForRun = () => requestController.abort();
+      abortController.signal.addEventListener('abort', abortForRun, { once: true });
+      const requestTimeout = setTimeout(() => {
+        requestController.abort(new DOMException('Request timed out.', 'TimeoutError'));
+      }, timeoutMs);
 
       try {
-        const timeoutSignal = AbortSignal.timeout(timeoutMs);
-        const combinedSignal = AbortSignal.any([abortController.signal, timeoutSignal]);
-
         const fetchOptions = {
           method,
           headers: reqHeaders,
-          signal: combinedSignal,
+          signal: requestController.signal,
           redirect: 'error',
         };
 
@@ -177,12 +248,20 @@ async function runWorker({
 
         const response = await fetch(url, fetchOptions);
         code = String(response.status);
-        await response.body?.cancel().catch(() => {});
+        const expectedStatus = assertions.status !== undefined ? response.status === assertions.status : response.ok;
+        const assertionsPass = expectedStatus ? await responseAssertionsPass(response, { ...assertions, status: undefined }) : (await response.body?.cancel().catch(() => {}), false);
+        if (expectedStatus && !assertionsPass) {
+          assertionFailureCount++;
+          failedCount++;
+        }
 
-        if (response.ok) {
+        if (expectedStatus && assertionsPass) {
           successCount++;
-        } else {
+        } else if (!expectedStatus && !response.ok) {
           httpErrorCount++;
+          failedCount++;
+        } else if (!expectedStatus) {
+          assertionFailureCount++;
           failedCount++;
         }
       } catch (err) {
@@ -203,6 +282,9 @@ async function runWorker({
           networkErrorCount++;
           failedCount++;
         }
+      } finally {
+        clearTimeout(requestTimeout);
+        abortController.signal.removeEventListener('abort', abortForRun);
       }
 
       statusCodes[code] = (statusCodes[code] || 0) + 1;
@@ -219,9 +301,7 @@ async function runWorker({
         lastRequestCompletedAt = Date.now();
       }
 
-      if (totalRequests % 5 === 0) {
-        sendProgress();
-      }
+      sendProgress();
     }
   }
 
@@ -248,6 +328,7 @@ async function runWorker({
     timeoutCount,
     networkErrorCount,
     redirectBlockedCount,
+    assertionFailureCount,
     cancelledCount,
     firstRequestStartedAt,
     lastRequestCompletedAt,

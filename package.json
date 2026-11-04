@@ -3,6 +3,8 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
+  "engines": { "node": ">=22 <23" },
+  "bin": { "devflow": "bin/devflow.js" },
   "scripts": {
     "dev": "vite --host 0.0.0.0 --port 3000",
     "server": "node server.js",
@@ -13,7 +15,12 @@
     "bench:compare": "node tools/compare-benchmarks.js",
     "bench:baseline": "node tools/run-benchmark.js --ci --save-baseline",
     "bench:scaling": "node tools/run-worker-scaling-benchmark.js",
-    "test": "node --test tests/**/*.test.js",
+    "soak": "node tools/soak-test.js",
+    "soak:ci": "node tools/soak-test.js --ci",
+    "bench:cross-validate": "node tools/cross-validate.js",
+    "regression:experiment": "node tools/run-regression-experiment.js",
+    "test": "node --test --test-concurrency=1 tests/**/*.test.js",
+    "test:validation": "node --test tests/validation/*.test.js",
     "build": "tsc --noEmit && vite build",
     "lint": "tsc --noEmit",
     "preview": "vite preview --host 0.0.0.0"
@@ -37,6 +44,7 @@
     "@types/pg": "^8.23.1",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
+    "autocannon": "^8.0.0",
     "typescript": "^7.0.2"
   }
 }
