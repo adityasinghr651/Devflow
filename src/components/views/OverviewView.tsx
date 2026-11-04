@@ -254,8 +254,8 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
               >
                 <defs>
                   <linearGradient id="overviewAreaGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#3B82F6" stopOpacity="0.2" />
-                    <stop offset="100%" stopColor="#3B82F6" stopOpacity="0.0" />
+                    <stop offset="0%" stopColor="var(--color-lime)" stopOpacity="0.25" />
+                    <stop offset="100%" stopColor="var(--color-lime)" stopOpacity="0.0" />
                   </linearGradient>
                 </defs>
 
@@ -278,7 +278,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                     .map((val, idx) => `${(idx / (chartPoints.length - 1)) * 800},${115 - val * 2.2}`)
                     .join(' ')}
                   fill="none"
-                  stroke="var(--color-blue)"
+                  stroke="var(--color-lime)"
                   strokeWidth="2"
                   strokeLinecap="round"
                   strokeLinejoin="round"
@@ -297,8 +297,8 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                         cx={cx}
                         cy={cy}
                         r={isHovered ? 6 : idx === chartPoints.length - 1 ? 4 : 3}
-                        fill={isHovered ? '#60A5FA' : idx === chartPoints.length - 1 ? 'var(--color-blue)' : 'var(--bg-card)'}
-                        stroke="var(--color-blue)"
+                        fill={isHovered ? 'var(--color-lime-hover)' : idx === chartPoints.length - 1 ? 'var(--color-lime)' : 'var(--bg-card)'}
+                        stroke="var(--color-lime)"
                         strokeWidth={isHovered ? 2.5 : 1.5}
                         style={{ cursor: 'pointer', transition: 'r 0.15s ease' }}
                         onMouseEnter={() => setHoveredIdx(idx)}

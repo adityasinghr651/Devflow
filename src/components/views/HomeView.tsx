@@ -92,7 +92,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
         <div className="hero-content-inner">
           {/* Top Pill Badge */}
           <div className="hero-badge-pill">
-            <Zap size={13} style={{ color: '#3B82F6', fill: '#3B82F6' }} />
+            <Zap size={13} style={{ color: 'var(--color-lime)', fill: 'var(--color-lime)' }} />
             <span>Open Source • Self-hosted • Developer Tool</span>
           </div>
 
@@ -122,7 +122,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
               className="btn-pill-subtle"
               onClick={() => onNavigatePage ? onNavigatePage('Overview') : onStart()}
             >
-              <Sparkles size={14} style={{ color: '#3B82F6' }} />
+              <Sparkles size={14} style={{ color: 'var(--color-lime)' }} />
               <span>Explore Demo Workspace</span>
             </button>
 
@@ -199,7 +199,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
         <div className="home-demo-card">
           <div className="demo-header">
             <div className="demo-target-badge">
-              <Terminal size={14} style={{ color: 'var(--color-blue)' }} />
+              <Terminal size={14} style={{ color: 'var(--color-lime)' }} />
               <span className="target-method">POST</span>
               <span className="target-url">https://api.gateway.internal/v1/checkout</span>
               <span className="env-pill">Illustrative sample</span>
@@ -295,7 +295,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
               </span>
               <div style={{ display: 'flex', gap: '16px', fontSize: '11px', fontFamily: 'var(--font-mono)' }}>
                 <span>p50: <b style={{ color: 'var(--text-primary)' }}>{(simP95 * 0.45).toFixed(1)} ms</b></span>
-                <span>p95: <b style={{ color: 'var(--color-blue)' }}>{simP95} ms</b></span>
+                <span>p95: <b style={{ color: 'var(--color-lime)' }}>{simP95} ms</b></span>
                 <span>p99: <b style={{ color: 'var(--text-primary)' }}>{(simP95 * 1.6).toFixed(1)} ms</b></span>
               </div>
             </div>
@@ -311,8 +311,8 @@ export const HomeView: React.FC<HomeViewProps> = ({
               >
                 <defs>
                   <linearGradient id="chartGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#3B82F6" stopOpacity="0.25" />
-                    <stop offset="100%" stopColor="#3B82F6" stopOpacity="0.0" />
+                    <stop offset="0%" stopColor="var(--color-lime)" stopOpacity="0.28" />
+                    <stop offset="100%" stopColor="var(--color-lime)" stopOpacity="0.0" />
                   </linearGradient>
                 </defs>
 
@@ -335,7 +335,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
                     .map((val, idx) => `${(idx / (simPoints.length - 1)) * 700},${110 - val * 2}`)
                     .join(' ')}
                   fill="none"
-                  stroke="var(--color-blue)"
+                  stroke="var(--color-lime)"
                   strokeWidth="2.5"
                   strokeLinecap="round"
                   strokeLinejoin="round"
@@ -346,7 +346,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
                   cx="700"
                   cy={110 - simPoints[simPoints.length - 1] * 2}
                   r="5"
-                  fill="var(--color-blue)"
+                  fill="var(--color-lime)"
                 />
               </svg>
             </div>
@@ -363,7 +363,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
                     setSimPreset('normal');
                     setSimVUs(Number(e.target.value));
                   }}
-                  style={{ accentColor: 'var(--color-blue)', width: '130px' }}
+                  style={{ accentColor: 'var(--color-lime)', width: '130px' }}
                 />
                 <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600, color: 'var(--text-primary)' }}>{simVUs} VUs</span>
               </div>

@@ -163,55 +163,127 @@ a {
   box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
 }
 
-.mobile-nav-trigger {
-  display: none;
+.mobile-nav-trigger,
+.mobile-menu-toggle {
+  display: none !important;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  color: var(--text-primary);
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1);
   flex-shrink: 0;
 }
 
-.home-mobile-drawer {
+.mobile-nav-trigger:hover,
+.mobile-menu-toggle:hover {
+  background: var(--bg-card-hover);
+  border-color: rgba(255, 255, 255, 0.2);
+  color: var(--color-lime);
+  transform: translateY(-1px);
+}
+
+:root[data-theme="light"] .mobile-nav-trigger,
+:root[data-theme="light"] .mobile-menu-toggle {
+  background: #FFFFFF;
+  border-color: #E4E4E7;
+  color: #09090B;
+}
+
+:root[data-theme="light"] .mobile-nav-trigger:hover,
+:root[data-theme="light"] .mobile-menu-toggle:hover {
+  background: #F4F4F6;
+  border-color: #D4D4D8;
+  color: #09090B;
+}
+
+.home-mobile-drawer,
+.mobile-nav-drawer {
   position: absolute;
   top: 64px;
   left: 0;
   right: 0;
   background: var(--bg-surface);
   border-bottom: 1px solid var(--border-default);
-  padding: 20px 24px 24px;
+  padding: 20px 24px 28px;
   box-shadow: var(--shadow-modal);
   display: flex;
   flex-direction: column;
   gap: 16px;
-  animation: fadeInSlideUp 0.2s ease forwards;
+  z-index: 60;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  animation: fadeInSlideUp 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
-.mobile-links-list {
+:root[data-theme="light"] .mobile-nav-drawer {
+  background: rgba(255, 255, 255, 0.98);
+  border-bottom-color: #E4E4E7;
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.08);
+}
+
+.mobile-links-list,
+.mobile-drawer-links {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.mobile-link,
+.mobile-drawer-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 14px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-subtle);
+  border: 1px solid var(--border-default);
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-decoration: none;
+}
+
+.mobile-link:hover,
+.mobile-drawer-item:hover {
+  background: var(--bg-card-hover);
+  border-color: rgba(255, 255, 255, 0.18);
+  color: var(--color-lime);
+  transform: translateX(2px);
+}
+
+:root[data-theme="light"] .mobile-link,
+:root[data-theme="light"] .mobile-drawer-item {
+  background: #F4F4F6;
+  border-color: #E4E4E7;
+}
+
+:root[data-theme="light"] .mobile-link:hover,
+:root[data-theme="light"] .mobile-drawer-item:hover {
+  background: #EAEAEF;
+  color: #09090B;
+}
+
+.mobile-drawer-bottom,
+.mobile-drawer-actions {
+  padding-top: 14px;
+  border-top: 1px solid var(--border-default);
   display: flex;
   flex-direction: column;
   gap: 10px;
 }
 
-.mobile-link {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 10px 12px;
-  border-radius: var(--radius-sm);
-  background: var(--bg-subtle);
-  border: 1px solid var(--border-default);
-  color: var(--text-primary);
-  font-size: 14px;
-  font-weight: 500;
-  text-align: left;
-}
-
-.mobile-drawer-bottom {
-  padding-top: 14px;
-  border-top: 1px solid var(--border-default);
-}
-
-.mobile-theme-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+.full-button {
+  width: 100%;
+  justify-content: center;
 }
 
 /* ==========================================================================
@@ -256,7 +328,7 @@ a {
   font-weight: 700;
   letter-spacing: 1px;
   text-transform: uppercase;
-  color: var(--color-blue);
+  color: var(--color-lime);
   display: block;
   margin-bottom: 6px;
 }
@@ -417,9 +489,9 @@ a {
   width: 40px;
   height: 40px;
   border-radius: 8px;
-  background: var(--color-blue-bg);
-  color: var(--color-blue);
-  border: 1px solid var(--color-blue-border);
+  background: var(--color-lime-bg);
+  color: var(--color-lime);
+  border: 1px solid var(--color-lime-border);
   display: grid;
   place-items: center;
   margin-bottom: 14px;
@@ -462,9 +534,9 @@ a {
   font-family: var(--font-mono);
   font-size: 14px;
   font-weight: 700;
-  color: var(--color-blue);
-  background: var(--color-blue-bg);
-  border: 1px solid var(--color-blue-border);
+  color: var(--color-lime);
+  background: var(--color-lime-bg);
+  border: 1px solid var(--color-lime-border);
   padding: 3px 8px;
   border-radius: 6px;
   display: inline-block;
@@ -670,8 +742,8 @@ a {
   width: 24px;
   height: 24px;
   border-radius: 6px;
-  background: var(--color-blue);
-  color: #FFFFFF;
+  background: var(--color-lime);
+  color: #0B0B0C;
   display: grid;
   place-items: center;
   font-weight: 700;
@@ -739,9 +811,9 @@ a {
 }
 
 .sidebar-nav-item.active {
-  background: var(--color-blue-bg);
-  border-color: var(--color-blue-border);
-  color: var(--color-blue);
+  background: var(--color-lime-bg);
+  border-color: var(--color-lime-border);
+  color: var(--color-lime);
   font-weight: 600;
 }
 
@@ -752,8 +824,8 @@ a {
   font-weight: 700;
   padding: 2px 6px;
   border-radius: 9999px;
-  background: var(--color-blue);
-  color: #FFFFFF;
+  background: var(--color-lime);
+  color: #0B0B0C;
 }
 
 .sidebar-bottom-panel {
@@ -901,8 +973,8 @@ a {
   width: 22px;
   height: 22px;
   border-radius: 50%;
-  background: var(--color-blue);
-  color: #FFFFFF;
+  background: var(--color-lime);
+  color: #0B0B0C;
   display: grid;
   place-items: center;
   font-weight: 700;
@@ -1109,7 +1181,8 @@ a {
   .nav-action-desktop {
     display: none !important;
   }
-  .mobile-nav-trigger {
+  .mobile-nav-trigger,
+  .mobile-menu-toggle {
     display: inline-flex !important;
     align-items: center;
     justify-content: center;
@@ -1218,4 +1291,37 @@ a {
     width: 100%;
     justify-content: center;
   }
+}
+
+
+/* ==========================================================================
+   Refined Light Mode Overrides for Navigation and Badges
+   ========================================================================== */
+:root[data-theme="light"] .workspace-avatar,
+:root[data-theme="light"] .sidebar-badge,
+:root[data-theme="light"] .avatar-letter {
+  background: #09090B;
+  color: #FFFFFF;
+}
+
+:root[data-theme="light"] .sidebar-nav-item.active {
+  background: #F4F4F6;
+  border-color: #E4E4E7;
+  color: #09090B;
+}
+
+:root[data-theme="light"] .section-eyebrow {
+  color: #15803D;
+}
+
+:root[data-theme="light"] .feature-icon-box {
+  background: #F4F4F6;
+  border-color: #E4E4E7;
+  color: #15803D;
+}
+
+:root[data-theme="light"] .step-number {
+  background: #DCFCE7;
+  border-color: rgba(22, 163, 74, 0.25);
+  color: #15803D;
 }

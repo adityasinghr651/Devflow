@@ -160,11 +160,11 @@ export const HomeNavbar: React.FC<HomeNavbarProps> = ({
           {/* Mobile Menu Hamburger */}
           <button
             type="button"
-            className="btn-icon mobile-menu-toggle"
+            className="mobile-menu-toggle"
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             aria-label="Toggle mobile menu"
           >
-            {mobileMenuOpen ? <X size={18} /> : <Menu size={18} />}
+            {mobileMenuOpen ? <X size={18} strokeWidth={2.2} /> : <Menu size={18} strokeWidth={2.2} />}
           </button>
         </div>
       </div>

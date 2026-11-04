@@ -34,9 +34,9 @@ button, a, input, select, textarea { -webkit-tap-highlight-color: transparent; }
 .target-auth-notice p { margin: 4px 0 0; color: var(--text-secondary); font-size: 12px; }
 
 :root[data-theme="light"] .sidebar-status-tag,
-:root[data-theme="light"] .status-dot-active { color: var(--color-green); background-color: var(--color-green); box-shadow: none; }
-:root[data-theme="light"] .table-check { color: var(--color-green); }
-:root[data-theme="light"] .theme-toggle-btn.active { color: var(--color-blue); }
+:root[data-theme="light"] .status-dot-active { color: var(--color-lime); background-color: var(--color-lime); box-shadow: none; }
+:root[data-theme="light"] .table-check { color: var(--color-lime); }
+:root[data-theme="light"] .theme-toggle-btn.active { color: #09090B; }
 
 @media (max-width: 640px) {
   .compare-selectors { grid-template-columns: 1fr; }

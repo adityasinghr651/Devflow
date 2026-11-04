@@ -1,0 +1,227 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 660" role="img" aria-labelledby="liveTitle liveDesc">
+  <title id="liveTitle">DevFlow Live API Load Test Execution</title>
+  <desc id="liveDesc">Live real-time telemetry stream against a controlled endpoint showing sub-millisecond bounded histograms and multi-worker execution.</desc>
+  <defs>
+    <style>
+      @keyframes progressAnim {
+        0% { width: 0%; }
+        85% { width: 100%; }
+        100% { width: 100%; }
+      }
+      @keyframes pulseLiveDot {
+        0%, 100% { fill: #C6F432; r: 4.5; opacity: 1; }
+        50% { fill: #10B981; r: 6.5; opacity: 0.4; }
+      }
+      @keyframes logStream {
+        0% { transform: translateY(0); }
+        25% { transform: translateY(-24px); }
+        50% { transform: translateY(-48px); }
+        75% { transform: translateY(-72px); }
+        100% { transform: translateY(-96px); }
+      }
+      @keyframes latencyCurve {
+        0% { stroke-dashoffset: 600; }
+        50% { stroke-dashoffset: 0; }
+        100% { stroke-dashoffset: 0; }
+      }
+      .progress-bar-fill { animation: progressAnim 6s ease-in-out infinite; }
+      .live-indicator { animation: pulseLiveDot 1.8s ease-in-out infinite; }
+      .log-scroller { animation: logStream 8s steps(4, end) infinite; }
+      .latency-chart { stroke-dasharray: 600; animation: latencyCurve 4s ease-in-out infinite; }
+    </style>
+
+    <linearGradient id="liveWindowBg" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#0B0B0C"/>
+      <stop offset="100%" stop-color="#121215"/>
+    </linearGradient>
+
+    <linearGradient id="progressGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#3B82F6"/>
+      <stop offset="60%" stop-color="#10B981"/>
+      <stop offset="100%" stop-color="#C6F432"/>
+    </linearGradient>
+
+    <linearGradient id="liveAreaGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#C6F432" stop-opacity="0.22"/>
+      <stop offset="100%" stop-color="#C6F432" stop-opacity="0.0"/>
+    </linearGradient>
+
+    <filter id="liveShadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="16" stdDeviation="24" flood-color="#000000" flood-opacity="0.75"/>
+    </filter>
+  </defs>
+
+  <!-- Window Frame -->
+  <rect width="1200" height="660" rx="16" fill="url(#liveWindowBg)" stroke="rgba(255,255,255,0.08)" stroke-width="1.5"/>
+
+  <!-- Titlebar -->
+  <g transform="translate(0, 0)">
+    <rect width="1200" height="42" rx="16" fill="#141416"/>
+    <rect y="28" width="1200" height="14" fill="#141416"/>
+    <line x1="0" y1="42" x2="1200" y2="42" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>
+
+    <!-- Window Dots -->
+    <circle cx="22" cy="21" r="5" fill="#EF4444" opacity="0.8"/>
+    <circle cx="38" cy="21" r="5" fill="#F59E0B" opacity="0.8"/>
+    <circle cx="54" cy="21" r="5" fill="#10B981" opacity="0.8"/>
+
+    <!-- Title / Breadcrumb -->
+    <text x="76" y="25" fill="#71717A" font-size="12" font-family="sans-serif">ServerTest <tspan fill="#3F3F46">/</tspan> <tspan fill="#FFFFFF" font-weight="600">Live Metrics &amp; Telemetry Stream</tspan></text>
+
+    <!-- Host Indicator -->
+    <g transform="translate(1010, 10)">
+      <rect width="166" height="22" rx="4" fill="#0B0B0C" stroke="rgba(255,255,255,0.08)"/>
+      <circle cx="12" cy="11" r="3.5" class="live-indicator"/>
+      <text x="24" y="15" fill="#C6F432" font-size="10" font-family="monospace">127.0.0.1:4000/api</text>
+    </g>
+  </g>
+
+  <!-- Active Test Header Card -->
+  <g transform="translate(36, 64)" font-family="Inter, -apple-system, sans-serif">
+    <rect width="1128" height="150" rx="14" fill="#141416" stroke="rgba(255,255,255,0.09)" stroke-width="1"/>
+    <!-- Top-edge highlight catch -->
+    <line x1="16" y1="1" x2="1112" y2="1" stroke="rgba(255,255,255,0.16)" stroke-width="1"/>
+
+    <!-- Left Header Info -->
+    <g transform="translate(24, 20)">
+      <g>
+        <rect width="210" height="24" rx="12" fill="rgba(198,244,50,0.1)" stroke="rgba(198,244,50,0.3)"/>
+        <circle cx="12" cy="12" r="4" class="live-indicator"/>
+        <text x="24" y="16" fill="#C6F432" font-size="10" font-weight="700" font-family="monospace">LIVE SSE TELEMETRY STREAM</text>
+      </g>
+      <g transform="translate(218, 0)">
+        <rect width="96" height="24" rx="12" fill="#0E0E10" stroke="rgba(255,255,255,0.08)"/>
+        <text x="12" y="16" fill="#A1A1AA" font-size="11" font-family="monospace">run_9f4k21</text>
+      </g>
+      <g transform="translate(322, 0)">
+        <rect width="138" height="24" rx="12" fill="#0E0E10" stroke="rgba(255,255,255,0.08)"/>
+        <text x="12" y="16" fill="#A1A1AA" font-size="11">Fixed Concurrency</text>
+      </g>
+
+      <!-- Target Name -->
+      <text x="0" y="58" fill="#FFFFFF" font-size="20" font-weight="700">Local Test Target — Controlled 50ms Delay</text>
+
+      <!-- Target Spec Line -->
+      <g transform="translate(0, 72)" font-family="monospace" font-size="12" fill="#71717A">
+        <text x="0" y="0"><tspan fill="#38BDF8" font-weight="700">GET</tspan> http://127.0.0.1:5050/slow?ms=50</text>
+        <text x="350" y="0">• <tspan fill="#FFFFFF">5 Virtual Users</tspan></text>
+        <text x="490" y="0">• <tspan fill="#FFFFFF">5.0s Target Duration</tspan></text>
+        <text x="660" y="0">• <tspan fill="#10B981">1 Worker Process (PID 4821)</tspan></text>
+      </g>
+    </g>
+
+    <!-- Right Controls -->
+    <g transform="translate(950, 24)">
+      <rect width="150" height="34" rx="6" fill="rgba(239,68,68,0.12)" stroke="rgba(239,68,68,0.3)"/>
+      <rect x="18" y="12" width="10" height="10" rx="1" fill="#EF4444"/>
+      <text x="36" y="21" fill="#EF4444" font-size="12" font-weight="600">Stop Execution</text>
+    </g>
+
+    <!-- Workload Execution Progress Bar -->
+    <g transform="translate(24, 114)">
+      <text x="0" y="12" fill="#71717A" font-size="11">Execution Progress: <tspan fill="#FFFFFF" font-weight="600">Active Benchmark</tspan></text>
+      <text x="1070" y="12" fill="#71717A" font-size="11" text-anchor="end">Target: <tspan fill="#FFFFFF" font-weight="600">5.0s</tspan></text>
+
+      <!-- Track -->
+      <rect y="18" width="1080" height="6" rx="3" fill="#0B0B0C" stroke="rgba(255,255,255,0.06)"/>
+      <!-- Animated Fill -->
+      <rect y="18" width="880" height="6" rx="3" fill="url(#progressGrad)" class="progress-bar-fill"/>
+    </g>
+  </g>
+
+  <!-- 4 Primary Metric Gauges -->
+  <g transform="translate(36, 234)" font-family="Inter, -apple-system, sans-serif">
+    <!-- Box 1: Throughput -->
+    <g>
+      <rect width="267" height="96" rx="12" fill="#141416" stroke="rgba(255,255,255,0.08)"/>
+      <text x="16" y="26" fill="#71717A" font-size="12" font-weight="500">Throughput Rate</text>
+      <text x="16" y="60" fill="#FFFFFF" font-size="28" font-weight="800" letter-spacing="-0.5">98.4 <tspan fill="#71717A" font-size="14" font-weight="400">req/s</tspan></text>
+      <text x="16" y="82" fill="#10B981" font-size="11" font-weight="600">↑ Steady saturation</text>
+    </g>
+
+    <!-- Box 2: Measured Latency p95 -->
+    <g transform="translate(287, 0)">
+      <rect width="267" height="96" rx="12" fill="#141416" stroke="rgba(255,255,255,0.08)"/>
+      <text x="16" y="26" fill="#71717A" font-size="12" font-weight="500">Measured p95 Latency</text>
+      <text x="16" y="60" fill="#C6F432" font-size="28" font-weight="800" letter-spacing="-0.5">53.2 <tspan fill="#71717A" font-size="14" font-weight="400">ms</tspan></text>
+      <text x="16" y="82" fill="#71717A" font-size="11">Exact histogram timing (~50ms delay)</text>
+    </g>
+
+    <!-- Box 3: Total Requests -->
+    <g transform="translate(574, 0)">
+      <rect width="267" height="96" rx="12" fill="#141416" stroke="rgba(255,255,255,0.08)"/>
+      <text x="16" y="26" fill="#71717A" font-size="12" font-weight="500">Completed Requests</text>
+      <text x="16" y="60" fill="#FFFFFF" font-size="28" font-weight="800" letter-spacing="-0.5">492 <tspan fill="#71717A" font-size="14" font-weight="400">reqs</tspan></text>
+      <text x="16" y="82" fill="#71717A" font-size="11">492 HTTP 200 OK • 0 Errors</text>
+    </g>
+
+    <!-- Box 4: Error Rate -->
+    <g transform="translate(861, 0)">
+      <rect width="267" height="96" rx="12" fill="#141416" stroke="rgba(255,255,255,0.08)"/>
+      <text x="16" y="26" fill="#71717A" font-size="12" font-weight="500">Error Rate</text>
+      <text x="16" y="60" fill="#10B981" font-size="28" font-weight="800" letter-spacing="-0.5">0.00%</text>
+      <text x="16" y="82" fill="#10B981" font-size="11" font-weight="600">100% Reliable Delivery</text>
+    </g>
+  </g>
+
+  <!-- Bottom Split Grid: Real-time Response Time Polyline & SSE Terminal Logs -->
+  <g transform="translate(36, 350)" font-family="Inter, -apple-system, sans-serif">
+    <!-- Left: Sub-millisecond Histogram Chart -->
+    <g>
+      <rect width="650" height="270" rx="14" fill="#141416" stroke="rgba(255,255,255,0.08)"/>
+      <text x="24" y="32" fill="#FFFFFF" font-size="14" font-weight="700">Measured Latency Distribution (ms)</text>
+      <text x="24" y="52" fill="#71717A" font-size="12">Nearest-Rank percentiles over 6,801 histogram buckets</text>
+
+      <!-- Percentile Summary -->
+      <g transform="translate(370, 22)" font-family="monospace" font-size="11">
+        <text x="0" y="10" fill="#71717A">p50: <tspan fill="#FFFFFF" font-weight="700">50.8ms</tspan></text>
+        <text x="90" y="10" fill="#71717A">p95: <tspan fill="#C6F432" font-weight="700">53.2ms</tspan></text>
+        <text x="180" y="10" fill="#71717A">p99: <tspan fill="#FFFFFF" font-weight="700">56.1ms</tspan></text>
+      </g>
+
+      <!-- SVG Polyline Chart -->
+      <g transform="translate(24, 76)">
+        <line x1="0" y1="30" x2="600" y2="30" stroke="rgba(255,255,255,0.04)" stroke-dasharray="4 4"/>
+        <line x1="0" y1="80" x2="600" y2="80" stroke="rgba(255,255,255,0.04)" stroke-dasharray="4 4"/>
+        <line x1="0" y1="130" x2="600" y2="130" stroke="rgba(255,255,255,0.04)" stroke-dasharray="4 4"/>
+
+        <!-- Area -->
+        <polygon points="0,140 50,110 100,105 150,112 200,95 250,98 300,92 350,95 400,88 450,90 500,84 550,86 600,78 600,150 0,150" fill="url(#liveAreaGrad)"/>
+        <!-- Polyline Curve -->
+        <path d="M0 140 L50 110 L100 105 L150 112 L200 95 L250 98 L300 92 L350 95 L400 88 L450 90 L500 84 L550 86 L600 78" fill="none" stroke="#C6F432" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="latency-chart"/>
+
+        <!-- Current Head -->
+        <circle cx="600" cy="78" r="5" fill="#C6F432" class="live-indicator"/>
+      </g>
+    </g>
+
+    <!-- Right: Animated Live SSE Terminal Stream -->
+    <g transform="translate(670, 0)">
+      <rect width="494" height="270" rx="14" fill="#0E0E10" stroke="rgba(255,255,255,0.08)"/>
+
+      <!-- Terminal Header -->
+      <rect width="494" height="34" rx="14" fill="#141416"/>
+      <rect y="22" width="494" height="12" fill="#141416"/>
+      <line x1="0" y1="34" x2="494" y2="34" stroke="rgba(255,255,255,0.06)"/>
+      <circle cx="16" cy="17" r="3.5" fill="#C6F432" class="live-indicator"/>
+      <text x="28" y="21" fill="#A1A1AA" font-size="11" font-family="monospace">Server-Sent Events (SSE) Live Feed</text>
+
+      <!-- Terminal Logs Window Clip -->
+      <g transform="translate(16, 52)" font-family="monospace" font-size="11" fill="#A1A1AA" line-height="1.8">
+        <text x="0" y="0" fill="#71717A">[21:28:01] Worker 1 spawned (pid 4821) · partitioned 5 VUs</text>
+        <text x="0" y="22" fill="#38BDF8">[21:28:02] IPC Handshake confirmed · state: running</text>
+        <text x="0" y="44" fill="#FFFFFF">[21:28:03] Progress: 20% | 98 req/s | p95: 52.8ms | 98 reqs</text>
+        <text x="0" y="66" fill="#FFFFFF">[21:28:04] Progress: 40% | 99 req/s | p95: 53.1ms | 197 reqs</text>
+        <text x="0" y="88" fill="#FFFFFF">[21:28:05] Progress: 60% | 98 req/s | p95: 53.0ms | 295 reqs</text>
+        <text x="0" y="110" fill="#FFFFFF">[21:28:06] Progress: 80% | 98 req/s | p95: 53.2ms | 394 reqs</text>
+        <text x="0" y="132" fill="#C6F432">[21:28:07] Progress: 100% | 98.4 req/s | p95: 53.2ms | 492 reqs</text>
+        <text x="0" y="154" fill="#10B981">[21:28:07] Run completed · 0 errors · persisted to storage</text>
+      </g>
+
+      <g transform="translate(16, 240)">
+        <text x="0" y="12" fill="#71717A" font-size="10" font-family="monospace">Zero client-side polling • Out-of-process Node worker</text>
+      </g>
+    </g>
+  </g>
+</svg>
+

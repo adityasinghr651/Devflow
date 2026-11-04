@@ -1,0 +1,250 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 680" role="img" aria-labelledby="uiTitle uiDesc">
+  <title id="uiTitle">DevFlow UI — Production-Grade Developer Interface</title>
+  <desc id="uiDesc">Interactive load test playground with animated real-time latency curve, throughput gauges, and midnight black with electric lime theme.</desc>
+  <defs>
+    <style>
+      @keyframes sparkDraw {
+        0% { stroke-dashoffset: 800; }
+        50% { stroke-dashoffset: 0; }
+        100% { stroke-dashoffset: 0; }
+      }
+      @keyframes pulseAura {
+        0%, 100% { opacity: 0.5; transform: scale(1); }
+        50% { opacity: 0.85; transform: scale(1.03); }
+      }
+      @keyframes pulseDot {
+        0%, 100% { r: 5; opacity: 1; }
+        50% { r: 7.5; opacity: 0.6; }
+      }
+      @keyframes scanBeam {
+        0% { transform: translateX(0); }
+        100% { transform: translateX(640px); }
+      }
+      .spark-line { stroke-dasharray: 800; animation: sparkDraw 4s cubic-bezier(0.16, 1, 0.3, 1) infinite; }
+      .ambient-glow { animation: pulseAura 5s ease-in-out infinite; transform-origin: 600px 380px; }
+      .pulsing-head { animation: pulseDot 1.6s ease-in-out infinite; }
+    </style>
+
+    <linearGradient id="windowBg" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#0B0B0C"/>
+      <stop offset="100%" stop-color="#0F0F12"/>
+    </linearGradient>
+
+    <linearGradient id="cardGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#141416"/>
+      <stop offset="100%" stop-color="#111113"/>
+    </linearGradient>
+
+    <linearGradient id="limeChartGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#C6F432" stop-opacity="0.25"/>
+      <stop offset="100%" stop-color="#C6F432" stop-opacity="0.0"/>
+    </linearGradient>
+
+    <radialGradient id="centerAura" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#C6F432" stop-opacity="0.22"/>
+      <stop offset="40%" stop-color="#10B981" stop-opacity="0.08"/>
+      <stop offset="75%" stop-color="#0B0B0C" stop-opacity="0"/>
+    </radialGradient>
+
+    <filter id="cardShadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="12" stdDeviation="24" flood-color="#000000" flood-opacity="0.6"/>
+    </filter>
+
+    <filter id="softGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="6" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Browser Shell Window -->
+  <rect width="1200" height="680" rx="16" fill="url(#windowBg)" stroke="rgba(255,255,255,0.08)" stroke-width="1.5"/>
+
+  <!-- Window Header / Title Bar -->
+  <g transform="translate(0, 0)">
+    <rect width="1200" height="44" rx="16" fill="#121214"/>
+    <rect y="30" width="1200" height="14" fill="#121214"/>
+    <line x1="0" y1="44" x2="1200" y2="44" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>
+
+    <!-- Window Controls -->
+    <circle cx="24" cy="22" r="5.5" fill="#EF4444" opacity="0.8"/>
+    <circle cx="42" cy="22" r="5.5" fill="#F59E0B" opacity="0.8"/>
+    <circle cx="60" cy="22" r="5.5" fill="#10B981" opacity="0.8"/>
+
+    <!-- URL Bar -->
+    <g transform="translate(420, 9)">
+      <rect width="360" height="26" rx="6" fill="#0B0B0C" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>
+      <circle cx="16" cy="13" r="3" fill="#C6F432"/>
+      <text x="28" y="17" fill="#A1A1AA" font-size="11" font-family="monospace">devflow.internal • workspace preview</text>
+    </g>
+  </g>
+
+  <!-- Navigation Bar Inside App -->
+  <g transform="translate(0, 44)">
+    <rect width="1200" height="54" fill="#0E0E10" opacity="0.95"/>
+    <line x1="0" y1="54" x2="1200" y2="54" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>
+
+    <!-- Brand Logo -->
+    <g transform="translate(36, 14)">
+      <rect width="26" height="26" rx="6" fill="#141416" stroke="rgba(255,255,255,0.12)"/>
+      <text x="7" y="17" fill="#C6F432" font-size="11" font-weight="700" font-family="monospace">&gt;_</text>
+      <text x="36" y="18" fill="#FFFFFF" font-size="15" font-weight="700" font-family="sans-serif">Server<tspan fill="#C6F432">Test</tspan></text>
+    </g>
+
+    <!-- Nav Links -->
+    <g transform="translate(470, 20)" font-family="sans-serif" font-size="13" fill="#A1A1AA" font-weight="500">
+      <text x="0" y="13" fill="#FFFFFF">Overview</text>
+      <text x="80" y="13">API Targets</text>
+      <text x="175" y="13">Test Runs</text>
+      <text x="260" y="13">Live Metrics</text>
+      <text x="360" y="13">Documentation</text>
+    </g>
+
+    <!-- User / CTA -->
+    <g transform="translate(1040, 13)">
+      <rect width="124" height="28" rx="14" fill="#C6F432"/>
+      <text x="26" y="18" fill="#0B0B0C" font-size="12" font-weight="700" font-family="sans-serif">Run Test +</text>
+    </g>
+  </g>
+
+  <!-- Ambient Radial Glow Halo Centered Behind Simulator Card -->
+  <circle cx="600" cy="380" r="280" fill="url(#centerAura)" class="ambient-glow"/>
+
+  <!-- Hero Content Heading -->
+  <g transform="translate(0, 118)" text-anchor="middle" font-family="Inter, -apple-system, sans-serif">
+    <!-- Eyebrow Pill -->
+    <g transform="translate(600, 0)">
+      <rect x="-130" width="260" height="26" rx="13" fill="rgba(20,20,22,0.85)" stroke="rgba(255,255,255,0.1)"/>
+      <circle cx="-110" cy="13" r="3.5" fill="#C6F432"/>
+      <text x="-96" y="17" fill="#E4E4E7" font-size="11" font-weight="600" text-anchor="start">Open Source • Self-hosted Developer Tool</text>
+    </g>
+
+    <!-- Main Title -->
+    <text x="600" y="58" fill="#FFFFFF" font-size="34" font-weight="800" letter-spacing="-1">
+      Test. Load. <tspan fill="#C6F432" font-style="italic" font-family="'Newsreader', Georgia, serif" font-weight="500">Analyze.</tspan>
+    </text>
+    <text x="600" y="86" fill="#A1A1AA" font-size="14" font-weight="400">
+      A powerful platform to run load tests, monitor live performance, and verify API reliability.
+    </text>
+  </g>
+
+  <!-- 2. Interactive Simulator Card (The Signature Centerpiece) -->
+  <g transform="translate(200, 230)" filter="url(#cardShadow)" font-family="Inter, -apple-system, sans-serif">
+    <!-- Card Frame -->
+    <rect width="800" height="380" rx="16" fill="url(#cardGrad)" stroke="rgba(255,255,255,0.1)" stroke-width="1"/>
+    <!-- Top-edge hairline catch -->
+    <line x1="16" y1="1" x2="784" y2="1" stroke="rgba(255,255,255,0.18)" stroke-width="1"/>
+
+    <!-- Header Row -->
+    <g transform="translate(24, 20)">
+      <!-- Method & URL Pill -->
+      <rect width="52" height="24" rx="4" fill="rgba(198,244,50,0.12)" stroke="rgba(198,244,50,0.3)"/>
+      <text x="12" y="16" fill="#C6F432" font-size="11" font-weight="700" font-family="monospace">POST</text>
+
+      <text x="62" y="17" fill="#FFFFFF" font-size="13" font-weight="600" font-family="monospace">https://api.gateway.internal/v1/checkout</text>
+
+      <g transform="translate(380, 0)">
+        <rect width="116" height="24" rx="12" fill="#0E0E10" stroke="rgba(255,255,255,0.08)"/>
+        <text x="12" y="16" fill="#71717A" font-size="11">Illustrative sample</text>
+      </g>
+
+      <!-- Status Pill -->
+      <g transform="translate(580, 0)">
+        <rect width="168" height="24" rx="12" fill="rgba(59,130,246,0.1)" stroke="rgba(59,130,246,0.25)"/>
+        <circle cx="14" cy="12" r="3.5" fill="#3B82F6"/>
+        <text x="26" y="16" fill="#60A5FA" font-size="11" font-weight="600">Demo simulation</text>
+      </g>
+    </g>
+
+    <!-- Preset Selection Bar -->
+    <g transform="translate(24, 62)">
+      <text x="0" y="18" fill="#71717A" font-size="11" font-weight="600">Interactive Preset:</text>
+      <!-- Active Pill -->
+      <g transform="translate(120, 0)">
+        <rect width="154" height="26" rx="6" fill="rgba(198,244,50,0.12)" stroke="rgba(198,244,50,0.4)"/>
+        <text x="14" y="17" fill="#C6F432" font-size="11" font-weight="600">Normal Load (15 VUs)</text>
+      </g>
+      <!-- Inactive 1 -->
+      <g transform="translate(284, 0)">
+        <rect width="144" height="26" rx="6" fill="#0E0E10" stroke="rgba(255,255,255,0.08)"/>
+        <text x="14" y="17" fill="#A1A1AA" font-size="11" font-weight="500">Flash Spike (50 VUs)</text>
+      </g>
+      <!-- Inactive 2 -->
+      <g transform="translate(438, 0)">
+        <rect width="148" height="26" rx="6" fill="#0E0E10" stroke="rgba(255,255,255,0.08)"/>
+        <text x="14" y="17" fill="#A1A1AA" font-size="11" font-weight="500">Stress Peak (100 VUs)</text>
+      </g>
+    </g>
+
+    <!-- 4 Key Stat Capsules -->
+    <g transform="translate(24, 104)">
+      <!-- Stat 1 -->
+      <g>
+        <rect width="176" height="66" rx="8" fill="#0E0E10" stroke="rgba(255,255,255,0.07)"/>
+        <text x="14" y="20" fill="#71717A" font-size="11" font-weight="500">Requests / second</text>
+        <text x="14" y="48" fill="#FFFFFF" font-size="20" font-weight="700" font-family="sans-serif">2,840 <tspan fill="#71717A" font-size="12" font-weight="400">req/s</tspan></text>
+      </g>
+      <!-- Stat 2 -->
+      <g transform="translate(192, 0)">
+        <rect width="176" height="66" rx="8" fill="#0E0E10" stroke="rgba(255,255,255,0.07)"/>
+        <text x="14" y="20" fill="#71717A" font-size="11" font-weight="500">Response Time (p95)</text>
+        <text x="14" y="48" fill="#FFFFFF" font-size="20" font-weight="700" font-family="sans-serif">16.2 <tspan fill="#71717A" font-size="12" font-weight="400">ms</tspan></text>
+      </g>
+      <!-- Stat 3 -->
+      <g transform="translate(384, 0)">
+        <rect width="176" height="66" rx="8" fill="#0E0E10" stroke="rgba(255,255,255,0.07)"/>
+        <text x="14" y="20" fill="#71717A" font-size="11" font-weight="500">Error Rate</text>
+        <text x="14" y="48" fill="#C6F432" font-size="20" font-weight="700" font-family="sans-serif">0.00%</text>
+      </g>
+      <!-- Stat 4 -->
+      <g transform="translate(576, 0)">
+        <rect width="176" height="66" rx="8" fill="#0E0E10" stroke="rgba(255,255,255,0.07)"/>
+        <text x="14" y="20" fill="#71717A" font-size="11" font-weight="500">Virtual Users</text>
+        <text x="14" y="48" fill="#FFFFFF" font-size="20" font-weight="700" font-family="sans-serif">15 <tspan fill="#71717A" font-size="12" font-weight="400">VUs</tspan></text>
+      </g>
+    </g>
+
+    <!-- Real-time Sparkline Response Curve Panel -->
+    <g transform="translate(24, 186)">
+      <rect width="752" height="174" rx="10" fill="#0E0E10" stroke="rgba(255,255,255,0.07)"/>
+
+      <!-- Header row of chart -->
+      <text x="16" y="24" fill="#A1A1AA" font-size="12" font-weight="600">Response Time (ms) — Real-Time Bounded Histogram</text>
+      <g transform="translate(520, 14)" font-family="monospace" font-size="11">
+        <text x="0" y="10" fill="#71717A">p50: <tspan fill="#FFFFFF" font-weight="700">7.3ms</tspan></text>
+        <text x="80" y="10" fill="#71717A">p95: <tspan fill="#C6F432" font-weight="700">16.2ms</tspan></text>
+        <text x="160" y="10" fill="#71717A">p99: <tspan fill="#FFFFFF" font-weight="700">25.9ms</tspan></text>
+      </g>
+
+      <!-- SVG Polyline Chart Area -->
+      <g transform="translate(16, 40)">
+        <!-- Gridlines -->
+        <line x1="0" y1="20" x2="720" y2="20" stroke="rgba(255,255,255,0.04)" stroke-dasharray="4 4"/>
+        <line x1="0" y1="50" x2="720" y2="50" stroke="rgba(255,255,255,0.04)" stroke-dasharray="4 4"/>
+        <line x1="0" y1="80" x2="720" y2="80" stroke="rgba(255,255,255,0.04)" stroke-dasharray="4 4"/>
+
+        <!-- Filled Gradient Polyline Area -->
+        <polygon points="0,90 40,82 80,74 120,78 160,65 200,68 240,55 280,59 320,48 360,52 400,42 440,46 480,38 520,40 560,32 600,35 640,24 680,26 720,18 720,95 0,95" fill="url(#limeChartGrad)"/>
+
+        <!-- Animated Stroke Polyline Curve -->
+        <path d="M0 90 L40 82 L80 74 L120 78 L160 65 L200 68 L240 55 L280 59 L320 48 L360 52 L400 42 L440 46 L480 38 L520 40 L560 32 L600 35 L640 24 L680 26 L720 18" fill="none" stroke="#C6F432" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="spark-line" filter="url(#softGlow)"/>
+
+        <!-- Pulsing Current Point Dot -->
+        <circle cx="720" cy="18" r="5" fill="#C6F432" class="pulsing-head"/>
+      </g>
+
+      <!-- Footer Row -->
+      <g transform="translate(16, 150)">
+        <text x="0" y="10" fill="#71717A" font-size="11">Virtual Users Slider: <tspan fill="#FFFFFF" font-weight="600">15 VUs</tspan></text>
+        <rect x="130" y="2" width="90" height="6" rx="3" fill="#1A1A1E"/>
+        <rect x="130" y="2" width="40" height="6" rx="3" fill="#C6F432"/>
+        <circle cx="170" cy="5" r="5" fill="#FFFFFF"/>
+
+        <text x="520" y="10" fill="#71717A" font-size="11" font-family="monospace">Phase 6.1 Validated • O(1) Fixed Memory</text>
+      </g>
+    </g>
+  </g>
+</svg>
+

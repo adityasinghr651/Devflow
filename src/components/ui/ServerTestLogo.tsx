@@ -33,16 +33,16 @@ export const ServerTestLogo: React.FC<ServerTestLogoProps> = ({
           width: `${badgeSize}px`,
           height: `${badgeSize}px`,
           borderRadius: size === 'sm' ? '6px' : '8px',
-          background: '#10141D',
-          border: '1px solid #242D3B',
+          background: 'var(--bg-card)',
+          border: '1px solid var(--border-default)',
           display: 'grid',
           placeItems: 'center',
-          color: '#F1F5F9',
+          color: 'var(--color-lime)',
           fontFamily: 'var(--font-mono)',
           fontWeight: 700,
           fontSize: `${promptSize}px`,
           letterSpacing: '-0.5px',
-          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.4)',
+          boxShadow: 'var(--shadow-sm)',
           flexShrink: 0,
         }}
         title="ServerTest"
@@ -60,7 +60,7 @@ export const ServerTestLogo: React.FC<ServerTestLogoProps> = ({
         }}
       >
         <span style={{ color: 'var(--text-primary)' }}>Server</span>
-        <span style={{ color: 'var(--color-blue)' }}>Test</span>
+        <span style={{ color: 'var(--color-lime)' }}>Test</span>
       </div>
     </div>
   );

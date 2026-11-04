@@ -14,7 +14,7 @@ export const HeroBackground: React.FC = () => {
       {/* 1. Subtle Developer Grid Overlay */}
       <div className="hero-grid-overlay" />
 
-      {/* 2. Dark Mode Aurora Waves (Muted Electric Blue & Soft Cyan) */}
+      {/* 2. Dark Mode Aurora Waves (Electric Lime & Shimmering Ambient Green) */}
       <svg
         className="hero-aurora-waves-dark"
         viewBox="0 0 1440 680"
@@ -29,18 +29,18 @@ export const HeroBackground: React.FC = () => {
       >
         <defs>
           <linearGradient id="darkBlueGlow" x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%" stopColor="#3B82F6" stopOpacity="0" />
-            <stop offset="25%" stopColor="#3B82F6" stopOpacity="0.4" />
-            <stop offset="50%" stopColor="#60A5FA" stopOpacity="0.8" />
-            <stop offset="75%" stopColor="#38BDF8" stopOpacity="0.5" />
-            <stop offset="100%" stopColor="#3B82F6" stopOpacity="0" />
+            <stop offset="0%" stopColor="#C6F432" stopOpacity="0" />
+            <stop offset="25%" stopColor="#10B981" stopOpacity="0.35" />
+            <stop offset="50%" stopColor="#C6F432" stopOpacity="0.7" />
+            <stop offset="75%" stopColor="#38BDF8" stopOpacity="0.35" />
+            <stop offset="100%" stopColor="#C6F432" stopOpacity="0" />
           </linearGradient>
 
           <linearGradient id="darkWaveGrad" x1="0%" y1="50%" x2="100%" y2="50%">
-            <stop offset="0%" stopColor="#080B12" stopOpacity="0.8" />
-            <stop offset="30%" stopColor="#1E3A8A" stopOpacity="0.25" />
-            <stop offset="60%" stopColor="#0284C7" stopOpacity="0.2" />
-            <stop offset="100%" stopColor="#080B12" stopOpacity="0.8" />
+            <stop offset="0%" stopColor="#0B0B0C" stopOpacity="0.8" />
+            <stop offset="30%" stopColor="#064E3B" stopOpacity="0.18" />
+            <stop offset="60%" stopColor="#0F766E" stopOpacity="0.15" />
+            <stop offset="100%" stopColor="#0B0B0C" stopOpacity="0.8" />
           </linearGradient>
 
           <filter id="darkGlowBlur" x="-20%" y="-20%" width="140%" height="140%">
@@ -98,24 +98,27 @@ export const HeroBackground: React.FC = () => {
           </linearGradient>
 
           <filter id="lightWaveBlur" x="-20%" y="-20%" width="140%" height="140%">
-            <feGaussianBlur stdDeviation="35" />
+            <feGaussianBlur stdDeviation="24" result="blur" />
+            <feMerge>
+              <feMergeNode in="blur" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
           </filter>
         </defs>
 
-        {/* Soft Flowing Multi-Color Pastel Cloud */}
         <path
-          d="M-80 480 C 180 380, 420 580, 720 460 C 1020 340, 1220 540, 1520 420 L 1520 700 L -80 700 Z"
-          fill="url(#lightPastelWave)"
+          d="M-50 490 C 240 430, 480 560, 750 490 C 1020 420, 1240 550, 1490 470"
+          stroke="url(#lightPastelWave)"
+          strokeWidth="3.5"
           filter="url(#lightWaveBlur)"
-          opacity="0.85"
+          opacity="0.8"
         />
 
-        {/* Defined Soft Pastel Wave Contour */}
         <path
-          d="M-80 520 C 200 430, 460 620, 740 500 C 1020 380, 1240 570, 1520 460"
+          d="M-50 530 C 260 470, 500 590, 770 520 C 1040 450, 1260 570, 1490 490"
           stroke="url(#lightPastelWave)"
-          strokeWidth="3"
-          opacity="0.6"
+          strokeWidth="2"
+          opacity="0.5"
         />
       </svg>
     </div>
