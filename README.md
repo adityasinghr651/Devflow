@@ -145,7 +145,15 @@ Create the database and role with your PostgreSQL administration tool or `psql`.
 
 ### Start the API and UI
 
-Run each command from the repository root in a separate terminal:
+To start the complete local project (API, UI, and controlled test target) together, run this from the repository root after installing dependencies and configuring `.env`:
+
+```bash
+npm run dev:all
+```
+
+Open <http://localhost:3000>. The API is at <http://127.0.0.1:4000> and the controlled test target is at <http://127.0.0.1:5050>. Press **Ctrl+C** to stop all three services.
+
+Alternatively, start each service from the repository root in a separate terminal:
 
 **Terminal 1 — API:**
 
