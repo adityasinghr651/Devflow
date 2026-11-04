@@ -420,6 +420,22 @@ export class PgStorage {
     }
   }
 
+  async getAuditEvents(userId, limit = 100) {
+    await this.init();
+    const boundedLimit = Math.max(1, Math.min(500, Number(limit) || 100));
+    const result = await this.pool.query(
+      `SELECT id, user_id, action, resource_type, resource_id, details, ip_address, created_at
+       FROM audit_events WHERE user_id = $1 ORDER BY created_at DESC LIMIT $2`,
+      [userId, boundedLimit],
+    );
+    return result.rows.map(row => ({
+      id: row.id, userId: row.user_id, action: row.action,
+      resourceType: row.resource_type, resourceId: row.resource_id,
+      details: row.details || {}, ipAddress: row.ip_address,
+      createdAt: row.created_at.toISOString(),
+    }));
+  }
+
   getHealthInfo() {
     return {
       storage: 'postgresql',

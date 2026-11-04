@@ -9,13 +9,20 @@ export function createApp() {
   const app = express();
 
   app.disable('x-powered-by');
-  app.use(express.json({ limit: '64kb' }));
+  app.use(express.json({ limit: '64kb', strict: true }));
 
   // Security headers & CORS
   app.use((req, res, next) => {
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Cache-Control', 'no-store');
-    res.setHeader('Access-Control-Allow-Origin', config.corsOrigin);
+    res.setHeader('X-Frame-Options', 'DENY');
+    res.setHeader('Referrer-Policy', 'no-referrer');
+    res.setHeader('X-Permitted-Cross-Domain-Policies', 'none');
+    const origin = req.headers.origin;
+    if (origin && config.corsOrigins.includes(origin)) {
+      res.setHeader('Access-Control-Allow-Origin', origin);
+      res.setHeader('Vary', 'Origin');
+    }
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
 
@@ -39,7 +46,7 @@ export function createApp() {
     if (err.type === 'entity.too.large' || err.status === 413) {
       return res.status(413).json({ error: 'Request body exceeds allowable maximum size limit (64KB).' });
     }
-    console.error('[ServerTest API Error]:', err);
+    console.error('[ServerTest API Error]:', err.message || 'Unhandled request error');
     res.status(500).json({ error: 'Internal server error.' });
   });
 

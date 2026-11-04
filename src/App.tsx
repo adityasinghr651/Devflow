@@ -419,39 +419,45 @@ export default function App() {
     }
 
     if (token) {
-      const sseUrl = `${API}/runs/${selectedRun.id}/events?token=${encodeURIComponent(token)}`;
-      const eventSource = new EventSource(sseUrl);
+      let cancelled = false;
+      let eventSource: EventSource | null = null;
+      request<{ ticket: string }>(`/runs/${selectedRun.id}/events-ticket`, { method: 'POST' })
+        .then(({ ticket }) => {
+          if (cancelled) return;
+          const sseUrl = `${API}/runs/${selectedRun.id}/events?ticket=${encodeURIComponent(ticket)}`;
+          eventSource = new EventSource(sseUrl);
 
-      eventSource.addEventListener('progress', (e) => {
-        try {
-          const data = JSON.parse(e.data);
-          setLiveMetrics({
-            concurrency: data.currentConcurrency,
-            progressPercent: data.progressPercent,
-            rps: data.rps,
-            totalRequests: data.totalRequests,
-            errorRate: data.errorRate,
-            statusCodes: data.statusCodes,
+          eventSource.addEventListener('progress', (e) => {
+            try {
+              const data = JSON.parse(e.data);
+              setLiveMetrics({
+                concurrency: data.currentConcurrency,
+                progressPercent: data.progressPercent,
+                rps: data.rps,
+                totalRequests: data.totalRequests,
+                errorRate: data.errorRate,
+                statusCodes: data.statusCodes,
+              });
+              setSelectedRun((prev) => (prev ? { ...prev, ...data } : null));
+            } catch {}
           });
-          setSelectedRun((prev) => (prev ? { ...prev, ...data } : null));
-        } catch {}
-      });
 
-      eventSource.addEventListener('end', (e) => {
-        try {
-          const data = JSON.parse(e.data);
-          setSelectedRun((prev) => (prev ? { ...prev, status: data.status || 'completed' } : null));
-        } catch {}
-        eventSource.close();
-        refresh();
-      });
+          eventSource.addEventListener('end', (e) => {
+            try {
+              const data = JSON.parse(e.data);
+              setSelectedRun((prev) => (prev ? { ...prev, status: data.status || 'completed' } : null));
+            } catch {}
+            eventSource?.close();
+            refresh();
+          });
 
-      eventSource.onerror = () => {
-        eventSource.close();
-      };
+          eventSource.onerror = () => eventSource?.close();
+        })
+        .catch(() => {});
 
       return () => {
-        eventSource.close();
+        cancelled = true;
+        eventSource?.close();
       };
     }
   }, [selectedRun?.id, token]);

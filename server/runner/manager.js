@@ -21,6 +21,7 @@ export class RunnerManager {
     this.maxActive = config.maxActiveRuns || 1;
     this.runningCount = 0;
     this.dispatchedRuns = new Set();
+    this.executionInputs = new Map();
     this.events = new EventEmitter();
     this.events.setMaxListeners(200);
   }
@@ -41,6 +42,7 @@ export class RunnerManager {
       console.warn(`[RunnerManager] Run ${run.id} is already dispatched. Ignoring duplicate enqueue.`);
       return run;
     }
+    this.executionInputs.set(run.id, { headers: run.headers || {} });
     this.dispatchedRuns.add(run.id);
     this.queue.push(run.id);
     this._processNext();
@@ -51,6 +53,7 @@ export class RunnerManager {
     const qIdx = this.queue.indexOf(id);
     if (qIdx !== -1) {
       this.queue.splice(qIdx, 1);
+      this.executionInputs.delete(id);
       await this._transitionState(id, 'cancelled', {
         finishedAt: new Date().toISOString(),
       });
@@ -105,6 +108,16 @@ export class RunnerManager {
       status: newStatus,
     });
 
+    if (TERMINAL_STATES.has(newStatus) && !TERMINAL_STATES.has(current.status)) {
+      await this.storage.createAuditEvent?.({
+        userId: current.userId,
+        action: 'RUN_FINISH',
+        resourceType: 'run',
+        resourceId: id,
+        details: { status: newStatus },
+      })?.catch(() => {});
+    }
+
     this.events.emit(`status:${id}`, { id, status: newStatus, ...updates });
     return updated;
   }
@@ -117,11 +130,16 @@ export class RunnerManager {
     const runId = this.queue.shift();
     const run = await this.storage.getRunById(runId);
     if (!run || TERMINAL_STATES.has(run.status)) {
+      this.executionInputs.delete(runId);
       return this._processNext();
     }
 
+    const executionInput = this.executionInputs.get(runId);
+    this.executionInputs.delete(runId);
+    const executionRun = executionInput ? { ...run, ...executionInput } : run;
+
     this.runningCount++;
-    this._executeRun(run).finally(() => {
+    this._executeRun(executionRun).finally(() => {
       this.runningCount--;
       this._processNext();
     });

@@ -278,8 +278,10 @@ test('Security Regression: Comprehensive validation of security controls and bou
     assert.equal(getResB.status, 404, 'User B must receive 404 when querying User A run');
 
     // 2. User B attempts GET /api/runs/:id/events (SSE)
+    const ticketResB = await fetch(`${apiBaseUrl}/runs/${runA.id}/events-ticket`, { method: 'POST', headers: { Authorization: `Bearer ${tokenB}` } });
+    assert.equal(ticketResB.status, 404, 'User B must not receive a stream ticket for User A run');
     const sseResB = await fetch(`${apiBaseUrl}/runs/${runA.id}/events?token=${tokenB}`);
-    assert.equal(sseResB.status, 404, 'User B must receive 404 when connecting to User A SSE stream');
+    assert.equal(sseResB.status, 401, 'Long-lived query tokens are rejected for SSE');
 
     // 3. User B attempts POST /api/runs/:id/cancel
     const cancelResB = await fetch(`${apiBaseUrl}/runs/${runA.id}/cancel`, {
@@ -326,6 +328,10 @@ test('Security Regression: Comprehensive validation of security controls and bou
           'X-Api-Key': 'production-api-key-999',
           'Cookie': 'sessionId=secret-cookie-val',
           'X-Custom-Secret': 'confidential-vault-key',
+          'Proxy-Authorization': 'proxy-user:proxy-password',
+          'X-Password': 'password-value-123',
+          'X-Token-Value': 'token-value-123',
+          'X-Secret-Value': 'secret-value-123',
           'Accept': 'application/json',
         },
         body: JSON.stringify({ query: 'status' }),
@@ -346,6 +352,10 @@ test('Security Regression: Comprehensive validation of security controls and bou
     assert.equal(fetchedRun.headers['X-Api-Key'], '[REDACTED]');
     assert.equal(fetchedRun.headers['Cookie'], '[REDACTED]');
     assert.equal(fetchedRun.headers['X-Custom-Secret'], '[REDACTED]');
+    assert.equal(fetchedRun.headers['Proxy-Authorization'], '[REDACTED]');
+    assert.equal(fetchedRun.headers['X-Password'], '[REDACTED]');
+    assert.equal(fetchedRun.headers['X-Token-Value'], '[REDACTED]');
+    assert.equal(fetchedRun.headers['X-Secret-Value'], '[REDACTED]');
     assert.equal(fetchedRun.headers['Accept'], 'application/json', 'Safe headers remain unmasked');
 
     // Verify raw secret strings are NOT present anywhere in JSON serialization
@@ -354,6 +364,10 @@ test('Security Regression: Comprehensive validation of security controls and bou
     assert.equal(serialized.includes('production-api-key-999'), false);
     assert.equal(serialized.includes('secret-cookie-val'), false);
     assert.equal(serialized.includes('confidential-vault-key'), false);
+    assert.equal(serialized.includes('proxy-user:proxy-password'), false);
+    assert.equal(serialized.includes('password-value-123'), false);
+    assert.equal(serialized.includes('token-value-123'), false);
+    assert.equal(serialized.includes('secret-value-123'), false);
 
     // Verify audit logs do not contain raw headers or body
     const auditEvents = storage.store.auditEvents || [];

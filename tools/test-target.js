@@ -57,6 +57,13 @@ export function createTestTargetServer(options = {}) {
       });
     }
 
+    // Controlled fixture for verifying request headers without logging them.
+    if (req.method === 'GET' && pathname === '/header') {
+      const name = reqUrl.searchParams.get('name');
+      if (!name || !/^[a-z0-9-]{1,64}$/i.test(name)) return sendJson(400, { error: 'A valid header name is required.' });
+      return sendJson(200, { present: req.headers[name.toLowerCase()] !== undefined, value: req.headers[name.toLowerCase()] || null });
+    }
+
     // Reset deterministic endpoint counters between test scenarios.
     if (req.method === 'POST' && pathname === '/__reset') {
       reqCount = 0;
@@ -280,6 +287,7 @@ export function createTestTargetServer(options = {}) {
       path: pathname,
       availableEndpoints: [
         'GET /health',
+        'GET /header?name=x-api-key',
         'GET /fixed?delayMs=50',
         'GET /status/500',
         'GET /flaky?everyN=5&status=503',

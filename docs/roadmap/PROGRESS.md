@@ -1,6 +1,6 @@
 # Roadmap Progress
 
-Current phase: 1   Last updated: 2026-11-04T10:29:09Z   Branch: roadmap/phase-1-measurement-validation   HEAD: 1ee5424c1069eb0852c9138d1e2acbceba38caf9
+Current phase: 3   Last updated: 2026-11-04T10:46:41Z   Branch: roadmap/phase-2-security   HEAD: 7c0072f
 
 ## Phase table
 
@@ -8,8 +8,8 @@ Current phase: 1   Last updated: 2026-11-04T10:29:09Z   Branch: roadmap/phase-1-
 |---|---|---|---|
 | 0 | done | PASS; see known limitations | [evidence/phase-0.md](evidence/phase-0.md) |
 | 1 | done | PASS; V1–V6 passed five times, all standard checks passed, 3 full-suite passes, no leaked processes | [evidence/phase-1.md](evidence/phase-1.md) |
-| 2 | todo | not run | — |
-| 3 | todo | not run | — |
+| 2 | done | PASS; lint/build, all 30 files, three full-suite passes, audit clean | [evidence/phase-2.md](evidence/phase-2.md) |
+| 3 | in-progress | started from Phase 2 gate PASS | [evidence/phase-3.md](evidence/phase-3.md) |
 | 4 | todo | not run | — |
 | 5 | todo | not run | — |
 | 6 | skipped | not approved in runbook | — |
@@ -62,3 +62,4 @@ Current phase: 1   Last updated: 2026-11-04T10:29:09Z   Branch: roadmap/phase-1-
 - The optional k6 adapter does not expose the Node engine's per-category failure counters; the adapter's aggregate failure count is retained and its scope is documented in `docs/METRICS.md`. k6 was not installed, so that path is NOT VERIFIED.
 - For zero completed requests, legacy API/storage fields still use zero for RPS and latency percentiles; consumers should treat them as unavailable when `totalRequests` is zero. This compatibility behavior is documented in `docs/METRICS.md`.
 - Benchmark workers and the test target share one Windows host; this does not verify multi-machine or production-scale behavior.
+

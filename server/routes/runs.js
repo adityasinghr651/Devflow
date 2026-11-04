@@ -1,5 +1,6 @@
 import express from 'express';
 import { randomUUID } from 'node:crypto';
+import { randomBytes } from 'node:crypto';
 import { getStorage } from '../storage/index.js';
 import { getRunnerManager } from '../runner/manager.js';
 import { validateRunPayload, sanitizeHeadersForStorage } from '../security/validation.js';
@@ -9,6 +10,22 @@ import { config } from '../config.js';
 export const runsRouter = express.Router();
 
 const TERMINAL_STATES = new Set(['completed', 'failed', 'cancelled', 'timed_out']);
+const streamTickets = new Map();
+
+runsRouter.post('/runs/:id/events-ticket', authenticateToken, async (req, res, next) => {
+  try {
+    const storage = getStorage();
+    const run = await storage.getRunById(req.params.id, req.user.id);
+    if (!run) return res.status(404).json({ error: 'Run not found.' });
+    const now = Date.now();
+    for (const [ticket, value] of streamTickets) if (value.expiresAt <= now) streamTickets.delete(ticket);
+    const ticket = randomBytes(32).toString('base64url');
+    streamTickets.set(ticket, { userId: req.user.id, runId: run.id, expiresAt: now + 30_000 });
+    res.json({ ticket, expiresInSeconds: 30 });
+  } catch (err) {
+    next(err);
+  }
+});
 
 // GET /api/runs (Scoped to authenticated user)
 runsRouter.get('/runs', authenticateToken, async (req, res, next) => {
@@ -38,23 +55,20 @@ runsRouter.get('/runs/:id', authenticateToken, async (req, res, next) => {
 // GET /api/runs/:id/events (Server-Sent Events stream for live metrics)
 runsRouter.get('/runs/:id/events', async (req, res, next) => {
   try {
-    // Authenticate via Authorization header or ?token= query parameter (for EventSource)
+    // EventSource cannot set Authorization headers, so it uses a single-use 30-second ticket.
     let user = null;
     const authHeader = req.headers['authorization'];
-    const queryToken = req.query.token;
-
-    const token = authHeader && authHeader.startsWith('Bearer ')
-      ? authHeader.slice(7).trim()
-      : typeof queryToken === 'string' ? queryToken.trim() : null;
-
-    if (!token) {
-      return res.status(401).json({ error: 'Authentication required. Pass Bearer token or ?token= parameter.' });
-    }
-
-    try {
-      user = verifyToken(token);
-    } catch {
-      return res.status(401).json({ error: 'Invalid or expired session token.' });
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      try { user = verifyToken(authHeader.slice(7).trim()); }
+      catch { return res.status(401).json({ error: 'Invalid or expired session token.' }); }
+    } else {
+      const ticket = typeof req.query.ticket === 'string' ? req.query.ticket : '';
+      const ticketInfo = streamTickets.get(ticket);
+      streamTickets.delete(ticket);
+      if (!ticketInfo || ticketInfo.expiresAt <= Date.now() || ticketInfo.runId !== req.params.id) {
+        return res.status(401).json({ error: 'A valid single-use stream ticket is required.' });
+      }
+      user = { id: ticketInfo.userId };
     }
 
     const storage = getStorage();
@@ -160,6 +174,30 @@ runsRouter.post('/runs', authenticateToken, async (req, res, next) => {
 
     if (!validation.valid) {
       return res.status(validation.statusCode || 400).json({ error: validation.error });
+    }
+
+    const userRuns = await storage.getRuns(req.user.id);
+    const now = Date.now();
+    const oneDayAgo = now - 24 * 60 * 60 * 1000;
+    const activeRuns = userRuns.filter(run => ['queued', 'validating', 'running', 'cancelling'].includes(run.status));
+    const dailyRuns = userRuns.filter(run => Date.parse(run.createdAt || run.startedAt) >= oneDayAgo);
+    const runCost = validation.data.concurrency * validation.data.durationSec;
+    const dailyVuSeconds = dailyRuns.reduce((total, run) => total + (Number(run.concurrency) || 0) * (Number(run.durationSec) || 0), 0);
+    let quotaReason = null;
+    if (activeRuns.length >= config.maxActiveRunsPerUser) quotaReason = 'active_run_limit';
+    else if (dailyRuns.length >= config.maxRunsPerDay) quotaReason = 'daily_run_limit';
+    else if (dailyVuSeconds + runCost > config.maxVuSecondsPerDay) quotaReason = 'daily_vu_seconds_limit';
+
+    if (quotaReason) {
+      await storage.createAuditEvent({
+        userId: req.user.id,
+        action: 'RUN_QUOTA_DENIED',
+        resourceType: 'run',
+        details: { quota: quotaReason },
+        ipAddress: req.ip,
+      });
+      res.setHeader('Retry-After', '60');
+      return res.status(429).json({ error: 'Run quota exceeded.', quota: quotaReason, retryAfterSeconds: 60 });
     }
 
     const {

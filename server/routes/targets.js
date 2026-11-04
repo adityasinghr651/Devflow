@@ -104,6 +104,14 @@ targetsRouter.post('/targets/:id/verify', authenticateToken, async (req, res, ne
 
       return res.json({ verified: true, target: updated });
     } else {
+      await storage.createAuditEvent({
+        userId: req.user.id,
+        action: 'TARGET_VERIFY_FAILED',
+        resourceType: 'target',
+        resourceId: target.id,
+        details: { error: result.error },
+        ipAddress: req.ip,
+      });
       return res.status(400).json({
         verified: false,
         error: result.error,

@@ -275,6 +275,15 @@ export class JsonStorage {
     return event;
   }
 
+  async getAuditEvents(userId, limit = 100) {
+    await this.init();
+    const boundedLimit = Math.max(1, Math.min(500, Number(limit) || 100));
+    return JSON.parse(JSON.stringify(this.store.auditEvents
+      .filter(event => event.userId === userId)
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+      .slice(0, boundedLimit)));
+  }
+
   getHealthInfo() {
     return {
       storage: 'local-json',

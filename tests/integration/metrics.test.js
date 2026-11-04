@@ -332,7 +332,9 @@ test('Metrics Correctness: Comprehensive audit against controlled test target', 
     const runId = createdRun.id;
 
     // Connect to SSE stream
-    const sseRes = await fetch(`${apiBaseUrl}/runs/${runId}/events?token=${token}`);
+    const ticketResponse = await fetch(`${apiBaseUrl}/runs/${runId}/events-ticket`, { method: 'POST', headers: { Authorization: `Bearer ${token}` } });
+    const { ticket } = await ticketResponse.json();
+    const sseRes = await fetch(`${apiBaseUrl}/runs/${runId}/events?ticket=${ticket}`);
     assert.equal(sseRes.status, 200);
 
     const reader = sseRes.body.getReader();

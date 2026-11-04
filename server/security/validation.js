@@ -3,14 +3,14 @@ import { isLocalhostTarget } from './ownership.js';
 
 const ALLOWED_ENVIRONMENTS = ['Development', 'Staging', 'Production', 'Local'];
 const ALLOWED_METHODS = ['GET', 'POST', 'PUT', 'DELETE', 'HEAD', 'PATCH'];
-const SENSITIVE_HEADER_KEYS = new Set(['authorization', 'cookie', 'set-cookie', 'x-api-key', 'token', 'secret', 'password']);
+const SENSITIVE_HEADER_KEYS = new Set(['authorization', 'proxy-authorization', 'cookie', 'set-cookie', 'token', 'secret', 'password']);
 
 export function sanitizeHeadersForStorage(headers = {}) {
   if (!headers || typeof headers !== 'object') return {};
   const sanitized = {};
   for (const [k, v] of Object.entries(headers)) {
     const lower = k.toLowerCase();
-    if (SENSITIVE_HEADER_KEYS.has(lower) || lower.includes('token') || lower.includes('key') || lower.includes('secret')) {
+    if (SENSITIVE_HEADER_KEYS.has(lower) || /token|secret|key|password/i.test(lower)) {
       sanitized[k] = '[REDACTED]';
     } else {
       sanitized[k] = String(v);
@@ -233,6 +233,12 @@ export function validateRunPayload(payload, target, limits = {}) {
       };
     }
     for (const [k, v] of Object.entries(headers)) {
+      if (['__proto__', 'prototype', 'constructor'].includes(k.toLowerCase())) {
+        return { valid: false, statusCode: 400, error: 'Header name is not permitted.' };
+      }
+      if (['host', 'content-length', 'connection', 'transfer-encoding'].includes(k.toLowerCase())) {
+        return { valid: false, statusCode: 400, error: `Header '${k}' is controlled by the runner and cannot be overridden.` };
+      }
       if (!/^[a-zA-Z0-9_-]+$/.test(k) || k.length > 64) {
         return {
           valid: false,
