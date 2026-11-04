@@ -9,7 +9,7 @@ import { RunnerManager } from '../server/runner/manager.js';
 const durationSec = Math.min(1800, Math.max(60, Number(process.env.SOAK_DURATION_SEC || (process.argv.includes('--ci') ? 120 : 1800))));
 const intervalSec = Math.min(60, Math.max(1, Number(process.env.SOAK_SAMPLE_INTERVAL_SEC || 10)));
 const concurrency = Math.min(4, Math.max(1, Number(process.env.SOAK_CONCURRENCY || 2)));
-const warmupSec = 300;
+const warmupSec = Math.min(300, Math.max(0, Number(process.env.SOAK_WARMUP_SEC || (process.argv.includes('--ci') ? 30 : 300))));
 const outputDir = path.resolve('benchmarks/results');
 await fs.mkdir(outputDir, { recursive: true });
 const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
@@ -92,7 +92,7 @@ try {
     sampleIntervalSec: intervalSec,
     samples: samples.length,
     warmupSec,
-    passCriterion: 'After 300 seconds warm-up, coordinator and worker RSS spread must each be <= max(50 MiB, 20% of median RSS), and worker heap spread <= max(64 MiB, 25% of median heap). File descriptors and event-loop lag are also recorded.',
+    passCriterion: `After ${warmupSec} seconds warm-up, coordinator and worker RSS spread must each be <= max(50 MiB, 20% of median RSS), and worker heap spread <= max(64 MiB, 25% of median heap). File descriptors and event-loop lag are also recorded.`,
     coordinatorRssWarmupMedianMb: medianRss,
     coordinatorRssWarmupSpreadMb: spreadMb,
     coordinatorRssCriterionPassed: coordinatorPass,
