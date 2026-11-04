@@ -1072,7 +1072,7 @@ export default function App() {
           )}
 
           {page === 'Comparisons' && (
-            <ComparisonsView completed={completed} />
+            <ComparisonsView completed={completed} token={token} />
           )}
 
           {page === 'Documentation' && <DocsView />}

@@ -71,6 +71,10 @@ paths:
     get:
       parameters: [{in: path, name: id, required: true, schema: {type: string}}]
       responses: {'200': {description: Run details}, '404': {description: Not found}}
+  /runs/{id}/regression:
+    get:
+      parameters: [{in: path, name: id, required: true, schema: {type: string}}]
+      responses: {'200': {description: Statistical regression verdict and baseline explanation}, '404': {description: Not found}}
   /runs/{id}/cancel:
     post:
       parameters: [{in: path, name: id, required: true, schema: {type: string}}]

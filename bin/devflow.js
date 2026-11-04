@@ -41,10 +41,17 @@ async function main() {
       run = await request(`${base}/runs/${encodeURIComponent(created.id)}`);
     }
     if (!['completed', 'failed', 'cancelled', 'timed_out'].includes(run.status)) throw new Error(`Timed out waiting for run ${created.id}`);
-    const report = { runId: run.id, status: run.status, totalRequests: run.totalRequests, successCount: run.successCount, failedCount: run.failedCount, assertionFailureCount: run.assertionFailureCount || 0, rps: run.rps, p50: run.p50, p95: run.p95, p99: run.p99, errorRate: run.errorRate };
+    const regression = await request(`${base}/runs/${encodeURIComponent(created.id)}/regression`);
+    const report = { runId: run.id, status: run.status, totalRequests: run.totalRequests, successCount: run.successCount, failedCount: run.failedCount, assertionFailureCount: run.assertionFailureCount || 0, rps: run.rps, p50: run.p50, p95: run.p95, p99: run.p99, errorRate: run.errorRate, regression };
     if (args.json) console.log(JSON.stringify(report, null, 2));
-    else console.log(`DevFlow run ${run.id}: ${run.status}\nRequests: ${report.totalRequests} (${report.successCount} succeeded, ${report.failedCount} failed)\nRPS: ${report.rps} | p95: ${report.p95} ms | p99: ${report.p99} ms | error rate: ${report.errorRate}%`);
-    process.exitCode = run.status === 'completed' && report.failedCount === 0 && report.assertionFailureCount === 0 ? 0 : 1;
+    else {
+      const metricLine = key => {
+        const metric = regression.metrics[key];
+        return metric?.band ? `${key}: ${metric.verdict} (${metric.observed}; band ${metric.band.lower}–${metric.band.upper})` : `${key}: ${metric?.verdict || 'insufficient_data'}`;
+      };
+      console.log(`DevFlow run ${run.id}: ${run.status}\nRequests: ${report.totalRequests} (${report.successCount} succeeded, ${report.failedCount} failed)\nRPS: ${report.rps} | p95: ${report.p95} ms | p99: ${report.p99} ms | error rate: ${report.errorRate}%\nRegression verdict: ${regression.verdict} (${regression.baselineCount}/${regression.minimumBaselineRuns} minimum comparable runs)\n${['rps', 'p95', 'p99', 'errorRate'].map(metricLine).join('\n')}`);
+    }
+    process.exitCode = run.status === 'completed' && report.failedCount === 0 && report.assertionFailureCount === 0 && regression.verdict !== 'regression' ? 0 : 1;
   } catch (err) { console.error(`DevFlow error: ${err.message}`); process.exitCode = 2; }
 }
 

@@ -6,6 +6,7 @@ import { getRunnerManager } from '../runner/manager.js';
 import { validateRunPayload, sanitizeHeadersForStorage } from '../security/validation.js';
 import { authenticateToken, verifyToken } from '../security/auth.js';
 import { config } from '../config.js';
+import { evaluateRunRegression } from '../runner/regression.js';
 
 export const runsRouter = express.Router();
 
@@ -47,6 +48,18 @@ runsRouter.get('/runs/:id', authenticateToken, async (req, res, next) => {
       return res.status(404).json({ error: 'Run not found.' });
     }
     res.json(run);
+  } catch (err) {
+    next(err);
+  }
+});
+
+runsRouter.get('/runs/:id/regression', authenticateToken, async (req, res, next) => {
+  try {
+    const storage = getStorage();
+    const run = await storage.getRunById(req.params.id, req.user.id);
+    if (!run) return res.status(404).json({ error: 'Run not found.' });
+    const history = await storage.getRuns(req.user.id);
+    res.json(evaluateRunRegression(run, history));
   } catch (err) {
     next(err);
   }

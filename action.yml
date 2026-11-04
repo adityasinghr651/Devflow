@@ -37,8 +37,20 @@ runs:
           const fs = require('fs');
           const marker = '<!-- devflow-performance-result -->';
           const file = `${process.env.GITHUB_WORKSPACE}/devflow-result.json`;
-          const report = fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : 'Run failed before producing a result.';
-          const body = `${marker}\n## DevFlow performance result\n\n\\`\\`\\`json\n${report}\n\\`\\`\\``;
+          const fence = String.fromCharCode(96).repeat(3);
+          let summary = 'Run failed before producing a result.';
+          if (fs.existsSync(file)) {
+            try {
+              const report = JSON.parse(fs.readFileSync(file, 'utf8'));
+              const metrics = report.regression?.metrics || {};
+              const rows = ['rps', 'p95', 'p99', 'errorRate'].map(key => {
+                const metric = metrics[key];
+                return metric ? `| ${key} | ${metric.observed} | ${metric.band ? `${metric.band.lower}–${metric.band.upper}` : 'n/a'} | ${metric.verdict} |` : `| ${key} | n/a | n/a | insufficient_data |`;
+              }).join('\n');
+              summary = `**Verdict:** ${report.regression?.verdict || 'unavailable'} (${report.regression?.baselineCount || 0} comparable runs)\n\nRequests: ${report.totalRequests} (${report.successCount} passed, ${report.failedCount} failed; ${report.assertionFailureCount} assertion failures)\n\n| Metric | Observed | Decision band | Verdict |\n|---|---:|---:|---|\n${rows}\n\n<details><summary>Full JSON report</summary>\n\n${fence}json\n${JSON.stringify(report, null, 2)}\n${fence}\n\n</details>`;
+            } catch { summary = 'Run finished but its result JSON could not be parsed.'; }
+          }
+          const body = `${marker}\n## DevFlow performance result\n\n${summary}`;
           const { owner, repo } = context.repo;
           const issue_number = context.issue.number;
           const comments = await github.rest.issues.listComments({ owner, repo, issue_number });

@@ -73,6 +73,33 @@ export type Run = {
   progressPercent?: number;
 };
 
+export type RegressionMetric = {
+  verdict: 'pass' | 'regression' | 'improvement' | 'insufficient_data';
+  observed: number;
+  median?: number;
+  mad?: number;
+  scaledMad?: number;
+  statisticalBand?: number;
+  minimumRelativeChange?: number;
+  absoluteMinimumChange?: number;
+  threshold?: number;
+  band?: { lower: number; upper: number };
+  baselineValues?: number[];
+};
+
+export type RunRegression = {
+  runId: string;
+  targetId: string;
+  fingerprint: string;
+  verdict: 'pass' | 'regression' | 'improvement' | 'insufficient_data';
+  reason: string;
+  baselineCount: number;
+  minimumBaselineRuns: number;
+  baselineRunIds: string[];
+  mismatchedRunCount?: number;
+  metrics: { rps: RegressionMetric; p95: RegressionMetric; p99: RegressionMetric; errorRate: RegressionMetric };
+};
+
 export type ThemeMode = 'dark' | 'light' | 'system';
 
 export type LiveMetrics = {

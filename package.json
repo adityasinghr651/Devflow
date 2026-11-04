@@ -18,6 +18,7 @@
     "soak": "node tools/soak-test.js",
     "soak:ci": "node tools/soak-test.js --ci",
     "bench:cross-validate": "node tools/cross-validate.js",
+    "regression:experiment": "node tools/run-regression-experiment.js",
     "test": "node --test --test-concurrency=1 tests/**/*.test.js",
     "test:validation": "node --test tests/validation/*.test.js",
     "build": "tsc --noEmit && vite build",

@@ -26,6 +26,7 @@ In separate terminals, run `npm run server` and `npm run dev`. Open `http://loca
 
 - [Concepts](docs/CONCEPTS.md) · [Architecture](docs/ARCHITECTURE.md) · [API reference](docs/API.md) · [OpenAPI spec](docs/openapi.yaml)
 - [CLI](docs/CLI.md) · [GitHub Action](docs/GITHUB_ACTION.md) · [Limits and safety](docs/LIMITS.md)
+- [Statistical regression detection](docs/REGRESSION_DETECTION.md)
 - [Troubleshooting](docs/TROUBLESHOOTING.md) · [FAQ, including comparison with k6](docs/FAQ.md) · [Operations](docs/OPERATIONS.md)
 - [Contributing](CONTRIBUTING.md) · [Security policy](SECURITY.md) · [Changelog](CHANGELOG.md)
 
