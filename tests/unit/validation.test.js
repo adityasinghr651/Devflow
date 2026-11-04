@@ -61,3 +61,27 @@ test('Validation: Run payload bounds enforcement', () => {
   assert.equal(valid.data.method, 'GET');
 });
 
+test('Validation: response assertions use a strict bounded shape and safe JSON path subset', () => {
+  const target = { id: 't-1', name: 'Test Target', url: 'http://localhost:3001' };
+  const valid = validateRunPayload({
+    authorized: true,
+    assertions: { status: 200, bodyContains: 'ok', jsonPath: [{ path: 'errors', op: 'notExists' }, { path: 'data.items[0].id', op: 'equals', equals: 7 }] },
+  }, target);
+  assert.equal(valid.valid, true);
+  assert.deepEqual(valid.data.assertions, {
+    status: 200,
+    bodyContains: 'ok',
+    jsonPath: [{ path: 'errors', op: 'notExists' }, { path: 'data.items[0].id', op: 'equals', equals: 7 }],
+  });
+
+  for (const assertions of [
+    { eval: 'process.exit()' },
+    { bodyContains: 'x'.repeat(257) },
+    { jsonPath: [{ path: 'errors.constructor', op: 'exists' }] },
+    { jsonPath: [{ path: 'errors', op: 'eval' }] },
+    { jsonPath: [{ path: 'x..y', op: 'exists' }] },
+  ]) {
+    assert.equal(validateRunPayload({ authorized: true, assertions }, target).valid, false);
+  }
+});
+

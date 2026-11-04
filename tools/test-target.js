@@ -7,6 +7,7 @@ export const TARGET_CONFIG = {
   maxEchoBytes: 65536, // 64 KB max payload for /echo
   minLargeKb: 1,      // 1 KB min for /large
   maxLargeKb: 512,    // 512 KB max for /large
+  maxBigBytes: 512 * 1024, // 512 KB max payload for /big
 };
 
 /**
@@ -17,6 +18,8 @@ export function createTestTargetServer(options = {}) {
   const host = TARGET_CONFIG.host;
   const startTime = Date.now();
   let reqCount = 0;
+  let flakyCount = 0;
+  let graphqlCount = 0;
 
   const server = http.createServer(async (req, res) => {
     // Standard CORS headers for testing
@@ -34,8 +37,14 @@ export function createTestTargetServer(options = {}) {
 
     // Helper: JSON response
     const sendJson = (statusCode, data) => {
+      if (res.destroyed || res.writableEnded) return;
       res.writeHead(statusCode, { 'Content-Type': 'application/json; charset=utf-8' });
       res.end(JSON.stringify(data));
+    };
+
+    const readPositiveInteger = (value, maximum) => {
+      const number = Number(value);
+      return Number.isInteger(number) && number >= 1 && number <= maximum ? number : null;
     };
 
     // 1. GET /health - Predictable 200 response
@@ -46,6 +55,83 @@ export function createTestTargetServer(options = {}) {
         timestamp: new Date().toISOString(),
         uptimeSec: Math.floor((Date.now() - startTime) / 1000),
       });
+    }
+
+    // Reset deterministic endpoint counters between test scenarios.
+    if (req.method === 'POST' && pathname === '/__reset') {
+      reqCount = 0;
+      flakyCount = 0;
+      graphqlCount = 0;
+      return sendJson(200, { reset: true });
+    }
+
+    // Fixed, bounded response delay used to validate measured latency.
+    if (req.method === 'GET' && pathname === '/fixed') {
+      const delayParam = reqUrl.searchParams.get('delayMs');
+      const delayMs = delayParam === null ? 0 : Number(delayParam);
+      if (!Number.isInteger(delayMs) || delayMs < 0 || delayMs > TARGET_CONFIG.maxDelayMs) {
+        return sendJson(400, {
+          error: `Query parameter 'delayMs' must be an integer between 0 and ${TARGET_CONFIG.maxDelayMs} milliseconds.`,
+          received: delayParam,
+        });
+      }
+      if (delayMs > 0) await new Promise(resolve => setTimeout(resolve, delayMs));
+      return sendJson(200, { delayMs, timestamp: new Date().toISOString() });
+    }
+
+    // Deterministic status failure every Kth request (no random sampling).
+    if (req.method === 'GET' && pathname === '/flaky') {
+      const everyN = readPositiveInteger(reqUrl.searchParams.get('everyN'), 1_000_000);
+      const statusParam = reqUrl.searchParams.get('status') || '500';
+      const status = Number(statusParam);
+      if (!everyN || !Number.isInteger(status) || status < 400 || status > 599) {
+        return sendJson(400, { error: 'Query parameters require everyN 1..1000000 and status 400..599.' });
+      }
+      flakyCount += 1;
+      const failed = flakyCount % everyN === 0;
+      return sendJson(failed ? status : 200, {
+        requestIndex: flakyCount,
+        failed,
+        statusCode: failed ? status : 200,
+      });
+    }
+
+    // GraphQL-shaped responses remain HTTP 200, including deterministic errors.
+    if (req.method === 'GET' && pathname === '/graphql-errors') {
+      const everyN = readPositiveInteger(reqUrl.searchParams.get('everyN'), 1_000_000);
+      if (!everyN) return sendJson(400, { error: 'Query parameter everyN must be an integer from 1 to 1000000.' });
+      graphqlCount += 1;
+      if (graphqlCount % everyN === 0) {
+        return sendJson(200, {
+          data: { item: null },
+          errors: [{ message: 'Deterministic fixture error.', path: ['item'] }],
+          requestIndex: graphqlCount,
+        });
+      }
+      return sendJson(200, { data: { item: { id: 'fixture-item' } }, requestIndex: graphqlCount });
+    }
+
+    // Never completes unless the client closes the connection.
+    if (req.method === 'GET' && pathname === '/hang') {
+      return;
+    }
+
+    // Fixed-size body for payload and response-limit checks.
+    if (req.method === 'GET' && pathname === '/big') {
+      const bytesParam = reqUrl.searchParams.get('bytes');
+      const bytes = Number(bytesParam ?? 1024);
+      if (!Number.isInteger(bytes) || bytes < 1 || bytes > TARGET_CONFIG.maxBigBytes) {
+        return sendJson(400, {
+          error: `Query parameter 'bytes' must be an integer between 1 and ${TARGET_CONFIG.maxBigBytes}.`,
+          received: bytesParam,
+        });
+      }
+      if (res.destroyed || res.writableEnded) return;
+      res.writeHead(200, {
+        'Content-Type': 'application/octet-stream',
+        'Content-Length': bytes,
+      });
+      return res.end(Buffer.alloc(bytes, 0x78));
     }
 
     // 2. GET /slow - Configurable bounded delay
@@ -192,7 +278,20 @@ export function createTestTargetServer(options = {}) {
     return sendJson(404, {
       error: 'Endpoint not found on controlled test target.',
       path: pathname,
-      availableEndpoints: ['GET /health', 'GET /slow?ms=100', 'GET /status/500', 'GET /mixed', 'POST /echo', 'GET /large?kb=64'],
+      availableEndpoints: [
+        'GET /health',
+        'GET /fixed?delayMs=50',
+        'GET /status/500',
+        'GET /flaky?everyN=5&status=503',
+        'GET /hang',
+        'GET /graphql-errors?everyN=5',
+        'GET /big?bytes=65536',
+        'POST /__reset',
+        'GET /slow?ms=100',
+        'GET /mixed',
+        'POST /echo',
+        'GET /large?kb=64',
+      ],
     });
   });
 

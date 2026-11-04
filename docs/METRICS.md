@@ -9,13 +9,14 @@ DevFlow enforces strict mathematical and statistical purity in all measured metr
 | Metric | Field | Classification & Mathematical Definition |
 | :--- | :--- | :--- |
 | **Total Requests** | `totalRequests` | Total number of HTTP requests that reached a definitive terminal outcome: <br>$$\text{totalRequests} = \text{successCount} + \text{failedCount}$$<br>*Note: Cancelled in-flight requests are excluded from this denominator.* |
-| **Successful Requests** | `successCount` | HTTP responses with status code in the 2xx range (`200–299`, `response.ok === true`). |
+| **Successful Requests** | `successCount` | HTTP responses with the expected status (2xx by default; a configured exact `assertions.status` overrides the expected code) and all configured assertions passing. |
 | **HTTP Errors** | `httpErrorCount` | HTTP responses with non-2xx status codes (`4xx` client errors, `5xx` server errors). |
 | **Timeouts** | `timeoutCount` | Requests terminated by the per-request watchdog timer (`AbortSignal.timeout(timeoutMs)`). |
 | **Network Errors** | `networkErrorCount` | Low-level transport failures: connection refused (`ECONNREFUSED`), socket resets (`ECONNRESET`), and DNS resolution failure. |
 | **Blocked Redirects** | `redirectBlockedCount` | Redirects are rejected instead of followed. This is a separate failure category. |
+| **Assertion Failures** | `assertionFailureCount` | Expected response status/body/JSON assertions failed. Counted once per request, as a distinct failure category. |
 | **Cancelled Requests** | `cancelledCount` | Requests intentionally aborted mid-flight due to user or coordinator cancellation (`AbortError` when `isCancelled === true`). These requests **never finished** and are therefore **excluded from latency percentiles and from the error rate denominator**. |
-| **Failed Requests** | `failedCount` | Total failed requests:<br>$$\text{failedCount} = \text{httpErrorCount} + \text{timeoutCount} + \text{networkErrorCount} + \text{redirectBlockedCount}$$ |
+| **Failed Requests** | `failedCount` | Total failed requests:<br>$$\text{failedCount} = \text{httpErrorCount} + \text{timeoutCount} + \text{networkErrorCount} + \text{redirectBlockedCount} + \text{assertionFailureCount}$$ |
 | **Error Rate** | `errorRate` | Percentage of completed requests resulting in failure (0.0000% – 100.0000%):<br>$$\text{errorRate} = \begin{cases} 0 & \text{if } \text{totalRequests} = 0 \\ \frac{\text{failedCount}}{\text{totalRequests}} \times 100 & \text{otherwise} \end{cases}$$<br>*Stored in PostgreSQL as `NUMERIC(7, 4)` and in JSON with at least 4 decimal places.* |
 | **Throughput (RPS)** | `rps` | Completed requests divided by the cluster measurement window, from the earliest counted request start to the latest counted request completion across workers. Worker spawn time is excluded. The window is exposed as `measurementWindowSec`. |
 | **Percentiles** | `p50`, `p95`, `p99` | Response time percentiles computed via Nearest-Rank interpolation over the additive 6,801-bucket HDR latency histogram. |
@@ -66,9 +67,11 @@ If a worker process is terminated by the 1-second cancellation grace timeout, cr
 ## 4. Known Limitations & Scope Clarification
 
 - Existing JSON and Postgres records receive a zero default for `redirectBlockedCount` when read after migration.
+- Optional response assertions support exact status, literal `bodyContains`, and a bounded JSON path subset with `equals`, `exists`, and `notExists`. JSON paths reject prototype-related keys and executable expressions. A configured assertion reads at most 64 KiB of each response; oversized bodies fail the assertion. With no assertions configured, the response body is cancelled without being read.
+- Each run records the selected engine, worker count, Node version, operating system, CPU, memory, runner version, and commit in `environmentMetadata`. k6 does not expose Node's detailed category counters; only its aggregate error result is available.
+- Runs with response assertions use the Node engine so an optional k6 installation cannot skip those checks.
 - When no request reaches a counted terminal outcome, the legacy API currently reports RPS as `0`; consumers should treat it as unavailable when `totalRequests` is zero.
 - The optional k6 adapter reports the aggregate failed count from k6's `http_req_failed` metric; it does not yet provide the per-category failure counters available from the Node engine.
-- Response-body assertions are not implemented, so response bodies are not inspected and `assertionFailure` is not currently a failure category.
 
 > [!IMPORTANT]
 > **Single-Machine Operating System Multiprocessing:**  

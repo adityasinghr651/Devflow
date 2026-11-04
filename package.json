@@ -13,7 +13,9 @@
     "bench:compare": "node tools/compare-benchmarks.js",
     "bench:baseline": "node tools/run-benchmark.js --ci --save-baseline",
     "bench:scaling": "node tools/run-worker-scaling-benchmark.js",
-    "test": "node --test tests/**/*.test.js",
+    "bench:cross-validate": "node tools/cross-validate.js",
+    "test": "node --test --test-concurrency=1 tests/**/*.test.js",
+    "test:validation": "node --test tests/validation/*.test.js",
     "build": "tsc --noEmit && vite build",
     "lint": "tsc --noEmit",
     "preview": "vite preview --host 0.0.0.0"
@@ -37,6 +39,7 @@
     "@types/pg": "^8.23.1",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
+    "autocannon": "^8.0.0",
     "typescript": "^7.0.2"
   }
 }

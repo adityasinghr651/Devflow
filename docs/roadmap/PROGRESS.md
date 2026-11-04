@@ -1,13 +1,13 @@
 # Roadmap Progress
 
-Current phase: 0   Last updated: 2026-11-03T15:15:19Z   Branch: roadmap/phase-0-correctness   HEAD: f95189ab88710631c6895232f7ee4f7038353c33 (phase start)
+Current phase: 1   Last updated: 2026-11-04T10:29:09Z   Branch: roadmap/phase-1-measurement-validation   HEAD: 1ee5424c1069eb0852c9138d1e2acbceba38caf9
 
 ## Phase table
 
 | Phase | Status | Gate result | Evidence file |
 |---|---|---|---|
 | 0 | done | PASS; see known limitations | [evidence/phase-0.md](evidence/phase-0.md) |
-| 1 | todo | not run | — |
+| 1 | done | PASS; V1–V6 passed five times, all standard checks passed, 3 full-suite passes, no leaked processes | [evidence/phase-1.md](evidence/phase-1.md) |
 | 2 | todo | not run | — |
 | 3 | todo | not run | — |
 | 4 | todo | not run | — |
@@ -29,6 +29,12 @@ Current phase: 0   Last updated: 2026-11-03T15:15:19Z   Branch: roadmap/phase-0-
 - [x] T0.10 Scaling benchmark ran against its self-started `127.0.0.1` target; report and raw JSON are saved in `benchmarks/results/`.
 - [x] T0.11 CI already runs unit/integration tests; branch triggers now include `roadmap/**` while benchmark regression behavior is unchanged.
 - [x] T0.12 Metrics semantics and benchmark result labels/limitations are documented.
+- [x] T1.1 Added deterministic loopback-only `/fixed`, `/flaky`, `/graphql-errors`, `/hang`, `/big`, and `POST /__reset`; legacy endpoints remain. Fail-before was 404, and target integration tests pass. See [phase-1 evidence](evidence/phase-1.md#t11--deterministic-controlled-target).
+- [x] T1.2 Added V1-V6 validation suite; all eight tests pass five consecutive times, timing tolerance is derived from measured variance. Evidence in [phase-1](evidence/phase-1.md#t12--validation-suite).
+- [x] T1.3 Added bounded status/body/JSON-path assertions and `assertionFailureCount` across worker, aggregation, storage, API, and run detail. Evidence in [phase-1](evidence/phase-1.md#t13--safe-response-assertions).
+- [x] T1.4 Ran DevFlow vs autocannon on loopback; k6 is marked NOT RUN because it is not installed. Evidence in [phase-1](evidence/phase-1.md#t14--cross-tool-comparison).
+- [x] T1.5 Ran 10 samples each for 1 and 2 workers; mean, sample SD, and CV for RPS and p95 recorded with raw reports. Evidence in [phase-1](evidence/phase-1.md#t15--variance-study).
+- [x] T1.6 Persisted and displayed host/runtime, runner version/commit, engine, and worker count metadata. Evidence in [phase-1](evidence/phase-1.md#t16--environment-metadata).
 
 ## Decision log
 
@@ -37,16 +43,19 @@ Current phase: 0   Last updated: 2026-11-03T15:15:19Z   Branch: roadmap/phase-0-
 | Work from a dedicated `roadmap/phase-0-correctness` worktree at `phase-7-distributed-runner` | Modify the existing `main` checkout or isolate the phase work | The existing checkout contained untracked `DEVFLOW_ROADMAP_RUNBOOK.md` and `demo/` user work; isolation preserved both. |
 | Keep Node as the benchmark engine | `auto` could choose k6 for a one-worker run | The Phase 0 benchmark must compare the same runner implementation at each worker count. |
 | Keep the existing aggregate-only k6 failure result documented | Add custom k6 status/error instrumentation or remove k6 support | k6 is optional and not installed/verified here; Node is the validated engine for Phase 0. |
+| Continue Phase 1 in a dedicated roadmap worktree while leaving the dirty `main` checkout untouched | Stop until root untracked content is moved, or isolate this work | The owner explicitly said to proceed; the untracked content stays unchanged on `main`, and phase work is confined to `roadmap/phase-1-measurement-validation`. |
+| Run test files sequentially in the full suite | Keep Node's default file-level parallelism | Parallel worker-heavy integration files interfered with cancellation timing; serial files reduce cross-test CPU contention while preserving each test's own concurrency coverage. |
 
 ## Deviations from this runbook
 
 - Historical correctness fixes already present in the configured base branch were verified by regression tests rather than reimplemented.
 - The working tree was kept on an isolated worktree because the original `main` checkout had unrelated untracked user content.
 - The runbook's local commit policy is followed on this roadmap branch; no remote operation is performed.
+- The initial Phase 1 attempt stopped at the runbook's dirty-checkout gate. After the owner said to proceed, Phase 1 resumed in an isolated roadmap worktree; root `main` user files remain untouched.
 
 ## BLOCKED items
 
-- None for Phase 0.
+- None currently. The initial dirty-checkout concern was handled by the owner's explicit instruction to proceed in a separate roadmap worktree; `main` remains untouched.
 
 ## Known limitations discovered
 

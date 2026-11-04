@@ -115,3 +115,57 @@ test('Test Target: Endpoints, bounds, and security verification', async (t) => {
   assert.ok(Array.isArray(notFoundData.availableEndpoints));
 });
 
+test('Test Target: Deterministic measurement endpoints and reset', async (t) => {
+  const server = createTestTargetServer();
+  await new Promise(resolve => server.listen(0, TARGET_CONFIG.host, resolve));
+  assert.equal(server.address().address, '127.0.0.1');
+  const baseUrl = `http://${TARGET_CONFIG.host}:${server.address().port}`;
+
+  t.after(async () => {
+    await new Promise(resolve => server.close(resolve));
+  });
+
+  const fixedStart = performance.now();
+  const fixedResponse = await fetch(`${baseUrl}/fixed?delayMs=40`);
+  const fixedElapsed = performance.now() - fixedStart;
+  assert.equal(fixedResponse.status, 200);
+  assert.ok(fixedElapsed >= 30, `expected at least 30ms delay, got ${fixedElapsed.toFixed(1)}ms`);
+  assert.equal((await fixedResponse.json()).delayMs, 40);
+  assert.equal((await fetch(`${baseUrl}/fixed?delayMs=5001`)).status, 400);
+
+  const flakyStatuses = [];
+  for (let i = 0; i < 4; i++) {
+    flakyStatuses.push((await fetch(`${baseUrl}/flaky?everyN=2&status=503`)).status);
+  }
+  assert.deepEqual(flakyStatuses, [200, 503, 200, 503]);
+
+  const graphqlResults = [];
+  for (let i = 0; i < 3; i++) {
+    const response = await fetch(`${baseUrl}/graphql-errors?everyN=2`);
+    graphqlResults.push({ status: response.status, data: await response.json() });
+  }
+  assert.deepEqual(graphqlResults.map(x => x.status), [200, 200, 200]);
+  assert.equal(graphqlResults[0].data.errors, undefined);
+  assert.ok(Array.isArray(graphqlResults[1].data.errors));
+  assert.equal(graphqlResults[2].data.errors, undefined);
+
+  const big = await fetch(`${baseUrl}/big?bytes=1234`);
+  const bigBody = await big.arrayBuffer();
+  assert.equal(big.status, 200);
+  assert.equal(bigBody.byteLength, 1234);
+  assert.equal((await fetch(`${baseUrl}/big?bytes=999999999`)).status, 400);
+
+  const reset = await fetch(`${baseUrl}/__reset`, { method: 'POST' });
+  assert.equal(reset.status, 200);
+  assert.equal((await reset.json()).reset, true);
+  assert.equal((await fetch(`${baseUrl}/flaky?everyN=2&status=503`)).status, 200);
+  const graphqlAfterReset = await fetch(`${baseUrl}/graphql-errors?everyN=2`);
+  assert.equal(graphqlAfterReset.status, 200);
+  assert.equal((await graphqlAfterReset.json()).errors, undefined);
+
+  const controller = new AbortController();
+  const hanging = fetch(`${baseUrl}/hang`, { signal: controller.signal });
+  setTimeout(() => controller.abort(), 30);
+  await assert.rejects(hanging, error => error.name === 'AbortError');
+});
+

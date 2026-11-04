@@ -50,6 +50,9 @@ function mapRunFromDb(row) {
     measurementWindowSec: row.measurement_window_sec == null ? null : Number(row.measurement_window_sec),
     cancelledCount: Number(row.cancelled_count || 0),
     engine: row.engine || 'node',
+    assertions: row.assertions || undefined,
+    assertionFailureCount: Number(row.assertion_failure_count || 0),
+    environmentMetadata: row.environment_metadata || undefined,
     partialWorkers: row.partial_workers || undefined,
     histogramComplete: row.histogram_complete ?? true,
     rps: Number(Number(row.rps || 0).toFixed(2)),
@@ -264,14 +267,15 @@ export class PgStorage {
         worker_count, status, started_at, total_requests, success_count, failed_count,
         http_error_count, timeout_count, network_error_count, redirect_blocked_count, cancelled_count,
         engine, partial_workers, histogram_complete,
-        rps, p50, p95, p99, error_rate, status_codes, measurement_window_sec
+        rps, p50, p95, p99, error_rate, status_codes, measurement_window_sec,
+        assertions, assertion_failure_count, environment_metadata
       ) VALUES (
         $1, $2, $3, $4, $5, $6,
         $7, $8, $9, $10, $11, $12, $13,
         $14, $15, $16, $17, $18, $19,
         $20, $21, $22, $23, $24,
         $25, $26, $27,
-        $28, $29, $30, $31, $32, $33, $34
+        $28, $29, $30, $31, $32, $33, $34, $35, $36, $37
       ) RETURNING *
     `;
     const res = await this.pool.query(sql, [
@@ -309,6 +313,9 @@ export class PgStorage {
       run.errorRate || 0,
       JSON.stringify(run.statusCodes || {}),
       run.measurementWindowSec ?? null,
+      run.assertions ? JSON.stringify(run.assertions) : null,
+      run.assertionFailureCount || 0,
+      run.environmentMetadata ? JSON.stringify(run.environmentMetadata) : null,
     ]);
     return mapRunFromDb(res.rows[0]);
   }
@@ -333,6 +340,9 @@ export class PgStorage {
       networkErrorCount: 'network_error_count',
       redirectBlockedCount: 'redirect_blocked_count',
       measurementWindowSec: 'measurement_window_sec',
+      assertions: 'assertions',
+      assertionFailureCount: 'assertion_failure_count',
+      environmentMetadata: 'environment_metadata',
       cancelledCount: 'cancelled_count',
       engine: 'engine',
       partialWorkers: 'partial_workers',
@@ -349,7 +359,7 @@ export class PgStorage {
     for (const [key, col] of Object.entries(mapping)) {
       if (updates[key] !== undefined) {
         fields.push(`${col} = $${idx++}`);
-        if (key === 'statusCodes' || key === 'partialWorkers') {
+        if (['statusCodes', 'partialWorkers', 'assertions', 'environmentMetadata'].includes(key)) {
           values.push(JSON.stringify(updates[key]));
         } else {
           values.push(updates[key]);

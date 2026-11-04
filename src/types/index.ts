@@ -35,6 +35,13 @@ export type Run = {
   durationSec: number;
   workerCount?: number;
   engine?: string;
+  assertions?: Record<string, unknown>;
+  assertionFailureCount?: number;
+  environmentMetadata?: {
+    engine: string; workerCount: number; nodeVersion: string; platform: string;
+    osRelease: string; architecture: string; cpuModel: string; logicalCpuCores: number;
+    totalMemoryBytes: number; runnerVersion: string; runnerCommit: string;
+  };
   profile?: string;
   stages?: Stage[];
   headers?: Record<string, string>;

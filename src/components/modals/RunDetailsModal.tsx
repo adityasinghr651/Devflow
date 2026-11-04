@@ -53,6 +53,14 @@ export const RunDetailsModal: React.FC<RunDetailsModalProps> = ({
       wide
     >
       <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }} className="modal-animate">
+        {selectedRun.environmentMetadata && (
+          <div style={{ background: 'var(--bg-subtle)', border: '1px solid var(--border-default)', borderRadius: '8px', padding: '10px 14px', color: 'var(--text-secondary)', fontSize: '12px' }}>
+            <b style={{ color: 'var(--text-primary)' }}>Run environment</b>
+            <span> · {selectedRun.environmentMetadata.engine} engine · {selectedRun.environmentMetadata.workerCount} worker(s) · Node {selectedRun.environmentMetadata.nodeVersion}</span>
+            <div>{selectedRun.environmentMetadata.platform} {selectedRun.environmentMetadata.osRelease} ({selectedRun.environmentMetadata.architecture}) · {selectedRun.environmentMetadata.cpuModel} ({selectedRun.environmentMetadata.logicalCpuCores} logical cores) · {(selectedRun.environmentMetadata.totalMemoryBytes / (1024 ** 3)).toFixed(1)} GiB</div>
+            <div>Runner {selectedRun.environmentMetadata.runnerVersion} · commit {selectedRun.environmentMetadata.runnerCommit}</div>
+          </div>
+        )}
         {/* Top Header Badge Row */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px', paddingBottom: '12px', borderBottom: '1px solid var(--border-subtle)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>

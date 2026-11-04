@@ -28,7 +28,14 @@ test('Security Regression: Comprehensive validation of security controls and bou
   const apiBaseUrl = `http://127.0.0.1:${apiPort}/api`;
 
   t.after(async () => {
+    const deadline = Date.now() + 5000;
+    while (runner.activeRuns.size > 0 && Date.now() < deadline) await new Promise(resolve => setTimeout(resolve, 20));
+    if (runner.activeRuns.size > 0) {
+      for (const id of runner.activeRuns.keys()) await runner.cancelRun(id).catch(() => {});
+    }
+    await storage.writeQueue;
     await new Promise(r => apiServer.close(r));
+    await storage.writeQueue;
     await fs.rm(tmpDir, { recursive: true, force: true }).catch(() => {});
   });
 

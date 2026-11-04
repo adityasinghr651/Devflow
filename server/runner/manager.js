@@ -5,6 +5,7 @@ import { config } from '../config.js';
 import { getStorage } from '../storage/index.js';
 import { isK6Available, executeK6Run } from './k6-adapter.js';
 import { TestCoordinator } from './coordinator.js';
+import { getEnvironmentMetadata } from '../environment.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -189,7 +190,16 @@ export class RunnerManager {
       }
 
       const enginePref = (process.env.RUNNER_ENGINE || config.runnerEngine || 'auto').toLowerCase();
-      const canUseK6 = enginePref !== 'node' && (enginePref === 'k6' || (await isK6Available(config.k6Bin)));
+      const hasAssertions = run.assertions && Object.keys(run.assertions).length > 0;
+      const canUseK6 = !hasAssertions && enginePref !== 'node' && (enginePref === 'k6' || (await isK6Available(config.k6Bin)));
+
+      const engine = canUseK6 && run.profile !== 'stages' && (!run.workerCount || run.workerCount === 1)
+        ? 'k6' : 'node';
+      await this.storage.updateRun(run.id, {
+        engine,
+        workerCount: run.workerCount || 1,
+        environmentMetadata: getEnvironmentMetadata(engine, run.workerCount || 1),
+      });
 
       if (canUseK6 && run.profile !== 'stages' && (!run.workerCount || run.workerCount === 1)) {
         return await this._executeWithK6(run, fn => { cancelDelegate = fn; });

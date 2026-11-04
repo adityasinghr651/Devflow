@@ -40,6 +40,7 @@ export class ProgressAggregator {
     let timeoutCount = 0;
     let networkErrorCount = 0;
     let redirectBlockedCount = 0;
+    let assertionFailureCount = 0;
     let cancelledCount = 0;
     let currentConcurrency = 0;
     const statusCodes = {};
@@ -59,6 +60,7 @@ export class ProgressAggregator {
       timeoutCount += Number(snap.timeoutCount) || 0;
       networkErrorCount += Number(snap.networkErrorCount) || 0;
       redirectBlockedCount += Number(snap.redirectBlockedCount) || 0;
+      assertionFailureCount += Number(snap.assertionFailureCount) || 0;
       cancelledCount += Number(snap.cancelledCount) || 0;
       if (Number.isFinite(snap.firstRequestStartedAt)) {
         firstRequestStartedAt = firstRequestStartedAt === null
@@ -115,6 +117,7 @@ export class ProgressAggregator {
       timeoutCount,
       networkErrorCount,
       redirectBlockedCount,
+      assertionFailureCount,
       cancelledCount,
       rps,
       measurementWindowSec,

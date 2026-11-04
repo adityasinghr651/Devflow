@@ -134,6 +134,7 @@ export class TestCoordinator {
             method: this.run.method,
             headers: this.run.headers,
             body: this.run.body,
+            assertions: this.run.assertions,
             timeoutMs: this.run.timeoutMs || config.requestTimeoutMs || 5000,
             allowLocalTargets: config.allowLocalTargets,
           },
@@ -296,6 +297,7 @@ export class TestCoordinator {
     let timeoutCount = 0;
     let networkErrorCount = 0;
     let redirectBlockedCount = 0;
+    let assertionFailureCount = 0;
     let cancelledCount = 0;
     let firstRequestStartedAt = null;
     let lastRequestCompletedAt = null;
@@ -312,6 +314,7 @@ export class TestCoordinator {
         timeoutCount += Number(data.timeoutCount) || 0;
         networkErrorCount += Number(data.networkErrorCount) || 0;
         redirectBlockedCount += Number(data.redirectBlockedCount) || 0;
+        assertionFailureCount += Number(data.assertionFailureCount) || 0;
         cancelledCount += Number(data.cancelledCount) || 0;
         if (Number.isFinite(data.firstRequestStartedAt)) {
           firstRequestStartedAt = firstRequestStartedAt === null
@@ -361,6 +364,7 @@ export class TestCoordinator {
       timeoutCount,
       networkErrorCount,
       redirectBlockedCount,
+      assertionFailureCount,
       cancelledCount,
       statusCodes,
       engine: 'node',

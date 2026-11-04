@@ -174,6 +174,7 @@ runsRouter.post('/runs', authenticateToken, async (req, res, next) => {
       body,
       timeoutMs,
       workerCount,
+      assertions,
     } = validation.data;
 
     // Sanitize headers to prevent persisting sensitive tokens / credentials in DB/reports
@@ -194,6 +195,8 @@ runsRouter.post('/runs', authenticateToken, async (req, res, next) => {
       body: body || null,
       timeoutMs,
       workerCount: workerCount || 1,
+      assertions,
+      assertionFailureCount: 0,
       status: 'queued',
       startedAt: new Date().toISOString(),
       totalRequests: 0,
