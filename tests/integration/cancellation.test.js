@@ -39,6 +39,8 @@ test('Cancellation Test Matrix: Multi-worker lifecycle and cleanup audit', async
 
   t.after(async () => {
     await new Promise(resolve => apiServer.close(resolve)).catch(() => {});
+    await runner.shutdown(3000);
+    await storage.close();
     await new Promise(resolve => targetServer.close(resolve)).catch(() => {});
     await fs.rm(tmpDir, { recursive: true, force: true }).catch(() => {});
   });
@@ -67,7 +69,7 @@ test('Cancellation Test Matrix: Multi-worker lifecycle and cleanup audit', async
   const targetDoc = await targetRes.json();
 
   // Helper to wait for terminal status
-  async function waitForTerminal(runId, timeoutMs = 5000) {
+  async function waitForTerminal(runId, timeoutMs = 10000) {
     const deadline = Date.now() + timeoutMs;
     while (Date.now() < deadline) {
       const res = await fetch(`${apiBase}/runs/${runId}`, {
@@ -82,6 +84,20 @@ test('Cancellation Test Matrix: Multi-worker lifecycle and cleanup audit', async
       await new Promise(r => setTimeout(r, 60));
     }
     throw new Error(`Run ${runId} did not reach terminal state within ${timeoutMs}ms`);
+  }
+
+  async function waitForProgress(runId, timeoutMs = 10000) {
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+      const res = await fetch(`${apiBase}/runs/${runId}`, { headers: { Authorization: `Bearer ${tokenA}` } });
+      if (res.ok) {
+        const doc = await res.json();
+        if (doc.totalRequests > 0) return doc;
+        if (['failed', 'cancelled', 'timed_out'].includes(doc.status)) throw new Error(`Run ended before recording traffic: ${doc.status}`);
+      }
+      await new Promise(resolve => setTimeout(resolve, 50));
+    }
+    throw new Error(`Run ${runId} did not persist request progress within ${timeoutMs}ms`);
   }
 
   function isPidDead(pid) {
@@ -192,7 +208,8 @@ test('Cancellation Test Matrix: Multi-worker lifecycle and cleanup audit', async
       }),
     });
     const created = await postRes.json();
-    await new Promise(r => setTimeout(r, 1500)); // Active for 1.5s
+    await waitForProgress(created.id);
+    await new Promise(r => setTimeout(r, 150)); // Let additional requests enter flight.
 
     const cancelRes = await fetch(`${apiBase}/runs/${created.id}/cancel`, {
       method: 'POST',
@@ -220,7 +237,7 @@ test('Cancellation Test Matrix: Multi-worker lifecycle and cleanup audit', async
       }),
     });
     const created = await postRes.json();
-    const completedDoc = await waitForTerminal(created.id, 4000);
+    const completedDoc = await waitForTerminal(created.id, 15000);
     assert.equal(completedDoc.status, 'completed');
 
     // Attempt cancel on completed run

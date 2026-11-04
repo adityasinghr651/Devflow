@@ -20,6 +20,20 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  packaging-quickstart:
+    name: Packaging and quickstart (Node 22)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Run clean-install quickstart
+        run: bash tools/quickstart-check.sh
+      - name: Check local documentation links
+        run: node tools/check-doc-links.js
+
   postgres-integration:
     name: PostgreSQL migrations and integration
     runs-on: ubuntu-latest
@@ -57,15 +71,18 @@ jobs:
   correctness-tests:
     name: Unit & Integration Correctness Suite
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [22]
 
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Setup Node.js 22
+      - name: Setup supported Node.js version
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: ${{ matrix.node-version }}
           cache: npm
 
       - name: Install Dependencies

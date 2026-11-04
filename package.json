@@ -3,6 +3,8 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
+  "engines": { "node": ">=22 <23" },
+  "bin": { "devflow": "bin/devflow.js" },
   "scripts": {
     "dev": "vite --host 0.0.0.0 --port 3000",
     "server": "node server.js",

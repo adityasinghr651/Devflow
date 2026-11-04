@@ -1,6 +1,6 @@
 # Roadmap Progress
 
-Current phase: 3   Last updated: 2026-11-04T12:22:07Z   Branch: roadmap/phase-3-reliability   HEAD: 888ab51
+Current phase: 4   Last updated: 2026-11-04T13:33:07Z   Branch: roadmap/phase-4-packaging   HEAD: bde3c7e
 
 ## Phase table
 
@@ -10,7 +10,7 @@ Current phase: 3   Last updated: 2026-11-04T12:22:07Z   Branch: roadmap/phase-3-
 | 1 | done | PASS; V1–V6 passed five times, all standard checks passed, 3 full-suite passes, no leaked processes | [evidence/phase-1.md](evidence/phase-1.md) |
 | 2 | done | PASS; lint/build, all 30 files, three full-suite passes, audit clean | [evidence/phase-2.md](evidence/phase-2.md) |
 | 3 | done | PASS; real 30-minute soak, PostgreSQL, chaos, lint/build, 28 files, 3 full-suite passes | [evidence/phase-3.md](evidence/phase-3.md) |
-| 4 | todo | not run | — |
+| 4 | done | PASS; CLI/Action contract, API contract, quickstart, 30 per-file test runs, 3 full-suite passes; Docker NOT VERIFIED | [evidence/phase-4.md](evidence/phase-4.md) |
 | 5 | todo | not run | — |
 | 6 | skipped | not approved in runbook | — |
 
@@ -54,6 +54,16 @@ Current phase: 3   Last updated: 2026-11-04T12:22:07Z   Branch: roadmap/phase-3-
 - [x] T3.7 All four worker indexes and server SIGKILL/restart are covered; PostgreSQL pool outage/recovery test passes.
 - [x] T3.8 Per-user terminal retention is implemented and verified in JSON and local PostgreSQL tests.
 - [x] T3.1–T3.8 Phase 3 complete; gate evidence is recorded in [phase-3 evidence](evidence/phase-3.md)
+- [x] T4.1 Multi-stage non-root API image, Nginx dashboard image, Compose/PostgreSQL, health checks, and complete environment template added; Docker runtime NOT VERIFIED because Docker is unavailable.
+- [x] T4.2 `devflow run` CLI supports `-c`/`--config`, API URL, token, wait, JSON output, clear validation, summary counts, and exit codes; success/error behavior tested.
+- [x] T4.3 Composite GitHub Action invokes CLI against an existing API, uploads JSON result, and upserts a single PR comment; action contract test and example added.
+- [x] T4.4 Handwritten OpenAPI covers route paths and methods; divergence test passes; `/api/v1` works and `/api` returns deprecation headers.
+- [x] T4.5 Quickstart, concepts, metrics, CLI, Action, API, Mermaid architecture, limits/safety, troubleshooting, FAQ, and k6 comparison documented.
+- [x] T4.6 Contributing, Code of Conduct, Security Policy, issue/PR templates, changelog, and tag-to-GitHub-release workflow added; no npm publishing. License decision remains in [HUMAN_ACTIONS](HUMAN_ACTIONS.md).
+- [x] T4.7 Local target config and sample GitHub workflow added.
+- [x] T4.8 Clean-install quickstart passed locally in 30 seconds; CI job and local link checker added.
+- [x] T4.9 Declared Node 22.x support and CI matrix aligned to it.
+- [x] T4.1–T4.9 Phase 4 complete; gate evidence is recorded in [phase-4 evidence](evidence/phase-4.md)
 
 ## Decision log
 

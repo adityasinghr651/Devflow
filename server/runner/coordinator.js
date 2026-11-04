@@ -216,8 +216,9 @@ export class TestCoordinator {
         this._handleWorkerFailure(workerIndex, `Worker ${workerIndex} sent an invalid completion payload.`);
         return;
       }
-      if (worker && worker.state !== 'completed') {
-        worker.state = 'completed';
+      if (worker && !worker.summary) {
+        // Keep the worker active until its OS process exits. The completion IPC can
+        // arrive before process.exit(0), and shutdown must not resolve in that gap.
         worker.summary = msg.data;
         if (msg.data.histogram) {
           try {

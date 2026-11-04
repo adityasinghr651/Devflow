@@ -1,0 +1,47 @@
+name: DevFlow performance check
+description: Run a DevFlow workload against an existing server and publish its JSON report.
+inputs:
+  api-url:
+    description: DevFlow API URL, for example https://devflow.example/api/v1
+    required: true
+  token:
+    description: DevFlow API bearer token
+    required: true
+  config:
+    description: Path to a DevFlow run configuration JSON file
+    required: true
+  github-token:
+    description: Token used to create or update the pull request comment
+    required: false
+    default: ${{ github.token }}
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      env:
+        DEVFLOW_API: ${{ inputs.api-url }}
+        DEVFLOW_TOKEN: ${{ inputs.token }}
+        DEVFLOW_CONFIG: ${{ inputs.config }}
+      run: node "$GITHUB_ACTION_PATH/bin/devflow.js" run --config "$GITHUB_WORKSPACE/$DEVFLOW_CONFIG" --api "$DEVFLOW_API" --token "$DEVFLOW_TOKEN" --json > "$GITHUB_WORKSPACE/devflow-result.json"
+    - uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: devflow-result
+        path: ${{ github.workspace }}/devflow-result.json
+        if-no-files-found: ignore
+    - uses: actions/github-script@v7
+      if: always() && github.event_name == 'pull_request' && inputs.github-token != ''
+      with:
+        github-token: ${{ inputs.github-token }}
+        script: |
+          const fs = require('fs');
+          const marker = '<!-- devflow-performance-result -->';
+          const file = `${process.env.GITHUB_WORKSPACE}/devflow-result.json`;
+          const report = fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : 'Run failed before producing a result.';
+          const body = `${marker}\n## DevFlow performance result\n\n\\`\\`\\`json\n${report}\n\\`\\`\\``;
+          const { owner, repo } = context.repo;
+          const issue_number = context.issue.number;
+          const comments = await github.rest.issues.listComments({ owner, repo, issue_number });
+          const existing = comments.data.find(comment => comment.body.includes(marker));
+          if (existing) await github.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body });
+          else await github.rest.issues.createComment({ owner, repo, issue_number, body });

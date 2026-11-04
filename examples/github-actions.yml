@@ -1,0 +1,16 @@
+name: Performance check
+on: [pull_request]
+jobs:
+  devflow:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: adityasinghr651/Devflow@main
+        with:
+          api-url: ${{ secrets.DEVFLOW_API_URL }}
+          token: ${{ secrets.DEVFLOW_TOKEN }}
+          config: examples/devflow.config.json
+          github-token: ${{ secrets.GITHUB_TOKEN }}

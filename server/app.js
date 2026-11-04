@@ -20,6 +20,13 @@ export function createApp() {
     next();
   });
   app.use(express.json({ limit: '64kb', strict: true }));
+  app.use((req, res, next) => {
+    if (req.path === '/api' || (req.path.startsWith('/api/') && !req.path.startsWith('/api/v1/'))) {
+      res.setHeader('Deprecation', 'true');
+      res.setHeader('Sunset', '2027-11-04');
+    }
+    next();
+  });
 
   // Security headers & CORS
   app.use((req, res, next) => {
@@ -43,10 +50,12 @@ export function createApp() {
   });
 
   // Mount API routers
-  app.use('/api', healthRouter);
-  app.use('/api', authRouter);
-  app.use('/api', targetsRouter);
-  app.use('/api', runsRouter);
+  for (const prefix of ['/api', '/api/v1']) {
+    app.use(prefix, healthRouter);
+    app.use(prefix, authRouter);
+    app.use(prefix, targetsRouter);
+    app.use(prefix, runsRouter);
+  }
 
   // Error handling middleware
   app.use((err, req, res, _next) => {

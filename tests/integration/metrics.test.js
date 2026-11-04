@@ -241,8 +241,14 @@ test('Metrics Correctness: Comprehensive audit against controlled test target', 
     await storage.createRun(runRecord);
     await runner.enqueueRun(runRecord);
 
-    // Wait 400ms for several requests to complete
-    await new Promise(res => setTimeout(res, 400));
+    // Wait for persisted request progress instead of relying on a fixed startup delay.
+    const progressDeadline = Date.now() + 5000;
+    let inProgress = await storage.getRunById(runId);
+    while (inProgress.totalRequests === 0 && Date.now() < progressDeadline) {
+      await new Promise(res => setTimeout(res, 50));
+      inProgress = await storage.getRunById(runId);
+    }
+    assert.ok(inProgress.totalRequests > 0, 'Run should persist completed request progress before cancellation');
 
     // Cancel the run
     const cancelResult = await runner.cancelRun(runId);
@@ -770,6 +776,8 @@ test('Metrics Correctness: Comprehensive audit against controlled test target', 
         statusCodes: { '200': 999 },
       },
     });
+    // A completion summary alone does not mean the child process has exited.
+    coord._handleWorkerExit(0, 0, null);
 
     // Worker 1 was cancelled/killed before sending complete summary
     coord.isCancelled = true;
