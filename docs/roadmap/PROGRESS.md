@@ -1,6 +1,6 @@
 # Roadmap Progress
 
-Current phase: 4   Last updated: 2026-11-04T13:33:07Z   Branch: roadmap/phase-4-packaging   HEAD: bde3c7e
+Current phase: 5 (complete; Phase 6 unapproved)   Last updated: 2026-11-04T13:57:04Z   Branch: roadmap/phase-5-regression   HEAD: cee9a52723ecce9b479ede64bd8a003d47cae28c
 
 ## Phase table
 
@@ -11,7 +11,7 @@ Current phase: 4   Last updated: 2026-11-04T13:33:07Z   Branch: roadmap/phase-4-
 | 2 | done | PASS; lint/build, all 30 files, three full-suite passes, audit clean | [evidence/phase-2.md](evidence/phase-2.md) |
 | 3 | done | PASS; real 30-minute soak, PostgreSQL, chaos, lint/build, 28 files, 3 full-suite passes | [evidence/phase-3.md](evidence/phase-3.md) |
 | 4 | done | PASS; CLI/Action contract, API contract, quickstart, 30 per-file test runs, 3 full-suite passes; Docker NOT VERIFIED | [evidence/phase-4.md](evidence/phase-4.md) |
-| 5 | todo | not run | — |
+| 5 | done | PASS; statistical model, API/CLI/Action/UI, 20-run local experiment, three full-suite passes | [evidence/phase-5.md](evidence/phase-5.md) |
 | 6 | skipped | not approved in runbook | — |
 
 ## Task checklist
@@ -64,6 +64,12 @@ Current phase: 4   Last updated: 2026-11-04T13:33:07Z   Branch: roadmap/phase-4-
 - [x] T4.8 Clean-install quickstart passed locally in 30 seconds; CI job and local link checker added.
 - [x] T4.9 Declared Node 22.x support and CI matrix aligned to it.
 - [x] T4.1–T4.9 Phase 4 complete; gate evidence is recorded in [phase-4 evidence](evidence/phase-4.md)
+- [x] T5.1 Fingerprint includes all requested workload fields and only matching completed runs form the baseline.
+- [x] T5.2 Median/MAD model, minimum Phase 1-derived changes, per-metric verdicts and deterministic edge-case tests implemented.
+- [x] T5.3 Owner-scoped API, CLI exit/output behavior, Action PR comment and fixed-percentage gate compatibility covered.
+- [x] T5.4 Comparisons view displays verdicts, bands, matching history and insufficient-data warnings.
+- [x] T5.5 20 same-config local baseline comparisons plus one injected slowdown saved with raw results and measured rates.
+- [x] Phase 5 gate passed: lint/build, 32 per-file runs, and three full-suite passes; see [phase-5 evidence](evidence/phase-5.md).
 
 ## Decision log
 
@@ -71,6 +77,7 @@ Current phase: 4   Last updated: 2026-11-04T13:33:07Z   Branch: roadmap/phase-4-
 |---|---|---|
 | Work from a dedicated `roadmap/phase-0-correctness` worktree at `phase-7-distributed-runner` | Modify the existing `main` checkout or isolate the phase work | The existing checkout contained untracked `DEVFLOW_ROADMAP_RUNBOOK.md` and `demo/` user work; isolation preserved both. |
 | Keep Node as the benchmark engine | `auto` could choose k6 for a one-worker run | The Phase 0 benchmark must compare the same runner implementation at each worker count. |
+| Set regression minima from Phase 1 variance and require three median/MAD bands | Fixed percentage or one baseline sample | The model requires both a robust-band breach and a meaningful change; error-rate uses a documented absolute floor because Phase 1 observed no failures. |
 | Keep the existing aggregate-only k6 failure result documented | Add custom k6 status/error instrumentation or remove k6 support | k6 is optional and not installed/verified here; Node is the validated engine for Phase 0. |
 | Continue Phase 1 in a dedicated roadmap worktree while leaving the dirty `main` checkout untouched | Stop until root untracked content is moved, or isolate this work | The owner explicitly said to proceed; the untracked content stays unchanged on `main`, and phase work is confined to `roadmap/phase-1-measurement-validation`. |
 | Run test files sequentially in the full suite | Keep Node's default file-level parallelism | Parallel worker-heavy integration files interfered with cancellation timing; serial files reduce cross-test CPU contention while preserving each test's own concurrency coverage. |
