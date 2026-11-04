@@ -29,7 +29,7 @@ runs:
         name: devflow-result
         path: ${{ github.workspace }}/devflow-result.json
         if-no-files-found: ignore
-    - uses: actions/github-script@v7
+    - uses: actions/github-script@v9
       if: always() && github.event_name == 'pull_request' && inputs.github-token != ''
       with:
         github-token: ${{ inputs.github-token }}
