@@ -105,6 +105,9 @@ async function runWorker({
   method,
   concurrency,
   durationSec,
+  requestTarget = null,
+  warmupSec = 0,
+  rampUpSec = 0,
   profile = 'fixed',
   stages = [],
   headers = {},
@@ -138,9 +141,12 @@ async function runWorker({
 
   const deadline = Date.now() + totalDurationSec * 1000;
   const startTime = Date.now();
+  const warmupDeadline = startTime + Math.max(0, Number(warmupSec) || 0) * 1000;
   const latencyHistogram = new LatencyHistogram();
   const statusCodes = {};
   let totalRequests = 0;
+  let issuedRequests = 0;
+  let warmupRequests = 0;
   let successCount = 0;
   let failedCount = 0;
   let httpErrorCount = 0;
@@ -199,8 +205,11 @@ async function runWorker({
           statusCodes: { ...statusCodes },
           currentConcurrency: currentActiveConcurrency,
           currentStageIndex: hasStages ? currentStageIndex : null,
+          warmupRequests,
           elapsedSec: Number(elapsedSec.toFixed(1)),
-          progressPercent: Math.min(100, Number(((elapsedSec / totalDurationSec) * 100).toFixed(1))),
+          progressPercent: requestTarget
+            ? Math.min(100, Number(((totalRequests / requestTarget) * 100).toFixed(1)))
+            : Math.min(100, Number(((elapsedSec / totalDurationSec) * 100).toFixed(1))),
           heapUsedBytes: process.memoryUsage().heapUsed,
         },
       });
@@ -208,7 +217,7 @@ async function runWorker({
   }
 
   async function workerSlot(slotIndex) {
-    while (Date.now() < deadline && !isCancelled) {
+    while ((requestTarget !== null ? (Date.now() < warmupDeadline || issuedRequests < requestTarget) : Date.now() < deadline) && !isCancelled) {
       const nowSec = (Date.now() - startTime) / 1000;
 
       if (hasStages) {
@@ -221,6 +230,21 @@ async function runWorker({
           await new Promise(r => setTimeout(r, 60));
           continue;
         }
+      }
+
+      if (rampUpSec > 0) {
+        const rampProgress = Math.min(1, Math.max(0, (Date.now() - warmupDeadline) / (rampUpSec * 1000)));
+        const rampConcurrency = Math.max(1, Math.ceil(peakConcurrency * rampProgress));
+        if (slotIndex >= rampConcurrency) {
+          await new Promise(r => setTimeout(r, 25));
+          continue;
+        }
+      }
+
+      const isWarmupRequest = requestTarget !== null && Date.now() < warmupDeadline;
+      if (requestTarget !== null && !isWarmupRequest) {
+        if (issuedRequests >= requestTarget) break;
+        issuedRequests++;
       }
 
       const reqStart = performance.now();
@@ -248,27 +272,33 @@ async function runWorker({
 
         const response = await fetch(url, fetchOptions);
         code = String(response.status);
-        const expectedStatus = assertions.status !== undefined ? response.status === assertions.status : response.ok;
-        const assertionsPass = expectedStatus ? await responseAssertionsPass(response, { ...assertions, status: undefined }) : (await response.body?.cancel().catch(() => {}), false);
-        if (expectedStatus && !assertionsPass) {
-          assertionFailureCount++;
-          failedCount++;
-        }
+        if (isWarmupRequest) {
+          await response.body?.cancel().catch(() => {});
+        } else {
+          const expectedStatus = assertions.status !== undefined ? response.status === assertions.status : response.ok;
+          const assertionsPass = expectedStatus ? await responseAssertionsPass(response, { ...assertions, status: undefined }) : (await response.body?.cancel().catch(() => {}), false);
+          if (expectedStatus && !assertionsPass) {
+            assertionFailureCount++;
+            failedCount++;
+          }
 
-        if (expectedStatus && assertionsPass) {
-          successCount++;
-        } else if (!expectedStatus && !response.ok) {
-          httpErrorCount++;
-          failedCount++;
-        } else if (!expectedStatus) {
-          assertionFailureCount++;
-          failedCount++;
+          if (expectedStatus && assertionsPass) {
+            successCount++;
+          } else if (!expectedStatus && !response.ok) {
+            httpErrorCount++;
+            failedCount++;
+          } else if (!expectedStatus) {
+            assertionFailureCount++;
+            failedCount++;
+          }
         }
       } catch (err) {
         if (err.name === 'AbortError' && isCancelled) {
           code = 'cancelled';
           cancelledCount++;
           isAbortedReq = true;
+        } else if (isWarmupRequest) {
+          code = 'warmup_error';
         } else if (err.name === 'TimeoutError') {
           code = 'timeout';
           timeoutCount++;
@@ -287,12 +317,17 @@ async function runWorker({
         abortController.signal.removeEventListener('abort', abortForRun);
       }
 
-      statusCodes[code] = (statusCodes[code] || 0) + 1;
+      if (!isWarmupRequest) statusCodes[code] = (statusCodes[code] || 0) + 1;
 
       // Cancelled in-flight requests must NOT be recorded in latency histogram
       // and must NOT be in totalRequests (denominator for error rate).
       if (!isAbortedReq) {
         const elapsed = Math.max(0, performance.now() - reqStart);
+        if (isWarmupRequest) {
+          warmupRequests++;
+          sendProgress();
+          continue;
+        }
         latencyHistogram.record(elapsed);
         totalRequests++;
         firstRequestStartedAt = firstRequestStartedAt === null
@@ -322,6 +357,7 @@ async function runWorker({
   const finalSummary = {
     workerIndex,
     totalRequests,
+    warmupRequests,
     successCount,
     failedCount,
     httpErrorCount,
@@ -337,6 +373,7 @@ async function runWorker({
     p50: latencyHistogram.getPercentile(0.50),
     p95: latencyHistogram.getPercentile(0.95),
     p99: latencyHistogram.getPercentile(0.99),
+    meanLatency: latencyHistogram.totalCount ? Number((latencyHistogram.sumLatency / latencyHistogram.totalCount).toFixed(2)) : null,
     errorRate: totalRequests ? Number(((failedCount / totalRequests) * 100).toFixed(4)) : 0,
     status: isCancelled ? 'cancelled' : 'completed',
     finishedAt: new Date().toISOString(),

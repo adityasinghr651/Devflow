@@ -43,6 +43,9 @@ export function partitionWorkload(runConfig, workerCount = 1) {
 
   const baseConcurrency = Number(runConfig.concurrency) || 1;
   const concurrencySlices = partitionInteger(baseConcurrency, count);
+  const requestTargetSlices = Number.isInteger(runConfig.requestTarget)
+    ? partitionInteger(runConfig.requestTarget, count)
+    : null;
 
   const isStages = runConfig.profile === 'stages' && Array.isArray(runConfig.stages) && runConfig.stages.length > 0;
 
@@ -70,6 +73,7 @@ export function partitionWorkload(runConfig, workerCount = 1) {
       workerIndex,
       workerCount: count,
       concurrency: sliceConcurrency,
+      ...(requestTargetSlices ? { requestTarget: requestTargetSlices[workerIndex] } : {}),
       stages: workerStages,
       isSlice: true,
     };

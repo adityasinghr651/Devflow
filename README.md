@@ -105,6 +105,47 @@ The preview below illustrates an active load test against `http://127.0.0.1:5050
 
 ---
 
+## 1M Request Benchmark Campaign
+
+Benchmark Campaigns runs four separate quota based tests through DevFlow's existing worker coordinator: **250,000**, **500,000**, **750,000**, then **1,000,000** measured requests. Every stage receives a new run ID and fresh worker processes. Warm-up requests are shown separately from the measured request quota. The campaign stops on a failed, cancelled, incomplete, or quality threshold failing stage.
+
+### Run from the UI
+
+Start the local app with `npm run dev:all`, sign in, and open **Benchmark Campaigns**. Select a saved authorized target, enter concurrency for each stage, configure workers, timeout, optional warm-up and ramp-up, then confirm authorization. Stage 1 starts after creation. Each later stage waits for your explicit approval after its report is persisted. You can cancel a running campaign or retry the current failed stage. The report button downloads the saved JSON report for any stage with a result, including partial failed results.
+
+Stage success requires the exact measured request target, internally consistent response and histogram counts, complete worker summaries, valid persisted metrics, a saved report, and an error rate within the configured maximum. A technically finished run that exceeds that threshold is shown as `completed with errors` and stops progression. No cross-stage RPS or latency values are fabricated; Stage 1 reports that no prior stage is available.
+
+### Opt-in controlled local campaign
+
+The opt-in command requires `--confirm-large`, authenticates to the local DevFlow API, and targets only the controlled loopback test server at `127.0.0.1:5050`. It creates or reuses that local target, runs each stage through the same API and real worker processes as the UI, writes each persisted report under `benchmarks/results/`, and asks for approval before each next stage. Start the app and target first:
+
+```bash
+npm ci
+Copy-Item .env.example .env
+npm run dev:all
+```
+
+In a second terminal, set credentials and explicit workload settings, then start the campaign:
+
+```powershell
+$env:DEVFLOW_EMAIL = "your-local-account@example.com"
+$env:DEVFLOW_PASSWORD = "your-local-password"
+$env:DEVFLOW_CAMPAIGN_CONCURRENCY = "4,8,12,16"
+$env:DEVFLOW_CAMPAIGN_WORKERS = "4"
+npm run bench:campaign -- --confirm-large --path /health --method GET
+```
+
+The concurrency values above are an example profile only; choose values suitable for your machine and the controlled target. Optional inputs include `--timeout-ms`, `--warmup-sec`, `--ramp-up-sec`, `--max-error-rate`, `--output`, and `DEVFLOW_CAMPAIGN_HEADERS` (JSON). To use an existing session token instead of email/password, set `DEVFLOW_TOKEN`. Press Ctrl+C to request cancellation of the active campaign stage.
+
+### Measurement and limitations
+
+- The bounded HDR histogram remains fixed size; no raw per-request samples are retained. Workers reserve their assigned request quota before starting each HTTP call, preventing concurrency from exceeding the stage's target.
+- Stage reports use persisted run summaries and include the target/method, per-stage concurrency, worker count, request timeout, warm-up and ramp-up settings, actual and planned requests, response errors, RPS, latency percentiles, minimum/maximum/mean latency, validation, environment metadata, and comparison to the previous successful stage. CPU model and host memory are recorded; live CPU and memory utilization are not yet sampled.
+- Reports are persisted with the owner scoped campaign record and downloadable as JSON. A server restart marks an interrupted stage failed and preserves its partial run and report for inspection/retry.
+- A million requests is an opt-in manual benchmark, never part of the normal test suite. Results depend on the target, machine, network, Node version, concurrency, and workers. **No 1M benchmark result is claimed until a real campaign has been run and its saved reports reviewed.**
+
+---
+
 ## Quickstart
 
 ### Prerequisites

@@ -48,6 +48,11 @@ export type Run = {
   method: string;
   concurrency: number;
   durationSec: number;
+  requestTarget?: number | null;
+  warmupSec?: number;
+  rampUpSec?: number;
+  warmupRequests?: number;
+  histogramSampleCount?: number;
   workerCount?: number;
   engine?: string;
   assertions?: Record<string, unknown>;
@@ -83,12 +88,47 @@ export type Run = {
   p99: number;
   minLatency?: number | null;
   maxLatency?: number | null;
+  meanLatency?: number | null;
   tiers?: HistogramTiers;
   errorRate: number;
   statusCodes: Record<string, number>;
   error?: string;
   currentConcurrency?: number;
   progressPercent?: number;
+};
+
+export type BenchmarkCampaignStage = {
+  number: number;
+  requestTarget: number;
+  concurrency: number;
+  status: string;
+  runIds: string[];
+  currentRunId?: string;
+  startedAt?: string | null;
+  finishedAt?: string | null;
+  error?: string | null;
+  report?: Record<string, any> | null;
+};
+
+export type BenchmarkCampaign = {
+  id: string;
+  name: string;
+  targetId: string;
+  targetName: string;
+  path: string;
+  method: string;
+  concurrency: number;
+  stageConcurrency: number[];
+  workerCount: number;
+  timeoutMs: number;
+  warmupSec: number;
+  rampUpSec: number;
+  maxErrorRatePercent: number;
+  status: string;
+  currentStage: number;
+  currentRunId?: string | null;
+  error?: string | null;
+  stages: BenchmarkCampaignStage[];
 };
 
 export type RegressionMetric = {

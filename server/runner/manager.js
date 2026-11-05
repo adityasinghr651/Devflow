@@ -70,7 +70,11 @@ export class RunnerManager {
       console.warn(`[RunnerManager] Run ${run.id} is already dispatched. Ignoring duplicate enqueue.`);
       return run;
     }
-    this.executionInputs.set(run.id, { headers: run.headers || {} });
+    this.executionInputs.set(run.id, {
+      headers: run.headers || {},
+      ...(run.body !== undefined ? { body: run.body } : {}),
+      ...(run.maxWallDurationSec !== undefined ? { maxWallDurationSec: run.maxWallDurationSec } : {}),
+    });
     this.dispatchedRuns.add(run.id);
     this.queue.push(run.id);
     void this._processNext();
@@ -269,7 +273,7 @@ export class RunnerManager {
 
       const enginePref = (process.env.RUNNER_ENGINE || config.runnerEngine || 'auto').toLowerCase();
       const hasAssertions = run.assertions && Object.keys(run.assertions).length > 0;
-      const canUseK6 = !hasAssertions && enginePref !== 'node' && (enginePref === 'k6' || (await isK6Available(config.k6Bin)));
+      const canUseK6 = !run.requestTarget && !hasAssertions && enginePref !== 'node' && (enginePref === 'k6' || (await isK6Available(config.k6Bin)));
 
       const engine = canUseK6 && run.profile !== 'stages' && (!run.workerCount || run.workerCount === 1)
         ? 'k6' : 'node';

@@ -87,6 +87,38 @@ paths:
     get:
       parameters: [{in: path, name: id, required: true, schema: {type: string}}, {in: query, name: ticket, schema: {type: string}}]
       responses: {'200': {description: Server-sent events}, '401': {description: Invalid stream credentials}}
+  /campaigns:
+    get:
+      responses: {'200': {description: Owner-scoped benchmark campaigns}}
+    post:
+      requestBody:
+        required: true
+        content: {application/json: {schema: {type: object, required: [targetId, stageConcurrency, workerCount, authorized], properties: {name: {type: string}, targetId: {type: string}, path: {type: string}, method: {type: string}, stageConcurrency: {type: array, minItems: 4, maxItems: 4, items: {type: integer, minimum: 1, maximum: 20}}, workerCount: {type: integer, enum: [1, 2, 4]}, timeoutMs: {type: integer}, warmupSec: {type: integer}, rampUpSec: {type: integer}, maxErrorRatePercent: {type: number}, authorized: {type: boolean}}}}}
+      responses: {'201': {description: Campaign created}, '400': {description: Invalid campaign settings}, '403': {description: Target authorization required}}
+  /campaigns/{id}:
+    get:
+      parameters: [{in: path, name: id, required: true, schema: {type: string}}]
+      responses: {'200': {description: Owner-scoped campaign and persisted stage reports}, '404': {description: Not found}}
+  /campaigns/{id}/start:
+    post:
+      parameters: [{in: path, name: id, required: true, schema: {type: string}}]
+      responses: {'202': {description: First stage started}, '409': {description: Campaign is not startable}}
+  /campaigns/{id}/advance:
+    post:
+      parameters: [{in: path, name: id, required: true, schema: {type: string}}]
+      responses: {'202': {description: Approved next stage started}, '409': {description: Stage approval unavailable}}
+  /campaigns/{id}/retry:
+    post:
+      parameters: [{in: path, name: id, required: true, schema: {type: string}}]
+      responses: {'202': {description: Failed stage retry started}, '409': {description: Stage is not retryable}}
+  /campaigns/{id}/cancel:
+    post:
+      parameters: [{in: path, name: id, required: true, schema: {type: string}}]
+      responses: {'200': {description: Cancellation requested}, '409': {description: Campaign is not active}}
+  /campaigns/{id}/stages/{stageNumber}/report:
+    get:
+      parameters: [{in: path, name: id, required: true, schema: {type: string}}, {in: path, name: stageNumber, required: true, schema: {type: integer, minimum: 1, maximum: 4}}]
+      responses: {'200': {description: Downloadable persisted stage report}, '404': {description: Report unavailable}}
 components:
   securitySchemes:
     bearerAuth: {type: http, scheme: bearer, bearerFormat: JWT}

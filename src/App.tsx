@@ -29,6 +29,7 @@ import { ComparisonsView } from './components/views/ComparisonsView.tsx';
 import { DocsView } from './components/views/DocsView.tsx';
 import { SettingsView } from './components/views/SettingsView.tsx';
 import { LiveMetricsView } from './components/views/LiveMetricsView.tsx';
+import { BenchmarkCampaignsView } from './components/views/BenchmarkCampaignsView.tsx';
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:4000/api';
 const fmt = (n: number) => new Intl.NumberFormat('en-US').format(n || 0);
@@ -167,6 +168,8 @@ const ROUTE_MAP: Record<string, string> = {
   'reports': 'History',
   'analysis': 'Performance Analysis',
   'comparisons': 'Comparisons',
+  'campaigns': 'Benchmark Campaigns',
+  'benchmark-campaigns': 'Benchmark Campaigns',
   'docs': 'Documentation',
   'documentation': 'Documentation',
   'settings': 'Settings',
@@ -183,6 +186,7 @@ const PAGE_TO_HASH: Record<string, string> = {
   'Reports': '/history',
   'Performance Analysis': '/analysis',
   'Comparisons': '/comparisons',
+  'Benchmark Campaigns': '/campaigns',
   'Documentation': '/docs',
   'Settings': '/settings',
 };
@@ -915,6 +919,8 @@ export default function App() {
                   ? 'API Targets'
                   : page === 'Test Runs'
                   ? 'Test Runs'
+                  : page === 'Benchmark Campaigns'
+                  ? '1M Request Campaigns'
                   : page === 'Live Metrics'
                   ? 'Live Metrics'
                   : page === 'History'
@@ -932,6 +938,8 @@ export default function App() {
                   ? 'Real-time telemetry streaming over Server-Sent Events.'
                   : page === 'History'
                   ? 'Durable performance snapshots and execution comparisons.'
+                  : page === 'Benchmark Campaigns'
+                  ? 'Run staged, request-counted benchmarks with validated reports and manual stage approval.'
                   : 'A modern developer platform for repeatable performance benchmarks.'}
               </p>
             </div>
@@ -1013,6 +1021,15 @@ export default function App() {
                 }
               }}
               fmt={fmt}
+            />
+          )}
+
+          {page === 'Benchmark Campaigns' && (
+            <BenchmarkCampaignsView
+              targets={targets}
+              token={token}
+              onSignIn={() => navigateTo('Login')}
+              onNotice={setNotice}
             />
           )}
 

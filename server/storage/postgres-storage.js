@@ -32,6 +32,13 @@ function mapRunFromDb(row) {
     method: row.method,
     concurrency: Number(row.concurrency),
     durationSec: Number(row.duration_sec),
+    requestTarget: row.request_target == null ? null : Number(row.request_target),
+    warmupSec: Number(row.warmup_sec || 0),
+    rampUpSec: Number(row.ramp_up_sec || 0),
+    warmupRequests: Number(row.warmup_requests || 0),
+    histogramSampleCount: Number(row.histogram_sample_count || 0),
+    campaignId: row.campaign_id || null,
+    campaignStage: row.campaign_stage == null ? null : Number(row.campaign_stage),
     profile: row.profile || 'fixed',
     stages: row.stages || [],
     headers: row.headers || {},
@@ -60,6 +67,9 @@ function mapRunFromDb(row) {
     p50: Number(Number(row.p50 || 0).toFixed(2)),
     p95: Number(Number(row.p95 || 0).toFixed(2)),
     p99: Number(Number(row.p99 || 0).toFixed(2)),
+    minLatency: row.min_latency == null ? null : Number(row.min_latency),
+    maxLatency: row.max_latency == null ? null : Number(row.max_latency),
+    meanLatency: row.mean_latency == null ? null : Number(row.mean_latency),
     errorRate: Number(Number(row.error_rate || 0).toFixed(4)),
     statusCodes: row.status_codes || {},
     error: row.error || undefined,
@@ -269,14 +279,17 @@ export class PgStorage {
         http_error_count, timeout_count, network_error_count, redirect_blocked_count, cancelled_count,
         engine, partial_workers, histogram_complete,
         rps, p50, p95, p99, error_rate, status_codes, measurement_window_sec,
-        assertions, assertion_failure_count, environment_metadata
+        assertions, assertion_failure_count, environment_metadata,
+        request_target, warmup_sec, ramp_up_sec, warmup_requests, histogram_sample_count, campaign_id, campaign_stage,
+        min_latency, max_latency, mean_latency
       ) VALUES (
         $1, $2, $3, $4, $5, $6,
         $7, $8, $9, $10, $11, $12, $13,
         $14, $15, $16, $17, $18, $19,
         $20, $21, $22, $23, $24,
         $25, $26, $27,
-        $28, $29, $30, $31, $32, $33, $34, $35, $36, $37
+        $28, $29, $30, $31, $32, $33, $34, $35, $36, $37,
+        $38, $39, $40, $41, $42, $43, $44, $45, $46, $47
       ) RETURNING *
     `;
     const res = await this.pool.query(sql, [
@@ -317,6 +330,16 @@ export class PgStorage {
       run.assertions ? JSON.stringify(run.assertions) : null,
       run.assertionFailureCount || 0,
       run.environmentMetadata ? JSON.stringify(run.environmentMetadata) : null,
+      run.requestTarget ?? null,
+      run.warmupSec || 0,
+      run.rampUpSec || 0,
+      run.warmupRequests || 0,
+      run.histogramSampleCount || 0,
+      run.campaignId || null,
+      run.campaignStage ?? null,
+      run.minLatency ?? null,
+      run.maxLatency ?? null,
+      run.meanLatency ?? null,
     ]);
     await this.pool.query(`DELETE FROM test_runs WHERE user_id = $1 AND id IN (
       SELECT id FROM test_runs WHERE user_id = $1 AND status IN ('completed', 'failed', 'cancelled', 'timed_out')
@@ -337,6 +360,11 @@ export class PgStorage {
     const mapping = {
       status: 'status',
       finishedAt: 'finished_at',
+      warmupRequests: 'warmup_requests',
+      histogramSampleCount: 'histogram_sample_count',
+      minLatency: 'min_latency',
+      maxLatency: 'max_latency',
+      meanLatency: 'mean_latency',
       totalRequests: 'total_requests',
       successCount: 'success_count',
       failedCount: 'failed_count',
@@ -402,6 +430,62 @@ export class PgStorage {
       [id, userId]
     );
     return res.rowCount > 0;
+  }
+
+  async createCampaign(campaign) {
+    await this.init();
+    const result = await this.pool.query(
+      `INSERT INTO benchmark_campaigns (id, user_id, document) VALUES ($1, $2, $3) RETURNING document`,
+      [campaign.id, campaign.userId, JSON.stringify(campaign)],
+    );
+    return result.rows[0].document;
+  }
+
+  async getCampaigns(userId) {
+    await this.init();
+    const result = userId
+      ? await this.pool.query('SELECT document FROM benchmark_campaigns WHERE user_id = $1 ORDER BY created_at DESC', [userId])
+      : await this.pool.query('SELECT document FROM benchmark_campaigns ORDER BY created_at DESC');
+    return result.rows.map(row => row.document);
+  }
+
+  async getCampaignById(id, userId = null) {
+    await this.init();
+    const result = userId
+      ? await this.pool.query('SELECT document FROM benchmark_campaigns WHERE id = $1 AND user_id = $2', [id, userId])
+      : await this.pool.query('SELECT document FROM benchmark_campaigns WHERE id = $1', [id]);
+    return result.rows[0]?.document || null;
+  }
+
+  async updateCampaign(id, updates, userId = null) {
+    await this.init();
+    const current = await this.getCampaignById(id, userId);
+    if (!current) return null;
+    const document = { ...current, ...structuredClone(updates), updatedAt: new Date().toISOString() };
+    const result = await this.pool.query(
+      `UPDATE benchmark_campaigns SET document = $1, updated_at = NOW() WHERE id = $2${userId ? ' AND user_id = $3' : ''} RETURNING document`,
+      userId ? [JSON.stringify(document), id, userId] : [JSON.stringify(document), id],
+    );
+    return result.rows[0]?.document || null;
+  }
+
+  async cleanupStaleCampaigns() {
+    await this.init();
+    const campaigns = await this.getCampaigns();
+    let cleaned = 0;
+    for (const campaign of campaigns) {
+      if (!['running', 'validating'].includes(campaign.status)) continue;
+      const stage = campaign.stages?.[campaign.currentStage];
+      if (stage && ['running', 'validating'].includes(stage.status)) {
+        stage.status = 'failed';
+        stage.error = 'Campaign interrupted by a server restart.';
+      }
+      campaign.status = 'failed';
+      campaign.error = 'Campaign interrupted by a server restart.';
+      await this.updateCampaign(campaign.id, campaign, campaign.userId);
+      cleaned++;
+    }
+    return cleaned;
   }
 
   // Cleanup runs left in-flight after abrupt server crash/restart

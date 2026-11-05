@@ -1,6 +1,7 @@
 import React from 'react';
 import {
   Activity,
+  BarChart3,
   ArrowUpRight,
   BookOpen,
   ChevronDown,
@@ -49,6 +50,7 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
     { name: 'Overview', icon: LayoutDashboard },
     { name: 'API Targets', icon: Server },
     { name: 'Test Runs', icon: Activity, badge: activeRunsCount },
+    { name: 'Benchmark Campaigns', icon: BarChart3 },
     { name: 'Live Metrics', icon: Radio },
     { name: 'History', icon: History },
     { name: 'Settings', icon: Settings },

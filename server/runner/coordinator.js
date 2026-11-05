@@ -45,7 +45,7 @@ export class TestCoordinator {
     const hasStages = run.profile === 'stages' && Array.isArray(run.stages) && run.stages.length > 0;
     this.totalDurationSec = hasStages
       ? run.stages.reduce((acc, s) => acc + s.durationSec, 0)
-      : (Number(run.durationSec) || 10);
+      : (Number(run.requestTarget) ? Number(run.maxWallDurationSec || 21600) + Number(run.warmupSec || 0) : (Number(run.durationSec) || 10));
 
     this.progressAggregator = new ProgressAggregator(this.workerCount, this.totalDurationSec);
     this.masterHistogram = new LatencyHistogram();
@@ -92,6 +92,7 @@ export class TestCoordinator {
           error: 'Execution exceeded allowable maximum run duration watchdog threshold.',
           finishedAt: new Date().toISOString(),
         }).catch(() => {});
+        this.events?.emit(`status:${this.run.id}`, { id: this.run.id, status: 'timed_out', error: 'Execution exceeded allowable maximum run duration watchdog threshold.' });
         this._resolveCompletion({ status: 'timed_out' });
       }
     }, (this.totalDurationSec * 1000) + 8000);
@@ -150,6 +151,9 @@ export class TestCoordinator {
             body: this.run.body,
             assertions: this.run.assertions,
             timeoutMs: this.run.timeoutMs || config.requestTimeoutMs || 5000,
+            requestTarget: sliceConfig.requestTarget,
+            warmupSec: this.run.warmupSec || 0,
+            rampUpSec: this.run.rampUpSec || 0,
             allowLocalTargets: config.allowLocalTargets,
           },
         });
@@ -235,7 +239,7 @@ export class TestCoordinator {
   }
 
   _validWorkerPayload(data) {
-    const counters = ['totalRequests', 'successCount', 'failedCount', 'httpErrorCount', 'timeoutCount', 'networkErrorCount', 'redirectBlockedCount', 'assertionFailureCount', 'cancelledCount'];
+    const counters = ['totalRequests', 'warmupRequests', 'successCount', 'failedCount', 'httpErrorCount', 'timeoutCount', 'networkErrorCount', 'redirectBlockedCount', 'assertionFailureCount', 'cancelledCount'];
     if (counters.some(key => data[key] !== undefined && (!Number.isFinite(data[key]) || data[key] < 0))) return false;
     if (data.heapUsedBytes !== undefined && (!Number.isFinite(data.heapUsedBytes) || data.heapUsedBytes < 0)) return false;
     if (data.histogram !== undefined) {
@@ -308,13 +312,25 @@ export class TestCoordinator {
       this.events.emit(`error:${this.run.id}`, cleanError);
     }
 
+    const partial = this.progressAggregator.getAggregatedProgress();
     const failedSummary = {
+      ...partial,
       error: cleanError,
       status: 'failed',
       finishedAt: new Date().toISOString(),
+      p50: this.masterHistogram.getPercentile(0.5),
+      p95: this.masterHistogram.getPercentile(0.95),
+      p99: this.masterHistogram.getPercentile(0.99),
+      meanLatency: this.masterHistogram.totalCount ? Number((this.masterHistogram.sumLatency / this.masterHistogram.totalCount).toFixed(2)) : null,
+      minLatency: Number.isFinite(this.masterHistogram.minLatency) ? Number(this.masterHistogram.minLatency.toFixed(2)) : null,
+      maxLatency: this.masterHistogram.maxLatency > 0 ? Number(this.masterHistogram.maxLatency.toFixed(2)) : null,
+      partialWorkers: this.workers.filter(worker => !worker.summary).map(worker => worker.id),
+      histogramComplete: false,
+      histogramSampleCount: this.masterHistogram.totalCount,
     };
 
     await this.transitionState(this.run.id, 'failed', failedSummary).catch(() => {});
+    this.events?.emit(`status:${this.run.id}`, { id: this.run.id, ...failedSummary });
     this._resolveCompletion(failedSummary);
   }
 
@@ -336,6 +352,7 @@ export class TestCoordinator {
     clearInterval(this.workerHealthInterval);
 
     let totalRequests = 0;
+    let warmupRequests = 0;
     let successCount = 0;
     let failedCount = 0;
     let httpErrorCount = 0;
@@ -353,6 +370,7 @@ export class TestCoordinator {
       const data = w.summary || this.progressAggregator.workerSnapshots.get(w.id);
       if (data) {
         totalRequests += Number(data.totalRequests) || 0;
+        warmupRequests += Number(data.warmupRequests) || 0;
         successCount += Number(data.successCount) || 0;
         failedCount += Number(data.failedCount) || 0;
         httpErrorCount += Number(data.httpErrorCount) || 0;
@@ -403,6 +421,8 @@ export class TestCoordinator {
 
     const finalSummary = {
       totalRequests,
+      warmupRequests,
+      histogramSampleCount: this.masterHistogram.totalCount,
       successCount,
       failedCount,
       httpErrorCount,
@@ -420,6 +440,7 @@ export class TestCoordinator {
       p50: this.masterHistogram.getPercentile(0.50),
       p95: this.masterHistogram.getPercentile(0.95),
       p99: this.masterHistogram.getPercentile(0.99),
+      meanLatency: this.masterHistogram.totalCount ? Number((this.masterHistogram.sumLatency / this.masterHistogram.totalCount).toFixed(2)) : null,
       minLatency: Number.isFinite(this.masterHistogram.minLatency) ? Number(this.masterHistogram.minLatency.toFixed(2)) : null,
       maxLatency: this.masterHistogram.maxLatency > 0 ? Number(this.masterHistogram.maxLatency.toFixed(2)) : null,
       tiers: this.masterHistogram.getTierSummary(),

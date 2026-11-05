@@ -2,6 +2,7 @@ import { createApp } from './server/app.js';
 import { config } from './server/config.js';
 import { getStorage } from './server/storage/index.js';
 import { getRunnerManager } from './server/runner/manager.js';
+import { getCampaignManager } from './server/routes/campaigns.js';
 
 async function bootstrap() {
   const storage = getStorage();
@@ -10,6 +11,7 @@ async function bootstrap() {
 
   const runner = getRunnerManager(storage);
   await runner.startupRecovery();
+  await getCampaignManager().recoverAfterRestart();
 
   const app = createApp();
 

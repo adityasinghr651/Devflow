@@ -15,7 +15,7 @@ export class JsonStorage {
   constructor(dataDir) {
     this.dataDir = dataDir;
     this.dataFile = path.join(dataDir, 'store.json');
-    this.store = { users: [], targets: [], runs: [], auditEvents: [] };
+    this.store = { users: [], targets: [], runs: [], campaigns: [], auditEvents: [] };
     this.writeQueue = Promise.resolve();
     this.mutationQueue = Promise.resolve();
     this.initialized = false;
@@ -31,6 +31,7 @@ export class JsonStorage {
         users: Array.isArray(parsed.users) ? parsed.users : [],
         targets: Array.isArray(parsed.targets) ? parsed.targets : [],
         runs: Array.isArray(parsed.runs) ? parsed.runs : [],
+        campaigns: Array.isArray(parsed.campaigns) ? parsed.campaigns : [],
         auditEvents: Array.isArray(parsed.auditEvents) ? parsed.auditEvents : [],
       };
     } catch (err) {
@@ -275,6 +276,51 @@ export class JsonStorage {
       .filter(event => event.userId === userId)
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
       .slice(0, boundedLimit)));
+  }
+
+  async createCampaign(campaign) {
+    return this._commit(draft => {
+      const saved = { ...structuredClone(campaign), createdAt: campaign.createdAt || new Date().toISOString(), updatedAt: new Date().toISOString() };
+      draft.campaigns.unshift(saved);
+      return { value: saved };
+    });
+  }
+
+  async getCampaigns(userId = null) {
+    await this.init();
+    return structuredClone(userId ? this.store.campaigns.filter(campaign => campaign.userId === userId) : this.store.campaigns);
+  }
+
+  async getCampaignById(id, userId = null) {
+    await this.init();
+    const campaign = this.store.campaigns.find(item => item.id === id && (!userId || item.userId === userId));
+    return campaign ? structuredClone(campaign) : null;
+  }
+
+  async updateCampaign(id, updates, userId = null) {
+    return this._commit(draft => {
+      const index = draft.campaigns.findIndex(item => item.id === id && (!userId || item.userId === userId));
+      if (index < 0) return { value: null, persist: false };
+      draft.campaigns[index] = { ...draft.campaigns[index], ...structuredClone(updates), updatedAt: new Date().toISOString() };
+      return { value: draft.campaigns[index] };
+    });
+  }
+
+  async cleanupStaleCampaigns() {
+    return this._commit(draft => {
+      let cleaned = 0;
+      for (const campaign of draft.campaigns) {
+        if (campaign.status === 'running' || campaign.status === 'validating') {
+          campaign.status = 'failed';
+          campaign.error = 'Campaign interrupted by a server restart; inspect the persisted stage run before retrying.';
+          const stage = campaign.stages?.find(item => ['running', 'validating'].includes(item.status));
+          if (stage) { stage.status = 'failed'; stage.error = campaign.error; }
+          campaign.updatedAt = new Date().toISOString();
+          cleaned++;
+        }
+      }
+      return { value: cleaned, persist: cleaned > 0 };
+    });
   }
 
   getHealthInfo() {
