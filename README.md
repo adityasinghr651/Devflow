@@ -144,6 +144,16 @@ The concurrency values above are an example profile only; choose values suitable
 - Reports are persisted with the owner scoped campaign record and downloadable as JSON. A server restart marks an interrupted stage failed and preserves its partial run and report for inspection/retry.
 - A million requests is an opt-in manual benchmark, never part of the normal test suite. Results depend on the target, machine, network, Node version, concurrency, and workers. **No 1M benchmark result is claimed until a real campaign has been run and its saved reports reviewed.**
 
+## Sign-in, demo access, and plans
+
+Email/password registration requires a 10–128 character strong password. GitHub and Google sign-in use provider authorization-code exchanges; email-only claims are rejected. Existing password accounts are not silently linked to OAuth identities.
+
+The **Try Demo** action creates a signed HttpOnly-cookie session that expires after 24 hours. Demo history is temporary and lazily removed after expiry; demo accounts are limited to 10 accepted runs per session and IP, concurrency 2, and 10-second duration. Demo traffic still passes target ownership and SSRF checks.
+
+New registered users get Free: 15 accepted runs over the account lifetime and saved history. Pro is administrator assigned, with a configurable 10,000-run lifetime quota (`PAID_RUN_QUOTA`), own-run deletion, benchmark campaigns, and duration up to the server ceiling. Admin accounts bypass per-user run quotas, can delete any finished run, and can manage users and plans. Global worker capacity still applies. See [docs/PRICING.md](docs/PRICING.md). No payment processor is connected.
+
+To bootstrap the first administrator, set `ADMIN_BOOTSTRAP_EMAIL` and `ADMIN_BOOTSTRAP_PASSWORD` in a private environment, then run `npm run admin:bootstrap`. The password must meet the same strength rules as signup. The script refuses to create an admin if one already exists. OAuth setup uses `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, and optionally `OAUTH_REDIRECT_BASE_URL` / `OAUTH_FRONTEND_SUCCESS_URL`; placeholders are listed in `.env.example`.
+
 ---
 
 ## Quickstart

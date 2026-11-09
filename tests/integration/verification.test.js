@@ -150,4 +150,11 @@ test('Target Ownership: API POST /api/targets/:id/verify workflow', async (t) =>
   const reVerifyData = await reVerifyRes.json();
   assert.equal(reVerifyData.verified, true);
   assert.equal(reVerifyData.message, 'Target is already verified.');
+
+  const unauthenticated = await fetch(`${baseUrl}/targets/${localTarget.id}/verify`, { method: 'POST' });
+  assert.equal(unauthenticated.status, 401);
+  const otherUser = await storage.createUser({ name: 'Other User', email: 'other-verifier@example.com', passwordHash: 'test-hash' });
+  const otherToken = generateToken(otherUser);
+  const nonOwner = await fetch(`${baseUrl}/targets/${localTarget.id}/verify`, { method: 'POST', headers: { Authorization: `Bearer ${otherToken}` } });
+  assert.equal(nonOwner.status, 404);
 });

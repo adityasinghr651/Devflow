@@ -365,3 +365,5 @@ export function getRunnerManager(storage) {
   }
   return runnerInstance;
 }
+
+export function setRunnerManager(instance) { runnerInstance = instance; }

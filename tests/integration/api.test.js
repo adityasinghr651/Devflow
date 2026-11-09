@@ -176,38 +176,16 @@ test('API: Full Auth and API workflow test suite', async (t) => {
   });
   assert.equal(logoutRes.status, 200);
 
-  // 14. OAuth Social Login (GitHub & Google)
-  const ghRes = await fetch(`${baseUrl}/auth/oauth`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      provider: 'github',
-      email: 'octocat@github.com',
-      name: 'The Octocat',
-      providerId: 'gh_12345',
-    }),
-  });
-  assert.equal(ghRes.status, 200);
-  const ghData = await ghRes.json();
-  assert.ok(ghData.token);
-  assert.equal(ghData.user.email, 'octocat@github.com');
-  assert.equal(ghData.user.name, 'The Octocat');
-
-  // Google OAuth sign-in with existing or new user
-  const googleRes = await fetch(`${baseUrl}/auth/oauth`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      provider: 'google',
-      email: 'alex@google.com',
-      name: 'Alex Developer',
-      providerId: 'goog_9988',
-    }),
-  });
-  assert.equal(googleRes.status, 200);
-  const googleData = await googleRes.json();
-  assert.ok(googleData.token);
-  assert.equal(googleData.user.email, 'alex@google.com');
+  // Email-only OAuth payloads are rejected; verified provider callbacks are
+  // covered by auth-flows.test.js.
+  for (const provider of ['github', 'google']) {
+    const oauthRes = await fetch(`${baseUrl}/auth/oauth`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ provider, email: 'unverified@example.com' }),
+    });
+    assert.equal(oauthRes.status, 400);
+  }
 
   // Invalid OAuth provider rejected
   const badProvider = await fetch(`${baseUrl}/auth/oauth`, {

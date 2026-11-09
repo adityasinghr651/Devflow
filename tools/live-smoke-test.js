@@ -1,5 +1,6 @@
 import http from 'node:http';
 import { execSync } from 'node:child_process';
+import { randomBytes } from 'node:crypto';
 
 const API_BASE = 'http://127.0.0.1:4000/api';
 const TARGET_BASE = 'http://127.0.0.1:5050';
@@ -23,10 +24,11 @@ async function runSmokeSuite() {
 
   // 1. Authenticate user
   const email = 'smoke-runner-' + Date.now() + '@example.com';
+  const password = `${randomBytes(24).toString('base64url')}!Aa9`;
   const regRes = await fetch(`${API_BASE}/auth/register`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name: 'Smoke Test Engineer', email, password: 'SecurePassword123!' })
+    body: JSON.stringify({ name: 'Smoke Test Engineer', email, password })
   });
   if (!regRes.ok) throw new Error(`Registration failed: ${regRes.status} ${await regRes.text()}`);
   const { user, token } = await regRes.json();

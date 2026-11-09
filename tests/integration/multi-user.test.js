@@ -30,7 +30,7 @@ test('Multi-User: Strict resource isolation and privilege escalation prevention'
   const aliceReg = await fetch(`${baseUrl}/auth/register`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name: 'Alice', email: 'alice@company.com', password: 'Password123!' }),
+    body: JSON.stringify({ name: 'Alice', email: 'alice@company.com', password: 'ValidPassword123!' }),
   });
   assert.equal(aliceReg.status, 201);
   const { token: aliceToken, user: aliceUser } = await aliceReg.json();
@@ -39,7 +39,7 @@ test('Multi-User: Strict resource isolation and privilege escalation prevention'
   const bobReg = await fetch(`${baseUrl}/auth/register`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name: 'Bob', email: 'bob@company.com', password: 'Password123!' }),
+    body: JSON.stringify({ name: 'Bob', email: 'bob@company.com', password: 'ValidPassword123!' }),
   });
   assert.equal(bobReg.status, 201);
   const { token: bobToken, user: bobUser } = await bobReg.json();

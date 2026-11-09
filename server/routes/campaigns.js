@@ -7,6 +7,9 @@ import { authenticateToken } from '../security/auth.js';
 import { config } from '../config.js';
 
 export const campaignsRouter = express.Router();
+campaignsRouter.use('/campaigns', authenticateToken, async (req, res, next) => {
+  try { const user = await getStorage().getUserById(req.user.id); if (!user || !['paid','admin'].includes(user.tier)) return res.status(403).json({ error: 'Benchmark campaigns require the Pro plan.' }); req.user.tier = user.tier; next(); } catch (error) { next(error); }
+});
 let campaignManager;
 function getCampaignManager() {
   if (!campaignManager) campaignManager = new BenchmarkCampaignManager(getStorage(), getRunnerManager(getStorage()));

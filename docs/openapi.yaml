@@ -21,7 +21,7 @@ paths:
       security: []
       requestBody:
         required: true
-        content: {application/json: {schema: {type: object, required: [name, email, password], properties: {name: {type: string}, email: {type: string, format: email}, password: {type: string, minLength: 8}}}}}
+        content: {application/json: {schema: {type: object, required: [name, email, password], properties: {name: {type: string}, email: {type: string, format: email}, password: {type: string, minLength: 10, maxLength: 128}}}}}
       responses: {'201': {description: Account created}, '400': {description: Invalid input}, '409': {description: Registration rejected}}
   /auth/login:
     post:
@@ -39,7 +39,28 @@ paths:
   /auth/oauth:
     post:
       security: []
-      responses: {'200': {description: Session token}, '400': {description: Invalid OAuth identity}}
+      responses: {'400': {description: Email claims are rejected; use authorization-code flow}}
+  /auth/oauth/{provider}/start:
+    get:
+      security: []
+      parameters: [{in: path, name: provider, required: true, schema: {type: string, enum: [github, google]}}]
+      responses: {'302': {description: Redirect to provider consent}, '503': {description: OAuth is not configured}}
+  /auth/oauth/{provider}/callback:
+    get:
+      security: []
+      parameters: [{in: path, name: provider, required: true, schema: {type: string, enum: [github, google]}}, {in: query, name: code, required: true, schema: {type: string}}, {in: query, name: state, required: true, schema: {type: string}}]
+      responses: {'303': {description: Verified provider session redirected to the frontend}, '400': {description: Invalid state or provider response}, '409': {description: Existing account needs explicit linking}}
+    post:
+      security: []
+      responses: {'200': {description: OAuth code exchange result}, '400': {description: Invalid state or code}, '409': {description: Existing account needs explicit linking}}
+  /auth/demo:
+    post:
+      security: []
+      responses: {'201': {description: HttpOnly cookie backed 24 hour demo session}, '429': {description: Rate limited}}
+  /auth/demo/logout:
+    post:
+      security: []
+      responses: {'200': {description: Demo cookie cleared}}
   /audit-events:
     get:
       responses: {'200': {description: Owner-scoped audit events}}
@@ -61,7 +82,8 @@ paths:
       responses: {'200': {description: Verified}, '400': {description: Ownership verification failed}}
   /runs:
     get:
-      responses: {'200': {description: Owner-scoped runs}}
+      parameters: [{in: query, name: limit, schema: {type: integer, minimum: 1, maximum: 100}}, {in: query, name: offset, schema: {type: integer, minimum: 0}}]
+      responses: {'200': {description: Owner-scoped paginated runs; X-Total-Count and X-Next-Offset headers describe pagination}}
     post:
       requestBody:
         required: true
@@ -71,6 +93,9 @@ paths:
     get:
       parameters: [{in: path, name: id, required: true, schema: {type: string}}]
       responses: {'200': {description: Run details}, '404': {description: Not found}}
+    delete:
+      parameters: [{in: path, name: id, required: true, schema: {type: string}}]
+      responses: {'200': {description: Deleted by Pro owner or administrator}, '403': {description: Requires Pro or Admin}, '404': {description: Not found or not owned}}
   /runs/{id}/regression:
     get:
       parameters: [{in: path, name: id, required: true, schema: {type: string}}]
@@ -119,6 +144,29 @@ paths:
     get:
       parameters: [{in: path, name: id, required: true, schema: {type: string}}, {in: path, name: stageNumber, required: true, schema: {type: integer, minimum: 1, maximum: 4}}]
       responses: {'200': {description: Downloadable persisted stage report}, '404': {description: Report unavailable}}
+  /admin/stats:
+    get:
+      responses: {'200': {description: Platform aggregate totals by tier}, '403': {description: Admin role required}}
+  /admin/users:
+    get:
+      parameters: [{in: query, name: limit, schema: {type: integer, maximum: 100}}, {in: query, name: offset, schema: {type: integer, minimum: 0}}]
+      responses: {'200': {description: Safe user list}, '403': {description: Admin role required}}
+    post:
+      requestBody:
+        required: true
+        content: {application/json: {schema: {type: object, required: [name, email, password], properties: {name: {type: string}, email: {type: string, format: email}, password: {type: string, minLength: 10}}}}}
+      responses: {'201': {description: Admin account created}, '400': {description: Invalid input}, '403': {description: Admin role required}, '409': {description: Email already exists}}
+  /admin/users/{id}/tier:
+    patch:
+      parameters: [{in: path, name: id, required: true, schema: {type: string}}]
+      requestBody:
+        required: true
+        content: {application/json: {schema: {type: object, required: [tier], properties: {tier: {type: string, enum: [free, paid, admin]}}}}}
+      responses: {'200': {description: User tier changed}, '403': {description: Admin role required}, '404': {description: User not found}}
+  /admin/runs/{id}:
+    delete:
+      parameters: [{in: path, name: id, required: true, schema: {type: string}}]
+      responses: {'200': {description: Any finished run removed}, '403': {description: Admin role required}, '404': {description: Run not found}, '409': {description: Active run cannot be deleted}}
 components:
   securitySchemes:
     bearerAuth: {type: http, scheme: bearer, bearerFormat: JWT}

@@ -49,14 +49,14 @@ test('Cancellation Test Matrix: Multi-worker lifecycle and cleanup audit', async
   const userARes = await fetch(`${apiBase}/auth/register`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name: 'User A', email: 'userA@example.com', password: 'Password123!' }),
+    body: JSON.stringify({ name: 'User A', email: 'userA@example.com', password: 'ValidPassword123!' }),
   });
   const { token: tokenA, user: userA } = await userARes.json();
 
   const userBRes = await fetch(`${apiBase}/auth/register`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name: 'User B', email: 'userB@example.com', password: 'Password123!' }),
+    body: JSON.stringify({ name: 'User B', email: 'userB@example.com', password: 'ValidPassword123!' }),
   });
   const { token: tokenB } = await userBRes.json();
 

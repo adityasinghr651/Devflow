@@ -23,7 +23,7 @@ test('Auth: Password hashing and verification', async () => {
 
   await assert.rejects(
     async () => await hashPassword('short'),
-    /Password must be at least 8 characters long/
+    /Password must be between 10 and 128 characters/
   );
 });
 

@@ -50,10 +50,11 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
     { name: 'Overview', icon: LayoutDashboard },
     { name: 'API Targets', icon: Server },
     { name: 'Test Runs', icon: Activity, badge: activeRunsCount },
-    { name: 'Benchmark Campaigns', icon: BarChart3 },
+    ...(['paid', 'admin'].includes(user?.tier || '') ? [{ name: 'Benchmark Campaigns', icon: BarChart3 }] : []),
     { name: 'Live Metrics', icon: Radio },
     { name: 'History', icon: History },
     { name: 'Settings', icon: Settings },
+    ...(user?.role === 'admin' ? [{ name: 'Admin', icon: Settings }] : []),
   ];
 
   return (
@@ -85,7 +86,7 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
           </div>
           <div className="workspace-info">
             <span className="workspace-name">{user ? `${user.name}'s Workspace` : 'ServerTest Workspace'}</span>
-            <span className="workspace-tier">{user ? user.email : 'Developer Preview'}</span>
+            <span className="workspace-tier">{user ? `${user.tier || 'free'} plan · ${user.tier === 'admin' ? 'unlimited' : `${user.lifetimeRuns || 0} used`}` : 'Sign in or try demo'}</span>
           </div>
           <ChevronDown size={13} style={{ color: 'var(--text-dim)' }} />
         </div>

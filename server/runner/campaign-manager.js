@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { decryptCampaignSecrets, encryptCampaignSecrets } from '../security/campaign-secrets.js';
 import { sanitizeHeadersForStorage } from '../security/validation.js';
+import { config } from '../config.js';
 
 export const CAMPAIGN_STAGE_TARGETS = [250_000, 500_000, 750_000, 1_000_000];
 const ACTIVE_CAMPAIGN_STATES = new Set(['pending', 'running', 'validating', 'awaiting_approval']);
@@ -162,7 +163,10 @@ export class BenchmarkCampaignManager {
         assertionFailureCount: 0, cancelledCount: 0, rps: 0, p50: 0, p95: 0, p99: 0,
         errorRate: 0, statusCodes: {},
       };
-      await this.storage.createRun(run);
+      const account = await this.storage.getUserById(campaign.userId);
+      const quotaLimit = account?.tier === 'admin' ? Infinity : config.paidRunQuota;
+      const persistedRun = await this.storage.createRun(run, { quotaLimit });
+      if (!persistedRun) throw new Error('Pro plan run quota reached.');
       stage.status = 'running'; stage.runIds.push(runId); stage.currentRunId = runId; stage.startedAt = now;
       campaign.currentStage = stageIndex; campaign.currentRunId = runId; campaign.status = 'running'; campaign.error = null;
       await this.storage.updateCampaign(campaign.id, campaign, campaign.userId);

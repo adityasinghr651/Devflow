@@ -4,7 +4,7 @@ import { Run, RunRegression } from '../../types/index.ts';
 import { Card, PanelTitle } from '../ui/Card.tsx';
 import { EmptyState } from '../ui/EmptyState.tsx';
 
-interface ComparisonsViewProps { completed: Run[]; token: string | null; }
+interface ComparisonsViewProps { completed: Run[]; token: string | null; hasMore?: boolean; onLoadMore?: () => void; }
 const API = (import.meta.env.VITE_API_URL || 'http://localhost:4000/api').replace(/\/$/, '').replace(/\/v1$/, '');
 const metricMeta = [
   { key: 'rps', label: 'Throughput', unit: 'req/s', digits: 2 },
@@ -13,7 +13,7 @@ const metricMeta = [
   { key: 'errorRate', label: 'Error rate', unit: '%', digits: 4 },
 ] as const;
 
-export const ComparisonsView: React.FC<ComparisonsViewProps> = ({ completed, token }) => {
+export const ComparisonsView: React.FC<ComparisonsViewProps> = ({ completed, token, hasMore = false, onLoadMore }) => {
   const latest = completed[0];
   const [report, setReport] = useState<RunRegression | null>(null);
   const [loading, setLoading] = useState(false);
@@ -87,6 +87,7 @@ export const ComparisonsView: React.FC<ComparisonsViewProps> = ({ completed, tok
           )}
         </div>
       )}
+      {hasMore && <div style={{ display:'flex', justifyContent:'center', padding:16 }}><button type="button" className="btn btn-secondary btn-sm" onClick={onLoadMore}>Load older comparison history</button></div>}
     </Card>
   );
 };

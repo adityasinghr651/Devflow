@@ -57,6 +57,7 @@ export const config = {
   authRateLimitMax: Number(process.env.AUTH_RATE_LIMIT_MAX || 10), // 10 attempts
   maxActiveRunsPerUser: positiveInteger('MAX_ACTIVE_RUNS_PER_USER', 3),
   maxRunsPerDay: positiveInteger('MAX_RUNS_PER_DAY', 100),
+  paidRunQuota: positiveInteger('PAID_RUN_QUOTA', 10000),
   maxVuSecondsPerDay: positiveInteger('MAX_VU_SECONDS_PER_DAY', 36000),
   dbPoolMin: Number(process.env.DB_POOL_MIN || 2),
   dbPoolMax: Number(process.env.DB_POOL_MAX || 10),

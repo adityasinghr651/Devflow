@@ -49,7 +49,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   return (
     <Modal
       title={authMode === 'login' ? 'Welcome Back to ServerTest' : 'Create Your Engineering Account'}
-      subtitle="Sign in to manage saved targets and tests, or browse a read-only demo workspace."
+      subtitle="Sign in to manage saved targets and tests, or start a temporary demo session."
       onClose={onClose}
     >
       <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }} className="modal-animate">
@@ -91,10 +91,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 </div>
                 <div>
                   <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>
-                    Instant Developer Access
+                    Try the DevFlow demo
                   </div>
                   <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                    Preview the dashboard and sample runs. Saving targets and running tests requires an account.
+                    No signup required. Demo sessions expire after 24 hours and allow 10 test runs with reduced limits.
                   </div>
                 </div>
               </div>
@@ -107,7 +107,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               onClick={handleDemoAuth}
             >
               <Zap size={14} />
-              <span>Launch Demo Workspace (1-Click)</span>
+              <span>Start Demo Session</span>
               <ArrowRight size={14} />
             </button>
           </div>
@@ -119,7 +119,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             type="button"
             className="social-btn github"
             disabled={authSubmitting}
-            onClick={() => handleSocialAuth('github', 'developer@github.com')}
+            onClick={() => handleSocialAuth('github')}
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
               <path
@@ -135,7 +135,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             type="button"
             className="social-btn google"
             disabled={authSubmitting}
-            onClick={() => handleSocialAuth('google', 'developer@gmail.com')}
+            onClick={() => handleSocialAuth('google')}
           >
             <svg width="18" height="18" viewBox="0 0 24 24">
               <path
@@ -223,13 +223,15 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               <input
                 required
                 type="password"
-                minLength={8}
+                minLength={authMode === 'register' ? 10 : 1}
+                maxLength={128}
                 className="cyber-input"
                 value={authPassword}
                 onChange={(e) => setAuthPassword(e.target.value)}
-                placeholder="Minimum 8 characters"
+                placeholder={authMode === 'register' ? '10+ characters with mixed character types' : 'Your password'}
               />
             </div>
+            {authMode === 'register' && <small>Password must include lowercase, uppercase, number, and symbol characters; common passwords are rejected.</small>}
           </label>
 
           <div className="modal-actions" style={{ marginTop: '8px' }}>

@@ -15,7 +15,7 @@ export class JsonStorage {
   constructor(dataDir) {
     this.dataDir = dataDir;
     this.dataFile = path.join(dataDir, 'store.json');
-    this.store = { users: [], targets: [], runs: [], campaigns: [], auditEvents: [] };
+    this.store = { users: [], targets: [], runs: [], campaigns: [], auditEvents: [], demoIpUsage: {} };
     this.writeQueue = Promise.resolve();
     this.mutationQueue = Promise.resolve();
     this.initialized = false;
@@ -33,7 +33,9 @@ export class JsonStorage {
         runs: Array.isArray(parsed.runs) ? parsed.runs : [],
         campaigns: Array.isArray(parsed.campaigns) ? parsed.campaigns : [],
         auditEvents: Array.isArray(parsed.auditEvents) ? parsed.auditEvents : [],
+        demoIpUsage: parsed.demoIpUsage || {},
       };
+      for (const user of this.store.users) if (user.lifetimeRuns == null) user.lifetimeRuns = this.store.runs.filter(run => run.userId === user.id).length;
     } catch (err) {
       if (err.code !== 'ENOENT') {
         throw new Error(`Could not read persisted data at ${this.dataFile}; the existing file was left untouched.`, { cause: err });
@@ -106,17 +108,28 @@ export class JsonStorage {
   }
 
   // Users
-  async createUser({ email, passwordHash, name, role = 'user' }) {
+  async createUser({ email, passwordHash, name, role = 'user', tier = 'free', plan = tier, planExpiresAt = null, oauthProvider = null, oauthProviderId = null, demoExpiresAt = null }) {
     return this._commit((draft) => {
       const existing = draft.users.find(u => u.email.toLowerCase() === email.toLowerCase());
       if (existing) throw new Error('Email already registered.');
       const user = {
-        id: randomUUID(), email: email.toLowerCase(), passwordHash, name, role,
+        id: randomUUID(), email: email.toLowerCase(), passwordHash, name, role, tier, plan, planExpiresAt, oauthProvider, oauthProviderId, demoExpiresAt, lifetimeRuns: 0,
         createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
       };
       draft.users.push(user);
-      const { id, email: savedEmail, name: savedName, role: savedRole, createdAt, updatedAt } = user;
-      return { value: { id, email: savedEmail, name: savedName, role: savedRole, createdAt, updatedAt } };
+      const { id, email: savedEmail, name: savedName, role: savedRole, tier: savedTier, plan: savedPlan, lifetimeRuns, createdAt, updatedAt } = user;
+      return { value: { id, email: savedEmail, name: savedName, role: savedRole, tier: savedTier, plan: savedPlan, lifetimeRuns, createdAt, updatedAt } };
+    });
+  }
+
+  async createFirstAdmin({ email, passwordHash, name }) {
+    return this._commit(draft => {
+      if (draft.users.some(user => user.role === 'admin' || user.tier === 'admin')) throw new Error('An administrator already exists; bootstrap is one-time only.');
+      if (draft.users.some(user => user.email.toLowerCase() === email.toLowerCase())) throw new Error('Email already registered.');
+      const user = { id: randomUUID(), email: email.toLowerCase(), passwordHash, name, role: 'admin', tier: 'admin', plan: 'admin', lifetimeRuns: 0, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+      draft.users.push(user);
+      const { passwordHash: _hash, ...safe } = user;
+      return { value: safe };
     });
   }
 
@@ -135,10 +148,22 @@ export class JsonStorage {
       email: u.email,
       name: u.name,
       role: u.role,
+      tier: u.tier || (u.role === 'admin' ? 'admin' : 'free'),
+      plan: u.plan || (u.role === 'admin' ? 'admin' : 'free'),
+      planExpiresAt: u.planExpiresAt || null,
+      demoExpiresAt: u.demoExpiresAt || null,
+      lifetimeRuns: Number(u.lifetimeRuns || 0),
       createdAt: u.createdAt,
       updatedAt: u.updatedAt,
     };
   }
+
+  async listUsers() { await this.init(); return this.store.users.map(({ passwordHash, ...u }) => ({ ...u, tier: u.tier || (u.role === 'admin' ? 'admin' : 'free'), plan: u.plan || (u.role === 'admin' ? 'admin' : 'free') })); }
+  async updateUser(id, updates) { return this._commit(draft => { const u = draft.users.find(user => user.id === id); if (!u) return { value: null, persist: false }; Object.assign(u, structuredClone(updates), { updatedAt: new Date().toISOString() }); const { passwordHash, ...safe } = u; return { value: safe }; }); }
+  async getPlatformStats() { await this.init(); const visibleUsers = this.store.users.filter(item => item.tier !== 'demo' || Date.parse(item.demoExpiresAt) > Date.now()); const usersByTier = {}; const runsByTier = {}; for (const user of visibleUsers) usersByTier[user.tier || (user.role === 'admin' ? 'admin' : 'free')] = (usersByTier[user.tier || (user.role === 'admin' ? 'admin' : 'free')] || 0) + 1; const visibleUserIds = new Set(visibleUsers.map(user => user.id)); const visibleRuns = this.store.runs.filter(run => visibleUserIds.has(run.userId)); for (const run of visibleRuns) { const owner = visibleUsers.find(user => user.id === run.userId); const tier = owner?.tier || (owner?.role === 'admin' ? 'admin' : 'free'); runsByTier[tier] = (runsByTier[tier] || 0) + 1; } return { totalUsers: Object.values(usersByTier).reduce((sum, value) => sum + value, 0), totalRuns: visibleRuns.length, usersByTier, runsByTier }; }
+  async getUserByOAuth(provider, providerId) { await this.init(); const u = this.store.users.find(user => user.oauthProvider === provider && user.oauthProviderId === providerId); return u ? JSON.parse(JSON.stringify(u)) : null; }
+  async getDemoIpUsage(ipHash) { await this.init(); const entry = this.store.demoIpUsage[ipHash]; return entry && Date.parse(entry.expiresAt) > Date.now() ? entry.runCount : 0; }
+  async cleanupExpiredDemoUsers(now = new Date().toISOString()) { return this._commit(draft => { const expired = new Set(draft.users.filter(user => user.tier === 'demo' && user.demoExpiresAt && Date.parse(user.demoExpiresAt) <= Date.parse(now)).map(user => user.id)); if (!expired.size) return { value: 0, persist: false }; draft.users = draft.users.filter(user => !expired.has(user.id)); draft.targets = draft.targets.filter(target => !expired.has(target.userId)); draft.runs = draft.runs.filter(run => !expired.has(run.userId)); draft.auditEvents = draft.auditEvents.filter(event => !expired.has(event.userId)); draft.demoIpUsage = Object.fromEntries(Object.entries(draft.demoIpUsage).filter(([, usage]) => Date.parse(usage.expiresAt) > Date.parse(now))); return { value: expired.size }; }); }
 
   // Targets (scoped to userId)
   async getTargets(userId = null) {
@@ -189,13 +214,14 @@ export class JsonStorage {
   }
 
   // Runs (scoped to userId)
-  async getRuns(userId = null) {
+  async getRuns(userId = null, { limit = null, offset = 0 } = {}) {
     await this.init();
     const filtered = userId
       ? this.store.runs.filter(r => r.userId === userId)
       : this.store.runs;
-    return JSON.parse(JSON.stringify(filtered));
+    return JSON.parse(JSON.stringify(limit == null ? filtered : filtered.slice(offset, offset + limit)));
   }
+  async countRuns(userId = null) { await this.init(); return userId ? this.store.runs.filter(run => run.userId === userId).length : this.store.runs.length; }
 
   async getRunById(id, userId = null) {
     await this.init();
@@ -203,8 +229,16 @@ export class JsonStorage {
     return r ? JSON.parse(JSON.stringify(r)) : null;
   }
 
-  async createRun(run) {
+  async createRun(run, { quotaLimit = Infinity, demoIpHash = null } = {}) {
     return this._commit((draft) => {
+      const user = draft.users.find(item => item.id === run.userId);
+      if (user && Number.isFinite(quotaLimit) && (user.lifetimeRuns || 0) >= quotaLimit) return { value: null, persist: false };
+      if (user && user.tier === 'demo' && demoIpHash) {
+        const ipEntry = draft.demoIpUsage[demoIpHash];
+        if (ipEntry && Date.parse(ipEntry.expiresAt) > Date.now() && ipEntry.runCount >= 10) return { value: null, persist: false };
+        draft.demoIpUsage[demoIpHash] = { runCount: (ipEntry && Date.parse(ipEntry.expiresAt) > Date.now() ? ipEntry.runCount : 0) + 1, expiresAt: user.demoExpiresAt || new Date(Date.now() + 86400000).toISOString() };
+      }
+      if (user) user.lifetimeRuns = (user.lifetimeRuns || 0) + 1;
       const fullRun = {
         ...run, id: run.id || randomUUID(), httpErrorCount: run.httpErrorCount ?? 0,
         timeoutCount: run.timeoutCount ?? 0, networkErrorCount: run.networkErrorCount ?? 0,

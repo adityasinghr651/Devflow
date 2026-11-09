@@ -16,6 +16,7 @@
     "bench:compare": "node tools/compare-benchmarks.js",
     "bench:baseline": "node tools/run-benchmark.js --ci --save-baseline",
     "bench:campaign": "node tools/run-campaign.js",
+    "admin:bootstrap": "node scripts/create-admin.js",
     "bench:scaling": "node tools/run-worker-scaling-benchmark.js",
     "soak": "node tools/soak-test.js",
     "soak:ci": "node tools/soak-test.js --ci",
