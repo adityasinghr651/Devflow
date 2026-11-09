@@ -14,8 +14,8 @@ test('Campaign creation, listing, and stage reports are authenticated and owner 
   const storage = new JsonStorage(dataDir);
   await storage.init();
   setStorage(storage);
-  const owner = await storage.createUser({ email: 'campaign-owner@example.test', passwordHash: 'hash', name: 'Owner' });
-  const other = await storage.createUser({ email: 'campaign-other@example.test', passwordHash: 'hash', name: 'Other' });
+  const owner = await storage.createUser({ email: 'campaign-owner@example.test', passwordHash: 'hash', name: 'Owner', tier: 'paid', plan: 'pro' });
+  const other = await storage.createUser({ email: 'campaign-other@example.test', passwordHash: 'hash', name: 'Other', tier: 'paid', plan: 'pro' });
   const target = await storage.createTarget({ userId: owner.id, name: 'Local target', url: 'http://127.0.0.1:5050', environment: 'Local', verified: false });
   const server = createApp().listen(0, '127.0.0.1');
   await new Promise(resolve => server.once('listening', resolve));

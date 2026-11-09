@@ -3,6 +3,9 @@ export type User = {
   email: string;
   name: string;
   role: string;
+  tier?: 'demo' | 'free' | 'paid' | 'admin';
+  plan?: string;
+  lifetimeRuns?: number;
 };
 
 export type Target = {

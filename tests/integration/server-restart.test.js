@@ -48,7 +48,7 @@ test('Reliability: SIGKILL during a run is reconciled as failed after restart', 
   api = await startApi(apiPort, dataDir);
   const registration = await fetch(`${base}/auth/register`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email: 'restart@example.test', name: 'Restart Test', password: 'secure-password' }),
+    body: JSON.stringify({ email: 'restart@example.test', name: 'Restart Test', password: 'ValidRestartPassword123!' }),
   });
   assert.equal(registration.status, 201);
   const { token } = await registration.json();
@@ -106,7 +106,7 @@ test('Reliability: SIGTERM drains an active run before server exit', async t => 
   api = await startApi(apiPort, dataDir);
   const registration = await fetch(`${base}/auth/register`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email: 'shutdown@example.test', name: 'Shutdown Test', password: 'secure-password' }),
+    body: JSON.stringify({ email: 'shutdown@example.test', name: 'Shutdown Test', password: 'ValidShutdownPassword123!' }),
   });
   const { token } = await registration.json();
   const headers = { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` };

@@ -5,6 +5,7 @@ import { authRouter } from './routes/auth.js';
 import { targetsRouter } from './routes/targets.js';
 import { runsRouter } from './routes/runs.js';
 import { campaignsRouter } from './routes/campaigns.js';
+import { adminRouter } from './routes/admin.js';
 import { randomUUID } from 'node:crypto';
 
 export function createApp() {
@@ -39,10 +40,11 @@ export function createApp() {
     const origin = req.headers.origin;
     if (origin && config.corsOrigins.includes(origin)) {
       res.setHeader('Access-Control-Allow-Origin', origin);
+      res.setHeader('Access-Control-Allow-Credentials', 'true');
       res.setHeader('Vary', 'Origin');
     }
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, DELETE, OPTIONS');
 
     if (req.method === 'OPTIONS') {
       return res.sendStatus(204);
@@ -57,6 +59,7 @@ export function createApp() {
     app.use(prefix, targetsRouter);
     app.use(prefix, runsRouter);
     app.use(prefix, campaignsRouter);
+    app.use(prefix, adminRouter);
   }
 
   // Error handling middleware

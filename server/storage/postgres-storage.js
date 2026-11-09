@@ -104,23 +104,35 @@ export class PgStorage {
   }
 
   // User management
-  async createUser({ email, passwordHash, name, role = 'user' }) {
+  async createUser({ email, passwordHash, name, role = 'user', tier = 'free', plan = tier, planExpiresAt = null, oauthProvider = null, oauthProviderId = null, demoExpiresAt = null }) {
     await this.init();
     const sql = `
-      INSERT INTO users (email, password_hash, name, role)
-      VALUES ($1, $2, $3, $4)
-      RETURNING id, email, name, role, created_at, updated_at
+      INSERT INTO users (email, password_hash, name, role, tier, plan, plan_expires_at, oauth_provider, oauth_provider_id, demo_expires_at)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+      RETURNING id, email, name, role, tier, plan, lifetime_runs, created_at, updated_at
     `;
-    const res = await this.pool.query(sql, [email.toLowerCase(), passwordHash, name, role]);
+    const res = await this.pool.query(sql, [email.toLowerCase(), passwordHash, name, role, tier, plan, planExpiresAt, oauthProvider, oauthProviderId, demoExpiresAt]);
     const u = res.rows[0];
     return {
       id: u.id,
       email: u.email,
       name: u.name,
       role: u.role,
+      tier: u.tier, plan: u.plan, lifetimeRuns: Number(u.lifetime_runs || 0),
       createdAt: u.created_at.toISOString(),
       updatedAt: u.updated_at.toISOString(),
     };
+  }
+
+  async createFirstAdmin({ email, passwordHash, name }) {
+    await this.init(); const client=await this.pool.connect();
+    try {
+      await client.query('BEGIN'); await client.query("SELECT pg_advisory_xact_lock(hashtext('devflow-first-admin'))");
+      const existing=await client.query("SELECT 1 FROM users WHERE role='admin' OR tier='admin' LIMIT 1");
+      if(existing.rowCount) throw new Error('An administrator already exists; bootstrap is one-time only.');
+      const result=await client.query("INSERT INTO users(email,password_hash,name,role,tier,plan) VALUES($1,$2,$3,'admin','admin','admin') RETURNING id,email,name,role,tier,plan,lifetime_runs,created_at,updated_at",[email.toLowerCase(),passwordHash,name]);
+      await client.query('COMMIT'); const u=result.rows[0]; return {id:u.id,email:u.email,name:u.name,role:u.role,tier:u.tier,plan:u.plan,lifetimeRuns:Number(u.lifetime_runs||0),createdAt:u.created_at.toISOString(),updatedAt:u.updated_at.toISOString()};
+    } catch(error) { await client.query('ROLLBACK').catch(()=>{}); throw error; } finally { client.release(); }
   }
 
   async getUserByEmail(email) {
@@ -134,14 +146,27 @@ export class PgStorage {
       passwordHash: u.password_hash,
       name: u.name,
       role: u.role,
+      tier: u.tier || (u.role === 'admin' ? 'admin' : 'free'),
+      plan: u.plan || 'free',
+      oauthProvider: u.oauth_provider || null,
+      oauthProviderId: u.oauth_provider_id || null,
+      lifetimeRuns: Number(u.lifetime_runs || 0),
+      planExpiresAt: u.plan_expires_at?.toISOString() || null,
       createdAt: u.created_at.toISOString(),
       updatedAt: u.updated_at.toISOString(),
     };
   }
 
+  async listUsers() { await this.init(); const result = await this.pool.query('SELECT id,email,name,role,tier,plan,plan_expires_at,lifetime_runs,created_at,updated_at FROM users ORDER BY created_at DESC'); return result.rows.map(u => ({ id:u.id,email:u.email,name:u.name,role:u.role,tier:u.tier,plan:u.plan,planExpiresAt:u.plan_expires_at?.toISOString()||null,lifetimeRuns:Number(u.lifetime_runs||0),createdAt:u.created_at.toISOString(),updatedAt:u.updated_at.toISOString() })); }
+  async updateUser(id, updates) { await this.init(); const columns = { role:'role',tier:'tier',plan:'plan',planExpiresAt:'plan_expires_at' }; const entries = Object.entries(updates).filter(([key]) => columns[key]); if (!entries.length) return this.getUserById(id); const sets = entries.map(([key], i) => `${columns[key]}=$${i+2}`).join(', '); const result = await this.pool.query(`UPDATE users SET ${sets}, updated_at=NOW() WHERE id=$1 RETURNING id,email,name,role,tier,plan,plan_expires_at,lifetime_runs,created_at,updated_at`, [id,...entries.map(([,v])=>v)]); const u=result.rows[0]; return u?{id:u.id,email:u.email,name:u.name,role:u.role,tier:u.tier,plan:u.plan,planExpiresAt:u.plan_expires_at?.toISOString()||null,lifetimeRuns:Number(u.lifetime_runs||0),createdAt:u.created_at.toISOString(),updatedAt:u.updated_at.toISOString()}:null; }
+  async getPlatformStats() { await this.init(); const result = await this.pool.query(`SELECT (SELECT COUNT(*)::int FROM users WHERE tier <> 'demo' OR demo_expires_at>NOW()) total_users,(SELECT COUNT(*)::int FROM test_runs r JOIN users u ON u.id=r.user_id WHERE u.tier <> 'demo' OR u.demo_expires_at>NOW()) total_runs,(SELECT COALESCE(jsonb_object_agg(tier,cnt),'{}'::jsonb) FROM (SELECT u.tier,COUNT(r.id)::int cnt FROM users u LEFT JOIN test_runs r ON r.user_id=u.id WHERE u.tier <> 'demo' OR u.demo_expires_at>NOW() GROUP BY u.tier) t) runs_by_tier,(SELECT COALESCE(jsonb_object_agg(tier,cnt),'{}'::jsonb) FROM (SELECT tier,COUNT(*)::int cnt FROM users WHERE tier <> 'demo' OR demo_expires_at>NOW() GROUP BY tier) t) users_by_tier`); const r=result.rows[0]; return {totalUsers:r.total_users,totalRuns:r.total_runs,runsByTier:r.runs_by_tier,usersByTier:r.users_by_tier}; }
+  async getUserByOAuth(provider, providerId) { await this.init(); const result=await this.pool.query('SELECT * FROM users WHERE oauth_provider=$1 AND oauth_provider_id=$2',[provider,providerId]); const u=result.rows[0]; return u?{id:u.id,email:u.email,passwordHash:u.password_hash,name:u.name,role:u.role,tier:u.tier,plan:u.plan,oauthProvider:u.oauth_provider,oauthProviderId:u.oauth_provider_id}:null; }
+  async getDemoIpUsage(ipHash) { await this.init(); const result=await this.pool.query('SELECT run_count FROM demo_ip_usage WHERE ip_hash=$1 AND expires_at>NOW()',[ipHash]); return Number(result.rows[0]?.run_count||0); }
+  async cleanupExpiredDemoUsers(now = new Date().toISOString()) { await this.init(); const client=await this.pool.connect(); try { await client.query('BEGIN'); await client.query("DELETE FROM audit_events WHERE user_id IN (SELECT id FROM users WHERE tier='demo' AND demo_expires_at <= $1)",[now]); const result=await client.query("DELETE FROM users WHERE tier='demo' AND demo_expires_at <= $1",[now]); await client.query('DELETE FROM demo_ip_usage WHERE expires_at <= $1',[now]); await client.query('COMMIT'); return result.rowCount; } catch(error) { await client.query('ROLLBACK').catch(()=>{}); throw error; } finally { client.release(); } }
+
   async getUserById(id) {
     await this.init();
-    const res = await this.pool.query('SELECT id, email, name, role, created_at, updated_at FROM users WHERE id = $1', [id]);
+    const res = await this.pool.query('SELECT id, email, name, role, tier, plan, plan_expires_at, demo_expires_at, lifetime_runs, created_at, updated_at FROM users WHERE id = $1', [id]);
     if (!res.rows[0]) return null;
     const u = res.rows[0];
     return {
@@ -149,6 +174,11 @@ export class PgStorage {
       email: u.email,
       name: u.name,
       role: u.role,
+      tier: u.tier || (u.role === 'admin' ? 'admin' : 'free'),
+      plan: u.plan || (u.role === 'admin' ? 'admin' : 'free'),
+      planExpiresAt: u.plan_expires_at?.toISOString() || null,
+      demoExpiresAt: u.demo_expires_at?.toISOString() || null,
+      lifetimeRuns: Number(u.lifetime_runs || 0),
       createdAt: u.created_at.toISOString(),
       updatedAt: u.updated_at.toISOString(),
     };
@@ -250,14 +280,14 @@ export class PgStorage {
   }
 
   // Run management (scoped to user)
-  async getRuns(userId) {
+  async getRuns(userId, { limit = null, offset = 0 } = {}) {
     await this.init();
-    const res = await this.pool.query(
-      'SELECT * FROM test_runs WHERE user_id = $1 ORDER BY started_at DESC',
-      [userId]
-    );
+    const res = limit == null
+      ? await this.pool.query('SELECT * FROM test_runs WHERE user_id = $1 ORDER BY started_at DESC', [userId])
+      : await this.pool.query('SELECT * FROM test_runs WHERE user_id = $1 ORDER BY started_at DESC LIMIT $2 OFFSET $3', [userId, limit, offset]);
     return res.rows.map(mapRunFromDb);
   }
+  async countRuns(userId) { await this.init(); const result=await this.pool.query('SELECT COUNT(*)::int AS total FROM test_runs WHERE user_id=$1',[userId]); return result.rows[0].total; }
 
   async getRunById(id, userId = null) {
     await this.init();
@@ -269,8 +299,18 @@ export class PgStorage {
     return mapRunFromDb(res.rows[0]);
   }
 
-  async createRun(run) {
+  async createRun(run, { quotaLimit = Infinity, demoIpHash = null } = {}) {
     await this.init();
+    const client = await this.pool.connect();
+    let createdRun;
+    await client.query('BEGIN');
+    try {
+      const quotaResult = await client.query('UPDATE users SET lifetime_runs=lifetime_runs+1 WHERE id=$1 AND ($2::integer IS NULL OR lifetime_runs < $2) RETURNING tier,demo_expires_at', [run.userId, Number.isFinite(quotaLimit) ? quotaLimit : null]);
+      if (!quotaResult.rowCount) { await client.query('ROLLBACK'); return null; }
+      if (quotaResult.rows[0].tier === 'demo' && demoIpHash) {
+        const ipResult = await client.query(`INSERT INTO demo_ip_usage(ip_hash,run_count,expires_at) VALUES($1,1,$2) ON CONFLICT(ip_hash) DO UPDATE SET run_count=CASE WHEN demo_ip_usage.expires_at>NOW() THEN demo_ip_usage.run_count+1 ELSE 1 END,expires_at=EXCLUDED.expires_at RETURNING run_count`, [demoIpHash, quotaResult.rows[0].demo_expires_at]);
+        if (ipResult.rows[0].run_count > 10) { await client.query('ROLLBACK'); return null; }
+      }
     const sql = `
       INSERT INTO test_runs (
         id, user_id, target_id, target_name, url, method,
@@ -292,7 +332,7 @@ export class PgStorage {
         $38, $39, $40, $41, $42, $43, $44, $45, $46, $47
       ) RETURNING *
     `;
-    const res = await this.pool.query(sql, [
+    createdRun = await client.query(sql, [
       run.id,
       run.userId,
       run.targetId,
@@ -341,11 +381,13 @@ export class PgStorage {
       run.maxLatency ?? null,
       run.meanLatency ?? null,
     ]);
+    await client.query('COMMIT');
+    } catch (error) { await client.query('ROLLBACK').catch(()=>{}); if (error.code === '23505') throw new Error('Email already registered.'); throw error; } finally { client.release(); }
     await this.pool.query(`DELETE FROM test_runs WHERE user_id = $1 AND id IN (
       SELECT id FROM test_runs WHERE user_id = $1 AND status IN ('completed', 'failed', 'cancelled', 'timed_out')
       ORDER BY started_at DESC OFFSET $2
     )`, [run.userId, config.maxRunsStoredPerUser]);
-    return mapRunFromDb(res.rows[0]);
+    return mapRunFromDb(createdRun.rows[0]);
   }
 
   async updateRun(id, updates) {
@@ -425,10 +467,9 @@ export class PgStorage {
 
   async deleteRun(id, userId) {
     await this.init();
-    const res = await this.pool.query(
-      'DELETE FROM test_runs WHERE id = $1 AND user_id = $2',
-      [id, userId]
-    );
+    const res = userId
+      ? await this.pool.query('DELETE FROM test_runs WHERE id = $1 AND user_id = $2', [id, userId])
+      : await this.pool.query('DELETE FROM test_runs WHERE id = $1', [id]);
     return res.rowCount > 0;
   }
 

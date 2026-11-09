@@ -11,9 +11,11 @@ interface ReportsViewProps {
   completed: Run[];
   exportRun: (run: Run) => void;
   fmt: (n: number) => string;
+  hasMore?: boolean;
+  onLoadMore?: () => void;
 }
 
-export const ReportsView: React.FC<ReportsViewProps> = ({ completed, exportRun, fmt }) => {
+export const ReportsView: React.FC<ReportsViewProps> = ({ completed, exportRun, fmt, hasMore = false, onLoadMore }) => {
   return (
     <Card className="full-panel page-animate">
       <PanelTitle
@@ -68,6 +70,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ completed, exportRun, 
           ))}
         </div>
       )}
+      {hasMore && <div style={{ display:'flex', justifyContent:'center', padding:16 }}><button type="button" className="btn btn-secondary btn-sm" onClick={onLoadMore}>Load older reports</button></div>}
     </Card>
   );
 };

@@ -190,3 +190,15 @@ test('Storage: malformed JSON is preserved and reported instead of replaced', as
   await assert.rejects(storage.init(), /existing file was left untouched/i);
   assert.equal(await fs.readFile(dataFile, 'utf8'), originalContent);
 });
+
+test('Storage: lifetime run quota reservation is atomic under concurrent writes', async t => {
+  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'devflow-quota-storage-'));
+  const storage = new JsonStorage(tempDir); await storage.init();
+  t.after(async () => { await fs.rm(tempDir, { recursive: true, force: true }).catch(() => {}); });
+  const user = await storage.createUser({ email:'quota@example.test',name:'Quota',passwordHash:'test-hash' });
+  const work = Array.from({length:24}, (_, index) => storage.createRun({ id:`quota-${index}`, userId:user.id,targetId:'target',targetName:'Target',url:'http://localhost/',method:'GET',concurrency:1,durationSec:1,status:'completed',totalRequests:0,successCount:0,failedCount:0,rps:0,p50:0,p95:0,p99:0,errorRate:0,statusCodes:{} }, { quotaLimit:15 }));
+  const saved = await Promise.all(work);
+  assert.equal(saved.filter(Boolean).length, 15);
+  assert.equal((await storage.getUserById(user.id)).lifetimeRuns, 15);
+  assert.equal(await storage.countRuns(user.id), 15);
+});

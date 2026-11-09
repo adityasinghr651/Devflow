@@ -10,6 +10,7 @@ import {
   Search,
   Square,
   X,
+  Trash2,
 } from 'lucide-react';
 import { Run } from '../../types/index.ts';
 import { StatusBadge } from '../ui/StatusBadge.tsx';
@@ -24,6 +25,10 @@ interface TestRunsViewProps {
   onStopRun: (id: string) => void;
   onCreateTestClick: () => void;
   fmt: (n: number) => string;
+  hasMore?: boolean;
+  onLoadMore?: () => void;
+  canDelete?: boolean;
+  onDeleteRun?: (id: string) => void;
 }
 
 export const TestRunsView: React.FC<TestRunsViewProps> = ({
@@ -35,6 +40,10 @@ export const TestRunsView: React.FC<TestRunsViewProps> = ({
   onStopRun,
   onCreateTestClick,
   fmt,
+  hasMore = false,
+  onLoadMore,
+  canDelete = false,
+  onDeleteRun,
 }) => {
   const [statusFilter, setStatusFilter] = useState<'all' | 'running' | 'completed' | 'failed'>('all');
 
@@ -259,18 +268,10 @@ export const TestRunsView: React.FC<TestRunsViewProps> = ({
                             <span>Stop</span>
                           </button>
                         ) : (
-                          <button
-                            type="button"
-                            className="btn btn-secondary btn-sm"
-                            style={{ padding: '4px 10px', fontSize: '11px' }}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onSelectRun(r);
-                            }}
-                          >
-                            <span>Inspect</span>
-                            <ArrowRight size={12} />
-                          </button>
+                          <>
+                            <button type="button" className="btn btn-secondary btn-sm" style={{ padding: '4px 10px', fontSize: '11px' }} onClick={(e) => { e.stopPropagation(); onSelectRun(r); }}><span>Inspect</span><ArrowRight size={12} /></button>
+                            {canDelete && <button type="button" className="btn btn-secondary btn-sm" aria-label={`Delete run ${r.id}`} style={{ padding: '4px 8px' }} onClick={(e) => { e.stopPropagation(); onDeleteRun?.(r.id); }}><Trash2 size={13} /></button>}
+                          </>
                         )}
                       </div>
                     </td>
@@ -281,6 +282,7 @@ export const TestRunsView: React.FC<TestRunsViewProps> = ({
           </table>
         </div>
       )}
+      {hasMore && <div style={{ display: 'flex', justifyContent: 'center', padding: 18 }}><button className="btn btn-secondary btn-sm" type="button" onClick={onLoadMore}>Load older runs</button></div>}
     </div>
   );
 };

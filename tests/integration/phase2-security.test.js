@@ -26,8 +26,8 @@ test('Phase 2: security headers, body size, quota enforcement, stream tickets, a
   await new Promise(resolve => apiServer.listen(0, '127.0.0.1', resolve));
   const api = `http://127.0.0.1:${apiServer.address().port}/api`;
   const targetUrl = `http://${TARGET_CONFIG.host}:${targetServer.address().port}`;
-  const userA = await storage.createUser({ email: 'phase2a@example.test', passwordHash: await hashPassword('secure-password'), name: 'Phase 2 A' });
-  const userB = await storage.createUser({ email: 'phase2b@example.test', passwordHash: await hashPassword('secure-password'), name: 'Phase 2 B' });
+  const userA = await storage.createUser({ email: 'phase2a@example.test', passwordHash: await hashPassword('ValidPhase2Password123!'), name: 'Phase 2 A' });
+  const userB = await storage.createUser({ email: 'phase2b@example.test', passwordHash: await hashPassword('ValidPhase2Password123!'), name: 'Phase 2 B' });
   const tokenA = generateToken(userA);
   const tokenB = generateToken(userB);
   const target = await storage.createTarget({ id: randomUUID(), userId: userA.id, name: 'Loopback fixture', url: targetUrl, verified: true });
@@ -66,10 +66,10 @@ test('Phase 2: security headers, body size, quota enforcement, stream tickets, a
 
   const duplicateRegistration = await fetch(`${api}/auth/register`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email: userA.email, name: 'Duplicate', password: 'secure-password' }),
+    body: JSON.stringify({ email: userA.email, name: 'Duplicate', password: 'ValidPhase2Password123!' }),
   });
   assert.equal(duplicateRegistration.status, 409);
-  assert.equal((await duplicateRegistration.json()).error, 'Unable to register with these details.');
+  assert.equal((await duplicateRegistration.json()).error, 'An account with this email already exists.');
 
   const allowedOrigin = await fetch(`${api}/health`, { headers: { Origin: 'http://localhost:3000' } });
   assert.equal(allowedOrigin.headers.get('access-control-allow-origin'), 'http://localhost:3000');

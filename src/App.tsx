@@ -30,124 +30,10 @@ import { DocsView } from './components/views/DocsView.tsx';
 import { SettingsView } from './components/views/SettingsView.tsx';
 import { LiveMetricsView } from './components/views/LiveMetricsView.tsx';
 import { BenchmarkCampaignsView } from './components/views/BenchmarkCampaignsView.tsx';
+import { AdminView } from './components/views/AdminView.tsx';
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:4000/api';
 const fmt = (n: number) => new Intl.NumberFormat('en-US').format(n || 0);
-
-// Demo Seed Data for Immediate Interactivity & Zero Blank States
-const DEMO_USER: User = {
-  id: 'usr_demo_lead',
-  email: 'alex.mercer@devflow.internal',
-  name: 'Alex Mercer',
-  role: 'admin',
-};
-
-const DEFAULT_TARGETS: Target[] = [
-  {
-    id: 'tgt_checkout_prod',
-    name: 'Payment & Checkout Gateway',
-    isDemo: true,
-    url: 'https://api.gateway.internal/v1/checkout',
-    environment: 'Production',
-    verified: true,
-    verificationMethod: 'dns',
-    verifiedAt: '2026-10-28T14:32:00Z',
-    createdAt: '2026-10-28T14:00:00Z',
-  },
-  {
-    id: 'tgt_users_staging',
-    name: 'User Directory API',
-    isDemo: true,
-    url: 'https://staging.internal/api/v2/users',
-    environment: 'Staging',
-    verified: true,
-    verificationMethod: 'dns',
-    verifiedAt: '2026-10-30T09:15:00Z',
-    createdAt: '2026-10-30T09:00:00Z',
-  },
-  {
-    id: 'tgt_local_dev',
-    name: 'Local Microservice (dev)',
-    isDemo: true,
-    url: 'http://localhost:3001/health',
-    environment: 'Development',
-    verified: true,
-    createdAt: '2026-11-01T08:00:00Z',
-  },
-];
-
-const DEFAULT_RUNS: Run[] = [
-  {
-    id: 'run_9f4a10',
-    targetId: 'tgt_checkout_prod',
-    targetName: 'Payment & Checkout Gateway (Demo data)',
-    url: 'https://api.gateway.internal/v1/checkout',
-    method: 'POST',
-    concurrency: 50,
-    durationSec: 30,
-    profile: 'stages',
-    status: 'completed',
-    isDemo: true,
-    startedAt: '2026-11-01T08:14:00Z',
-    finishedAt: '2026-11-01T08:14:30Z',
-    totalRequests: 85200,
-    successCount: 85200,
-    failedCount: 0,
-    rps: 2840,
-    p50: 8.3,
-    p95: 18.4,
-    p99: 29.4,
-    errorRate: 0.00,
-    statusCodes: { '200': 85200 },
-  },
-  {
-    id: 'run_8e3b21',
-    targetId: 'tgt_users_staging',
-    targetName: 'User Directory API (Demo data)',
-    url: 'https://staging.internal/api/v2/users',
-    method: 'GET',
-    concurrency: 25,
-    durationSec: 20,
-    profile: 'fixed',
-    status: 'completed',
-    isDemo: true,
-    startedAt: '2026-11-01T07:45:00Z',
-    finishedAt: '2026-11-01T07:45:20Z',
-    totalRequests: 42100,
-    successCount: 42080,
-    failedCount: 20,
-    httpErrorCount: 20,
-    rps: 2105,
-    p50: 12.1,
-    p95: 22.8,
-    p99: 41.5,
-    errorRate: 0.0475,
-    statusCodes: { '200': 42080, '504': 20 },
-  },
-  {
-    id: 'run_7d2c33',
-    targetId: 'tgt_local_dev',
-    targetName: 'Local Microservice (dev) (Demo data)',
-    url: 'http://localhost:3001/health',
-    method: 'GET',
-    concurrency: 10,
-    durationSec: 15,
-    profile: 'fixed',
-    status: 'completed',
-    isDemo: true,
-    startedAt: '2026-11-01T06:30:00Z',
-    finishedAt: '2026-11-01T06:30:15Z',
-    totalRequests: 19500,
-    successCount: 19500,
-    failedCount: 0,
-    rps: 1300,
-    p50: 4.2,
-    p95: 9.8,
-    p99: 14.1,
-    errorRate: 0.00,
-    statusCodes: { '200': 19500 },
-  },
-];
 
 // Bidirectional URL Route Mappings
 const ROUTE_MAP: Record<string, string> = {
@@ -173,6 +59,7 @@ const ROUTE_MAP: Record<string, string> = {
   'docs': 'Documentation',
   'documentation': 'Documentation',
   'settings': 'Settings',
+  'admin': 'Admin',
 };
 
 const PAGE_TO_HASH: Record<string, string> = {
@@ -189,6 +76,7 @@ const PAGE_TO_HASH: Record<string, string> = {
   'Benchmark Campaigns': '/campaigns',
   'Documentation': '/docs',
   'Settings': '/settings',
+  'Admin': '/admin',
 };
 
 function getInitialPage(): string {
@@ -222,10 +110,7 @@ export default function App() {
     () => (localStorage.getItem('servertest-theme') as ThemeMode) || 'dark'
   );
   const [token, setToken] = useState<string | null>(() => localStorage.getItem('servertest-token'));
-  const [user, setUser] = useState<User | null>(() => {
-    const savedDemo = localStorage.getItem('servertest-demo-mode');
-    return savedDemo === 'true' ? DEMO_USER : null;
-  });
+  const [user, setUser] = useState<User | null>(null);
 
   const [showAuth, setShowAuth] = useState<boolean>(() => initialAuth.show);
   const [authMode, setAuthMode] = useState<'login' | 'register'>(() => initialAuth.mode);
@@ -238,8 +123,10 @@ export default function App() {
   const [authError, setAuthError] = useState('');
 
   // Operational State
-  const [targets, setTargets] = useState<Target[]>(() => localStorage.getItem('servertest-demo-mode') === 'true' ? DEFAULT_TARGETS : []);
-  const [runs, setRuns] = useState<Run[]>(() => localStorage.getItem('servertest-demo-mode') === 'true' ? DEFAULT_RUNS : []);
+  const [targets, setTargets] = useState<Target[]>([]);
+  const [runs, setRuns] = useState<Run[]>([]);
+  const [runsOffset, setRunsOffset] = useState(0);
+  const [hasMoreRuns, setHasMoreRuns] = useState(false);
   const [loading, setLoading] = useState(false);
   const [dataError, setDataError] = useState('');
   const [notice, setNotice] = useState('');
@@ -298,11 +185,15 @@ export default function App() {
         return;
       }
       if (raw && ROUTE_MAP[raw]) {
-        setPage(ROUTE_MAP[raw]);
+        const selectedPage = ROUTE_MAP[raw];
+        const adminDenied = selectedPage === 'Admin' && user?.role !== 'admin';
+        const planDenied = selectedPage === 'Benchmark Campaigns' && !['paid','admin'].includes(user?.tier || '');
+        setPage(adminDenied || planDenied ? 'Overview' : selectedPage);
         return;
       }
       if (q && ROUTE_MAP[q.toLowerCase()]) {
-        setPage(ROUTE_MAP[q.toLowerCase()]);
+        const selectedPage = ROUTE_MAP[q.toLowerCase()];
+        setPage(selectedPage === 'Admin' && user?.role !== 'admin' || selectedPage === 'Benchmark Campaigns' && !['paid','admin'].includes(user?.tier || '') ? 'Overview' : selectedPage);
         return;
       }
       setPage('Home');
@@ -311,6 +202,15 @@ export default function App() {
     handleHashSync();
     window.addEventListener('hashchange', handleHashSync);
     return () => window.removeEventListener('hashchange', handleHashSync);
+  }, [user?.role]);
+
+  useEffect(() => {
+    const oauthToken = new URLSearchParams(window.location.hash.replace(/^#/, '')).get('oauth_token');
+    if (!oauthToken) return;
+    localStorage.setItem('servertest-token', oauthToken);
+    window.history.replaceState(null, '', `${window.location.pathname}#/overview`);
+    setPage('Overview');
+    setToken(oauthToken);
   }, []);
 
   // Theme synchronization: dark, light, system
@@ -381,10 +281,10 @@ export default function App() {
       headers['Authorization'] = `Bearer ${token}`;
     }
 
-    const r = await fetch(`${API}${route}`, { ...options, headers });
+    const r = await fetch(`${API}${route}`, { ...options, headers, credentials: 'include' });
     const body = await r.json().catch(() => ({ error: 'Invalid server response' }));
     if (!r.ok) {
-      if (r.status === 401 && !['/auth/login', '/auth/register', '/auth/oauth'].includes(route)) {
+      if (r.status === 401 && !['/auth/login', '/auth/register', '/auth/oauth', '/auth/me'].includes(route)) {
         localStorage.removeItem('servertest-token');
         localStorage.removeItem('servertest-demo-mode');
         setToken(null);
@@ -401,17 +301,26 @@ export default function App() {
 
   // Refresh server data when token is present
   async function refresh() {
-    if (!token) { setDataError('Sign in to load your saved targets and test runs.'); return; }
+    if (!token && user?.tier !== 'demo') { setDataError('Sign in to load your saved targets and test runs.'); return; }
     setLoading(true);
     try {
-      const [t, r] = await Promise.all([request<Target[]>('/targets'), request<Run[]>('/runs')]);
+      const [t, r] = await Promise.all([request<Target[]>('/targets'), request<Run[]>('/runs?limit=50&offset=0')]);
       const loadedTargets = Array.isArray(t) ? t : [];
       setTargets(loadedTargets);
       setTestTarget((previous) => previous && loadedTargets.some((target) => target.id === previous) ? previous : loadedTargets[0]?.id || '');
       setRuns(Array.isArray(r) ? r : []);
+      setRunsOffset(Array.isArray(r) ? r.length : 0);
+      setHasMoreRuns(Array.isArray(r) && r.length === 50);
       setDataError('');
     } catch (error) { setDataError(error instanceof Error ? error.message : 'Could not load workspace data.'); }
     finally { setLoading(false); }
+  }
+
+  async function loadMoreRuns() {
+    const page = await request<Run[]>(`/runs?limit=50&offset=${runsOffset}`);
+    setRuns(previous => [...previous, ...page]);
+    setRunsOffset(previous => previous + page.length);
+    setHasMoreRuns(page.length === 50);
   }
 
   useEffect(() => {
@@ -422,6 +331,13 @@ export default function App() {
           refresh();
         })
         .catch((error) => { setDataError(error instanceof Error ? error.message : 'Could not validate your session.'); });
+    } else {
+      request<{ user: User }>('/auth/me').then(async ({ user: currentUser }) => {
+        if (currentUser.tier !== 'demo') return;
+        setUser(currentUser);
+        const [savedTargets, savedRuns] = await Promise.all([request<Target[]>('/targets'), request<Run[]>('/runs?limit=50&offset=0')]);
+        setTargets(savedTargets); setRuns(savedRuns); setRunsOffset(savedRuns.length); setHasMoreRuns(savedRuns.length === 50);
+      }).catch(() => {});
     }
   }, [token]);
 
@@ -488,14 +404,21 @@ export default function App() {
   }, [selectedRun?.id, token]);
 
   // 1-Click Instant Demo Authentication
-  function handleDemoAuth() {
+  async function handleDemoAuth() {
     localStorage.removeItem('servertest-token');
     setToken(null);
-    setUser(DEMO_USER);
-    localStorage.setItem('servertest-demo-mode', 'true');
-    setShowAuth(false);
-    setNotice('Welcome Alex! You are now operating the ServerTest Developer Workspace.');
-    navigateTo('Overview');
+    try {
+      const response = await fetch(`${API}/auth/demo`, { method: 'POST', credentials: 'include' });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Could not start demo session.');
+      localStorage.removeItem('servertest-demo-mode');
+      setUser(result.user);
+      setShowAuth(false);
+      const [savedTargets, savedRuns] = await Promise.all([request<Target[]>('/targets'), request<Run[]>('/runs?limit=50&offset=0')]);
+      setTargets(savedTargets); setRuns(savedRuns); setRunsOffset(savedRuns.length); setHasMoreRuns(savedRuns.length === 50);
+      setNotice('Demo session started. It expires in 24 hours and allows up to 10 test runs.');
+      navigateTo('Overview');
+    } catch (error) { setAuthError(error instanceof Error ? error.message : 'Could not start demo session.'); }
   }
 
   // Email / Password Authentication
@@ -537,35 +460,17 @@ export default function App() {
   }
 
   // Social 1-Click Authentication
-  async function handleSocialAuth(provider: 'github' | 'google', customEmail?: string) {
+  async function handleSocialAuth(provider: 'github' | 'google') {
     setAuthSubmitting(true);
     setAuthError('');
-    const emailToUse = customEmail || socialEmail || (provider === 'github' ? 'developer@github.com' : 'developer@gmail.com');
-    const defaultName = provider === 'github' ? 'GitHub Developer' : 'Google Developer';
-
-    try {
-      const res = await request<{ user: User; token: string }>('/auth/oauth', {
-        method: 'POST',
-        body: JSON.stringify({ provider, email: emailToUse.trim(), name: defaultName }),
-      });
-      localStorage.removeItem('servertest-demo-mode');
-      localStorage.setItem('servertest-token', res.token);
-      setToken(res.token);
-      setUser(res.user);
-      setShowAuth(false);
-      setNotice(`Signed in with ${provider === 'github' ? 'GitHub' : 'Google'} as ${res.user.email}`);
-      navigateTo('Overview');
-    } catch (error) {
-      setAuthError(error instanceof Error ? error.message : 'Provider sign in failed.');
-    } finally {
-      setAuthSubmitting(false);
-    }
+    window.location.assign(`${API}/auth/oauth/${provider}/start`);
   }
 
   function handleLogout() {
     if (token) {
       request('/auth/logout', { method: 'POST' }).catch(() => {});
     }
+    if (user?.tier === 'demo') request('/auth/demo/logout', { method: 'POST' }).catch(() => {});
     localStorage.removeItem('servertest-token');
     localStorage.removeItem('servertest-demo-mode');
     setToken(null);
@@ -585,8 +490,8 @@ export default function App() {
   async function addTarget(e: React.FormEvent) {
     e.preventDefault();
     setTargetError('');
-    if (!token) {
-      setTargetError(user ? 'The demo workspace is read-only. Create or sign in to an account to save targets.' : 'Sign in or create an account before saving a target.');
+    if (!token && user?.tier !== 'demo') {
+      setTargetError('Sign in or start a demo session before saving targets.');
       return;
     }
     setTargetSaving(true);
@@ -625,8 +530,8 @@ export default function App() {
   async function launchTest(e: React.FormEvent) {
     e.preventDefault();
     setTestError('');
-    if (!token) {
-      setTestError(user ? 'The demo workspace is read-only. Sign in to an account to run tests.' : 'Sign in to run tests against your saved targets.');
+    if (!token && user?.tier !== 'demo') {
+      setTestError('Sign in or start a demo session before running tests.');
       return;
     }
     setStarting(true);
@@ -656,9 +561,9 @@ export default function App() {
       authorized: true,
       headers,
       timeoutMs,
-      concurrency,
-      durationSec: duration,
-      profile: testProfile,
+      concurrency: user?.tier === 'demo' ? Math.min(2, concurrency) : concurrency,
+      durationSec: user?.tier === 'demo' ? Math.min(10, duration) : duration,
+      profile: user?.tier === 'demo' ? 'fixed' : testProfile,
       workerCount,
     };
 
@@ -697,6 +602,16 @@ export default function App() {
       return;
     }
     setNotice(response.status === 'cancelled' ? `Test ${id} was cancelled.` : `Cancellation requested for test ${id}. The worker is stopping.`);
+  }
+
+  async function deleteRun(id: string) {
+    try {
+      await request<{ deleted: boolean }>(`/runs/${id}`, { method: 'DELETE' });
+      setRuns(previous => previous.filter(run => run.id !== id));
+      setRunsOffset(previous => Math.max(0, previous - 1));
+      if (selectedRun?.id === id) setSelectedRun(null);
+      setNotice('Test run deleted.');
+    } catch (error) { setNotice(error instanceof Error ? error.message : 'Could not delete this run.'); }
   }
 
   function exportRun(run: Run) {
@@ -1021,6 +936,10 @@ export default function App() {
                 }
               }}
               fmt={fmt}
+              hasMore={hasMoreRuns}
+              onLoadMore={() => { void loadMoreRuns(); }}
+              canDelete={['paid','admin'].includes(user?.tier || '')}
+              onDeleteRun={(id) => { void deleteRun(id); }}
             />
           )}
 
@@ -1033,16 +952,18 @@ export default function App() {
             />
           )}
 
+          {page === 'Admin' && user?.role === 'admin' && <AdminView token={token} api={API} onNotice={setNotice} />}
+
           {page === 'Performance Analysis' && (
             <AnalysisView completed={completed} fmt={fmt} />
           )}
 
           {(page === 'Reports' || page === 'History') && (
-            <ReportsView completed={completed} exportRun={exportRun} fmt={fmt} />
+            <ReportsView completed={completed} exportRun={exportRun} fmt={fmt} hasMore={hasMoreRuns} onLoadMore={() => { void loadMoreRuns(); }} />
           )}
 
           {page === 'Comparisons' && (
-            <ComparisonsView completed={completed} token={token} />
+            <ComparisonsView completed={completed} token={token} hasMore={hasMoreRuns} onLoadMore={() => { void loadMoreRuns(); }} />
           )}
 
           {page === 'Documentation' && <DocsView />}

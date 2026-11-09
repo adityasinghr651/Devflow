@@ -7,12 +7,12 @@ import { createApp } from '../../server/app.js';
 test('OpenAPI declares every Express API route and method', () => {
   const spec = fs.readFileSync('docs/openapi.yaml', 'utf8');
   const declaredPaths = new Set([...spec.matchAll(/^  (\/[^:]+):\s*$/gm)].map(match => match[1]));
-  const sourceFiles = ['server/routes/health.js', 'server/routes/auth.js', 'server/routes/targets.js', 'server/routes/runs.js', 'server/routes/campaigns.js'];
+  const sourceFiles = ['server/routes/health.js', 'server/routes/auth.js', 'server/routes/targets.js', 'server/routes/runs.js', 'server/routes/campaigns.js', 'server/routes/admin.js'];
   const missing = [];
   for (const file of sourceFiles) {
     const source = fs.readFileSync(file, 'utf8');
     const router = path.basename(file).replace('.js', '');
-    for (const match of source.matchAll(/\b(?:health|auth|targets|runs|campaigns)Router\.(get|post|delete)\(['"]([^'"]+)['"]/g)) {
+    for (const match of source.matchAll(/\b(?:health|auth|targets|runs|campaigns|admin)Router\.(get|post|patch|delete)\(['"]([^'"]+)['"]/g)) {
       const apiPath = match[2].replace(/:([A-Za-z]+)/g, '{$1}');
       const method = match[1].toLowerCase();
       const escapedPath = apiPath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');

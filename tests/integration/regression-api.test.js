@@ -21,10 +21,11 @@ test('regression API is authenticated and owner-scoped, returns the exact compar
     await fs.rm(temp, { recursive: true, force: true });
   });
   const base = `http://127.0.0.1:${server.address().port}/api/v1`;
-  const token = generateToken({ id: 'owner-1', email: 'owner@example.test', role: 'user' });
+  const owner = await storage.createUser({ email: 'owner@example.test', name: 'Owner', passwordHash: 'test-hash' });
+  const token = generateToken(owner);
   const headers = { Authorization: `Bearer ${token}` };
   const makeRun = (id, startedAt, rps) => ({
-    id, userId: 'owner-1', targetId: 'target-1', targetName: 'Local', url: 'http://127.0.0.1:5050/fixed?delayMs=50',
+    id, userId: owner.id, targetId: 'target-1', targetName: 'Local', url: 'http://127.0.0.1:5050/fixed?delayMs=50',
     method: 'GET', concurrency: 4, durationSec: 2, profile: 'fixed', engine: 'node', workerCount: 1,
     status: 'completed', startedAt, finishedAt: new Date(Date.parse(startedAt) + 1000).toISOString(),
     totalRequests: 200, successCount: 200, failedCount: 0, rps, p95: 50, p99: 90, errorRate: 0,
@@ -41,6 +42,7 @@ test('regression API is authenticated and owner-scoped, returns the exact compar
   assert.equal(verdict.metrics.rps.observed, 80);
   assert.deepEqual(verdict.baselineRunIds, ['prior-2', 'prior-1', 'prior-0']);
   assert.equal((await fetch(`${base}/runs/current/regression`)).status, 401);
-  const otherUser = generateToken({ id: 'owner-2', email: 'other@example.test', role: 'user' });
+  const otherAccount = await storage.createUser({ email: 'other@example.test', name: 'Other', passwordHash: 'test-hash' });
+  const otherUser = generateToken(otherAccount);
   assert.equal((await fetch(`${base}/runs/current/regression`, { headers: { Authorization: `Bearer ${otherUser}` } })).status, 404);
 });

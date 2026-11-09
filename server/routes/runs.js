@@ -1,6 +1,6 @@
 import express from 'express';
 import { randomUUID } from 'node:crypto';
-import { randomBytes } from 'node:crypto';
+import { randomBytes, createHash } from 'node:crypto';
 import { getStorage } from '../storage/index.js';
 import { getRunnerManager } from '../runner/manager.js';
 import { validateRunPayload, sanitizeHeadersForStorage } from '../security/validation.js';
@@ -33,7 +33,11 @@ runsRouter.post('/runs/:id/events-ticket', authenticateToken, async (req, res, n
 runsRouter.get('/runs', authenticateToken, async (req, res, next) => {
   try {
     const storage = getStorage();
-    const runs = await storage.getRuns(req.user.id);
+    const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 50));
+    const offset = Math.max(0, Number(req.query.offset) || 0);
+    const [runs, total] = await Promise.all([storage.getRuns(req.user.id, { limit, offset }), storage.countRuns(req.user.id)]);
+    res.setHeader('X-Total-Count', String(total));
+    res.setHeader('X-Next-Offset', offset + runs.length < total ? String(offset + runs.length) : '');
     res.json(runs);
   } catch (err) {
     next(err);
@@ -182,8 +186,8 @@ runsRouter.post('/runs', authenticateToken, async (req, res, next) => {
     const target = targetId ? await storage.getTargetById(targetId, req.user.id) : null;
 
     const validation = validateRunPayload(req.body, target, {
-      maxConcurrency: config.maxConcurrency,
-      maxDurationSec: config.maxDurationSec,
+      maxConcurrency: req.user.tier === 'demo' ? 2 : config.maxConcurrency,
+      maxDurationSec: req.user.tier === 'demo' ? Math.min(10, config.maxDurationSec) : ['paid','admin'].includes(req.user.tier) ? config.maxDurationSec : Math.min(30, config.maxDurationSec),
     });
 
     if (!validation.valid) {
@@ -198,9 +202,10 @@ runsRouter.post('/runs', authenticateToken, async (req, res, next) => {
     const runCost = validation.data.concurrency * validation.data.durationSec;
     const dailyVuSeconds = dailyRuns.reduce((total, run) => total + (Number(run.concurrency) || 0) * (Number(run.durationSec) || 0), 0);
     let quotaReason = null;
-    if (activeRuns.length >= config.maxActiveRunsPerUser) quotaReason = 'active_run_limit';
-    else if (dailyRuns.length >= config.maxRunsPerDay) quotaReason = 'daily_run_limit';
-    else if (dailyVuSeconds + runCost > config.maxVuSecondsPerDay) quotaReason = 'daily_vu_seconds_limit';
+    const isPaidOrAdmin = ['paid', 'admin'].includes(req.user.tier);
+    if (req.user.tier !== 'admin' && activeRuns.length >= config.maxActiveRunsPerUser) quotaReason = 'active_run_limit';
+    else if (!isPaidOrAdmin && dailyRuns.length >= config.maxRunsPerDay) quotaReason = 'daily_run_limit';
+    else if (!isPaidOrAdmin && dailyVuSeconds + runCost > config.maxVuSecondsPerDay) quotaReason = 'daily_vu_seconds_limit';
 
     if (quotaReason) {
       await storage.createAuditEvent({
@@ -264,7 +269,13 @@ runsRouter.post('/runs', authenticateToken, async (req, res, next) => {
       statusCodes: {},
     };
 
-    const saved = await storage.createRun(run);
+    const quotaLimit = req.user.tier === 'admin' ? Infinity : req.user.tier === 'paid' ? config.paidRunQuota : req.user.tier === 'demo' ? 10 : 15;
+    const demoIpHash = req.user.tier === 'demo' ? createHash('sha256').update(req.ip || req.socket.remoteAddress || 'unknown').digest('hex') : null;
+    const saved = await storage.createRun(run, { quotaLimit, demoIpHash });
+    if (!saved) {
+      res.setHeader('Upgrade', 'signup');
+      return res.status(429).json({ error: req.user.tier === 'demo' ? 'Demo limit reached (10 runs per session and IP). Sign up for a free account to continue.' : req.user.tier === 'paid' ? 'Pro plan run quota reached.' : 'Free plan includes 15 test runs total. Upgrade to Pro to continue.', quota: 'lifetime_run_limit' });
+    }
 
     await recordAuditEvent(storage, {
       userId: req.user.id,
@@ -290,6 +301,20 @@ runsRouter.post('/runs', authenticateToken, async (req, res, next) => {
   } catch (err) {
     next(err);
   }
+});
+
+runsRouter.delete('/runs/:id', authenticateToken, async (req, res, next) => {
+  try {
+    const storage = getStorage();
+    const run = await storage.getRunById(req.params.id, req.user.tier === 'admin' ? null : req.user.id);
+    if (!run) return res.status(404).json({ error: 'Run not found.' });
+    if (!['paid', 'admin'].includes(req.user.tier)) return res.status(403).json({ error: req.user.tier === 'free' ? 'Deleting runs requires a paid plan.' : 'Demo history cannot be deleted.' });
+    if (['queued','running','validating','cancelling'].includes(run.status)) return res.status(409).json({ error: 'Active runs cannot be deleted.' });
+    const deleted = await storage.deleteRun(run.id, req.user.tier === 'admin' ? null : req.user.id);
+    if (!deleted) return res.status(404).json({ error: 'Run not found.' });
+    await recordAuditEvent(storage, { userId: req.user.id, action: 'RUN_DELETE', resourceType: 'run', resourceId: run.id, ipAddress: req.ip });
+    res.json({ deleted: true });
+  } catch (error) { next(error); }
 });
 
 // POST /api/runs/:id/cancel (Scoped to authenticated user)
