@@ -120,7 +120,10 @@ campaignsRouter.post('/campaigns/:id/retry', authenticateToken, async (req, res,
 
 campaignsRouter.post('/campaigns/:id/cancel', authenticateToken, async (req, res, next) => {
   try {
-    const campaign = await getCampaignManager().cancel(req.params.id, req.user.id);
+    const manager = getCampaignManager();
+    const owned = await manager.get(req.params.id, req.user.id);
+    if (!owned) return res.status(404).json({ error: 'Campaign not found.' });
+    const campaign = await manager.cancel(req.params.id, req.user.id);
     res.json(campaign);
   } catch (error) { res.status(409).json({ error: error.message }); }
 });

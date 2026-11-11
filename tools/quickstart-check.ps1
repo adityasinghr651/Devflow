@@ -29,7 +29,11 @@ try {
   } while ((Get-Date) -lt $deadline)
   if ((Get-Date) -ge $deadline) { throw 'API did not become ready.' }
   $email = "quick-$([guid]::NewGuid().ToString('N'))@example.test"
-  $user = Invoke-RestMethod "$base/auth/register" -Method Post -ContentType 'application/json' -Body (@{ name='Quickstart'; email=$email; password='QuickstartPass123!' } | ConvertTo-Json)
+  $randomBytes = [byte[]]::new(24)
+  [System.Security.Cryptography.RandomNumberGenerator]::Fill($randomBytes)
+  $randomPart = [Convert]::ToBase64String($randomBytes).TrimEnd('=').Replace('+','A').Replace('/','b')
+  $password = 'Df!' + $randomPart + '9A'
+  $user = Invoke-RestMethod "$base/auth/register" -Method Post -ContentType 'application/json' -Body (@{ name='Quickstart'; email=$email; password=$password } | ConvertTo-Json)
   $headers = @{ Authorization = "Bearer $($user.token)" }
   $savedTarget = Invoke-RestMethod "$base/targets" -Method Post -Headers $headers -ContentType 'application/json' -Body (@{ name='Quickstart target'; url='http://127.0.0.1:5050'; environment='local' } | ConvertTo-Json)
   $run = Invoke-RestMethod "$base/runs" -Method Post -Headers $headers -ContentType 'application/json' -Body (@{ targetId=$savedTarget.id; path='/health'; method='GET'; concurrency=2; durationSec=2; workerCount=1; authorized=$true } | ConvertTo-Json)

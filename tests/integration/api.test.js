@@ -7,6 +7,7 @@ import os from 'node:os';
 import { createApp } from '../../server/app.js';
 import { setStorage } from '../../server/storage/index.js';
 import { JsonStorage } from '../../server/storage/json-storage.js';
+import { createTestPassword } from '../helpers/test-credentials.js';
 
 test('API: Full Auth and API workflow test suite', async (t) => {
   const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'servertest-api-test-'));
@@ -20,6 +21,8 @@ test('API: Full Auth and API workflow test suite', async (t) => {
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   const port = server.address().port;
   const baseUrl = `http://127.0.0.1:${port}/api`;
+  const password = createTestPassword();
+  const wrongPassword = createTestPassword();
 
   t.after(async () => {
     await new Promise(resolve => server.close(resolve));
@@ -46,7 +49,7 @@ test('API: Full Auth and API workflow test suite', async (t) => {
     body: JSON.stringify({
       name: 'Aditya Singh',
       email: 'aditya@example.com',
-      password: 'StrongPassword123!',
+      password,
     }),
   });
   assert.equal(regRes.status, 201);
@@ -62,7 +65,7 @@ test('API: Full Auth and API workflow test suite', async (t) => {
     body: JSON.stringify({
       name: 'Aditya Clone',
       email: 'aditya@example.com',
-      password: 'StrongPassword123!',
+      password,
     }),
   });
   assert.equal(dupRes.status, 409);
@@ -73,7 +76,7 @@ test('API: Full Auth and API workflow test suite', async (t) => {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       email: 'aditya@example.com',
-      password: 'WrongPassword!',
+      password: wrongPassword,
     }),
   });
   assert.equal(badLoginRes.status, 401);
@@ -84,7 +87,7 @@ test('API: Full Auth and API workflow test suite', async (t) => {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       email: 'aditya@example.com',
-      password: 'StrongPassword123!',
+      password,
     }),
   });
   assert.equal(loginRes.status, 200);

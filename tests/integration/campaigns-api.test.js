@@ -39,6 +39,8 @@ test('Campaign creation, listing, and stage reports are authenticated and owner 
   const campaign = await create.json();
   assert.equal(campaign.secretsEncrypted, undefined);
   assert.equal(campaign.headers.Authorization, '[REDACTED]');
+  const ownerCampaign = await fetch(`${base}/campaigns/${campaign.id}`, { headers: { Authorization: `Bearer ${ownerToken}` } });
+  assert.equal(ownerCampaign.status, 200);
   const persisted = await storage.getCampaignById(campaign.id, owner.id);
   assert.equal(JSON.stringify(persisted).includes('campaign-api-secret'), false);
 
@@ -52,4 +54,17 @@ test('Campaign creation, listing, and stage reports are authenticated and owner 
   assert.equal(otherReport.status, 404);
   const otherList = await fetch(`${base}/campaigns`, { headers: { Authorization: `Bearer ${otherToken}` } });
   assert.deepEqual(await otherList.json(), []);
+
+  for (const action of ['start', 'advance', 'retry', 'cancel']) {
+    const route = `${base}/campaigns/${campaign.id}/${action}`;
+    assert.equal((await fetch(route, { method: 'POST' })).status, 401, `${action} requires authentication`);
+    const otherAction = await fetch(route, { method: 'POST', headers: { Authorization: `Bearer ${otherToken}` } });
+    assert.equal(otherAction.status, 404, `a different owner must not access ${action}`);
+  }
+
+  const otherCreate = await fetch(`${base}/campaigns`, {
+    method: 'POST', headers: { Authorization: `Bearer ${otherToken}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ targetId: target.id, path: '/health', method: 'GET', stageConcurrency: [1, 2, 3, 4], workerCount: 1, timeoutMs: 2000, authorized: true }),
+  });
+  assert.equal(otherCreate.status, 404, 'a user cannot create a campaign against another user target');
 });

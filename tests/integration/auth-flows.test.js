@@ -9,6 +9,7 @@ import { JsonStorage } from '../../server/storage/json-storage.js';
 import { setStorage } from '../../server/storage/index.js';
 import { generateToken, hashPassword } from '../../server/security/auth.js';
 import { randomUUID } from 'node:crypto';
+import { createTestPassword } from '../helpers/test-credentials.js';
 import { config } from '../../server/config.js';
 
 config.authRateLimitMax = 100;
@@ -27,7 +28,7 @@ async function fixture(t) {
 
 test('OAuth rejects email-only identity claims (regression reproduction)', async t => {
   const { base } = await fixture(t);
-  const registration = await fetch(`${base}/auth/register`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'Victim', email: 'victim@example.com', password: 'ValidPassword123!' }) });
+  const registration = await fetch(`${base}/auth/register`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'Victim', email: 'victim@example.com', password: createTestPassword() }) });
   assert.equal(registration.status, 201);
   const exploit = await fetch(`${base}/auth/oauth`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ provider: 'github', email: 'victim@example.com' }) });
   assert.equal(exploit.status, 400);
@@ -36,16 +37,19 @@ test('OAuth rejects email-only identity claims (regression reproduction)', async
 
 test('Signup validates fields, rejects duplicates, and accepts matching credentials', async t => {
   const { base } = await fixture(t);
+  const password = createTestPassword();
+  const otherPassword = createTestPassword();
+  const wrongPassword = createTestPassword();
   const post = (route, body) => fetch(`${base}${route}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
   assert.equal((await post('/auth/register', { name:'Weak',email:'weak@example.com',password:'short' })).status, 400);
   assert.equal((await post('/auth/register', { name:'Weak',email:'common@example.com',password:'Password123!' })).status, 400);
-  const registration = await post('/auth/register', { name:'User',email:'same@example.com',password:'ValidPassword123!',role:'admin',tier:'admin' });
+  const registration = await post('/auth/register', { name:'User',email:'same@example.com',password,role:'admin',tier:'admin' });
   assert.equal(registration.status, 201);
   const initial = await registration.clone().json(); assert.equal(initial.user.tier,'free'); assert.equal(initial.user.role,'user');
-  const duplicate = await post('/auth/register', { name:'User 2',email:'SAME@example.com',password:'OtherPassword123!' });
+  const duplicate = await post('/auth/register', { name:'User 2',email:'SAME@example.com',password:otherPassword });
   assert.equal(duplicate.status, 409); assert.equal((await duplicate.json()).field, 'email');
-  assert.equal((await post('/auth/login', { email:'same@example.com',password:'WrongPassword123!' })).status, 401);
-  const login = await post('/auth/login', { email:'same@example.com',password:'ValidPassword123!' });
+  assert.equal((await post('/auth/login', { email:'same@example.com',password:wrongPassword })).status, 401);
+  const login = await post('/auth/login', { email:'same@example.com',password });
   assert.equal(login.status, 200); assert.equal((await login.json()).user.tier, 'free');
 });
 
@@ -101,7 +105,7 @@ test('GitHub OAuth exchanges one-time state-bound code and rejects tampering', a
 
 test('Demo/free run quotas and paid/admin delete permissions are enforced by API', async t => {
   const { base, storage } = await fixture(t);
-  const signup = await fetch(`${base}/auth/register`, { method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:'Free',email:'free@example.com',password:'ValidPassword123!'}) });
+  const signup = await fetch(`${base}/auth/register`, { method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:'Free',email:'free@example.com',password:createTestPassword()}) });
   const free = await signup.json();
   const target = await storage.createTarget({ userId:free.user.id,name:'Local',url:`http://127.0.0.1:${new URL(base).port}`,verified:true,environment:'Development' });
   const seedRun = async userId => storage.createRun({userId,targetId:target.id,targetName:target.name,url:target.url,method:'GET',concurrency:1,durationSec:1,status:'completed',startedAt:new Date().toISOString(),totalRequests:0,successCount:0,failedCount:0,rps:0,p50:0,p95:0,p99:0,errorRate:0,statusCodes:{}});

@@ -7,6 +7,7 @@ import os from 'node:os';
 import { createApp } from '../../server/app.js';
 import { setStorage } from '../../server/storage/index.js';
 import { JsonStorage } from '../../server/storage/json-storage.js';
+import { createTestPassword } from '../helpers/test-credentials.js';
 
 test('Multi-User: Strict resource isolation and privilege escalation prevention', async (t) => {
   const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'servertest-multiuser-test-'));
@@ -20,6 +21,8 @@ test('Multi-User: Strict resource isolation and privilege escalation prevention'
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   const port = server.address().port;
   const baseUrl = `http://127.0.0.1:${port}/api`;
+  const alicePassword = createTestPassword();
+  const bobPassword = createTestPassword();
 
   t.after(async () => {
     await new Promise(resolve => server.close(resolve));
@@ -30,7 +33,7 @@ test('Multi-User: Strict resource isolation and privilege escalation prevention'
   const aliceReg = await fetch(`${baseUrl}/auth/register`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name: 'Alice', email: 'alice@company.com', password: 'ValidPassword123!' }),
+    body: JSON.stringify({ name: 'Alice', email: 'alice@company.com', password: alicePassword }),
   });
   assert.equal(aliceReg.status, 201);
   const { token: aliceToken, user: aliceUser } = await aliceReg.json();
@@ -39,7 +42,7 @@ test('Multi-User: Strict resource isolation and privilege escalation prevention'
   const bobReg = await fetch(`${baseUrl}/auth/register`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name: 'Bob', email: 'bob@company.com', password: 'ValidPassword123!' }),
+    body: JSON.stringify({ name: 'Bob', email: 'bob@company.com', password: bobPassword }),
   });
   assert.equal(bobReg.status, 201);
   const { token: bobToken, user: bobUser } = await bobReg.json();

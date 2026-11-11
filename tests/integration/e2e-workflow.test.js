@@ -8,6 +8,7 @@ import { createApp } from '../../server/app.js';
 import { setStorage } from '../../server/storage/index.js';
 import { JsonStorage } from '../../server/storage/json-storage.js';
 import { RunnerManager } from '../../server/runner/manager.js';
+import { createTestPassword } from '../helpers/test-credentials.js';
 
 test('E2E: Full User-to-Results Workflow Verification', async (t) => {
   const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'servertest-e2e-workflow-'));
@@ -35,6 +36,7 @@ test('E2E: Full User-to-Results Workflow Verification', async (t) => {
   await new Promise(res => apiServer.listen(0, '127.0.0.1', res));
   const apiPort = apiServer.address().port;
   const baseUrl = `http://127.0.0.1:${apiPort}/api`;
+  const password = createTestPassword();
 
   t.after(async () => {
     await new Promise(r => mockTarget.close(r));
@@ -49,7 +51,7 @@ test('E2E: Full User-to-Results Workflow Verification', async (t) => {
     body: JSON.stringify({
       name: 'Aditya Engineer',
       email: 'aditya.workflow@test.local',
-      password: 'ProductionPassword2026!',
+      password,
     }),
   });
   assert.equal(regRes.status, 201);
