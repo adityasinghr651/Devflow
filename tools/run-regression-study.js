@@ -181,7 +181,7 @@ async function main() {
       runs: falsePositiveRuns,
     },
     truePositiveStudy: truePositiveGroups,
-    limitations: 'Single Windows host, one local controlled target, one owner/session per trial, one workload shape. These counts are an internal repeatability study only; they are not expected rates for other machines, CI, applications, or teams.',
+    limitations: 'Single Windows host, one loopback target server, one temporary owner per study, independent target IDs per injected trial, and one workload shape. These counts are internal repeatability observations only; they are not expected rates for other machines, CI, applications, or teams.',
   };
   const outDir = path.resolve('benchmarks/results');
   await fs.mkdir(outDir, { recursive: true });

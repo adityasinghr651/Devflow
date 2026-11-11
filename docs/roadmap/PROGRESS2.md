@@ -1,14 +1,14 @@
 # Regression-Gate Roadmap Progress
 
-Current phase: 2   Last updated: 2026-11-11   Branch: roadmap2/phase-2-regression   HEAD: a4c2df2bd37b44082b0bd4a69f22943e5da0a648
+Current phase: 3   Last updated: 2026-11-11   Branch: roadmap2/phase-2-regression   HEAD: f33e6919a2c40f765a36b5fc696f43e4b47d1b1c
 
 ## Phase table
 
 | Phase | Status | Gate result | Evidence file |
 |---|---|---|---|
 | 1 | done | pass with documented local credential exception | docs/roadmap/evidence/phase2-1-security.md |
-| 2 | in progress | pending | docs/roadmap/evidence/phase2-2-regression-studies.md |
-| 3 | not started | pending | docs/roadmap/evidence/phase2-3-adoption.md |
+| 2 | done | pass with documented +10% sensitivity limitation | docs/roadmap/evidence/phase2-2-regression-studies.md |
+| 3 | in progress | pending | docs/roadmap/evidence/phase2-3-adoption.md |
 | 4 | not started | blocked pending owner approval and repo list | docs/roadmap/evidence/phase2-4-pilot.md |
 | 5 | not started | gated on real Phase 4 signal | docs/roadmap/evidence/phase2-5-positioning.md |
 | 6 | not started | gated on Phases 4 and 5 | docs/roadmap/evidence/phase2-6-monetization.md |
@@ -22,11 +22,12 @@ Current phase: 2   Last updated: 2026-11-11   Branch: roadmap2/phase-2-regressio
 - [x] T1.5 `npm test` ran 3 consecutive times: each 181 passed, 1 Windows skip, 0 failed; each terminated normally.
 - [x] Phase 1 standard verification passed: lint, build, 39 individual test files, full suite 3x, `git diff --check`; evidence at `docs/roadmap/evidence/phase2-1-security.md`.
 - [x] T2.1 Documented the actual fingerprint, owner-scoped comparable-run filter, last-five baseline window, minimum three samples, median/MAD bands, thresholds, and verdicts in `docs/REGRESSION_MODEL.md`.
-- [ ] T2.2 CLI-driven 20-run stable-target false-positive study; harness added, live repetitions pending.
-- [ ] T2.3 Controlled +10%/+25%/+50% latency study with five independent trials each; harness added, live repetitions pending.
-- [ ] T2.4 Noise reduction will be based on the measured studies; no detector thresholds changed yet.
+- [x] T2.2 20 stable CLI/API/runner measurements; 17 eligible, 0 false regression verdicts (0/17).
+- [x] T2.3 Five trials per injected magnitude: +10% detected 0/5, +25% 5/5, +50% 5/5; raw JSON and summaries saved.
+- [x] T2.4 Kept policy unchanged: observed stable false-positive count was 0/17; the +10% miss agrees with the documented 19.3563% minimum p95 change and this sample is too small to safely retune.
 - [x] T2.5 API response now includes baseline window size; CLI and PR comment disclose used/available baseline window and minimum, with metric bands. Missing measurements remain unavailable and yield `insufficient_data`.
-- [ ] Phase 3 tasks T3.1–T3.4 remain pending Phase 2 gate.
+- [x] Phase 2 standard verification passed: lint, build, 39 individual test files, full suite twice (183 tests per run; 182 pass, 1 Windows skip, 0 fail); evidence at `docs/roadmap/evidence/phase2-2-regression-studies.md`.
+- [ ] Phase 3 tasks T3.1–T3.4 in progress after Phase 2 gate.
 - [ ] Phase 4 tasks T4.0–T4.4 require approved pilot repositories.
 - [ ] Phase 5 and Phase 6 remain gated on real pilot evidence and owner decisions.
 

@@ -29,4 +29,6 @@ Each metric result reports observed value, baseline median, MAD, scaled MAD, sta
 
 ## Validation scope
 
+The observed Phase 2 study produced 0 false regressions in 17 eligible stable comparisons. It detected +25% and +50% added latency in 5/5 independent trials each, and detected +10% latency in 0/5 trials. The +10% misses are consistent with the current p95 minimum change threshold (19.3563%); lowering that threshold is not justified by only 17 stable comparisons. Keep this sensitivity limit visible and collect more representative CI data before retuning. These rates are small local study counts, not accuracy guarantees.
+
 Accuracy claims must be based on the raw Phase 2 studies at `benchmarks/results/false-positive-study.md` and `benchmarks/results/true-positive-study.md`, including their run-level JSON data. Results apply only to the recorded Windows machine, controlled loopback target, and workload. They do not establish behavior across other hardware, hosted CI, real applications, or teams.
