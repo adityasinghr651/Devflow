@@ -49,7 +49,7 @@ async function main() {
         const metric = regression.metrics[key];
         return metric?.band ? `${key}: ${metric.verdict} (${metric.observed}; band ${metric.band.lower}–${metric.band.upper})` : `${key}: ${metric?.verdict || 'insufficient_data'}`;
       };
-      console.log(`DevFlow run ${run.id}: ${run.status}\nRequests: ${report.totalRequests} (${report.successCount} succeeded, ${report.failedCount} failed)\nRPS: ${report.rps} | p95: ${report.p95} ms | p99: ${report.p99} ms | error rate: ${report.errorRate}%\nRegression verdict: ${regression.verdict} (${regression.baselineCount}/${regression.minimumBaselineRuns} minimum comparable runs)\n${['rps', 'p95', 'p99', 'errorRate'].map(metricLine).join('\n')}`);
+      console.log(`DevFlow run ${run.id}: ${run.status}\nRequests: ${report.totalRequests} (${report.successCount} succeeded, ${report.failedCount} failed)\nRPS: ${report.rps} | p95: ${report.p95} ms | p99: ${report.p99} ms | error rate: ${report.errorRate}%\nRegression verdict: ${regression.verdict} (${regression.baselineCount}/${regression.historySize} most recent comparable runs; ${regression.minimumBaselineRuns} minimum required)\n${['rps', 'p95', 'p99', 'errorRate'].map(metricLine).join('\n')}`);
     }
     process.exitCode = run.status === 'completed' && report.failedCount === 0 && report.assertionFailureCount === 0 && regression.verdict !== 'regression' ? 0 : 1;
   } catch (err) { console.error(`DevFlow error: ${err.message}`); process.exitCode = 2; }

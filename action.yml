@@ -47,7 +47,7 @@ runs:
                 const metric = metrics[key];
                 return metric ? `| ${key} | ${metric.observed} | ${metric.band ? `${metric.band.lower}–${metric.band.upper}` : 'n/a'} | ${metric.verdict} |` : `| ${key} | n/a | n/a | insufficient_data |`;
               }).join('\n');
-              summary = `**Verdict:** ${report.regression?.verdict || 'unavailable'} (${report.regression?.baselineCount || 0} comparable runs)\n\nRequests: ${report.totalRequests} (${report.successCount} passed, ${report.failedCount} failed; ${report.assertionFailureCount} assertion failures)\n\n| Metric | Observed | Decision band | Verdict |\n|---|---:|---:|---|\n${rows}\n\n<details><summary>Full JSON report</summary>\n\n${fence}json\n${JSON.stringify(report, null, 2)}\n${fence}\n\n</details>`;
+              summary = `**Verdict:** ${report.regression?.verdict || 'unavailable'} (${report.regression?.baselineCount || 0}/${report.regression?.historySize || 0} most recent comparable runs; ${report.regression?.minimumBaselineRuns || 0} minimum required)\n\nRequests: ${report.totalRequests} (${report.successCount} passed, ${report.failedCount} failed; ${report.assertionFailureCount} assertion failures)\n\n| Metric | Observed | Decision band | Verdict |\n|---|---:|---:|---|\n${rows}\n\n<details><summary>Full JSON report</summary>\n\n${fence}json\n${JSON.stringify(report, null, 2)}\n${fence}\n\n</details>`;
             } catch { summary = 'Run finished but its result JSON could not be parsed.'; }
           }
           const body = `${marker}\n## DevFlow performance result\n\n${summary}`;

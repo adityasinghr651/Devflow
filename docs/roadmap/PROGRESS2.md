@@ -1,6 +1,6 @@
 # Regression-Gate Roadmap Progress
 
-Current phase: 2   Last updated: 2026-11-11   Branch: roadmap2/phase-1-security   HEAD: f68fae93c21a1826311a481be3c4fbbfe821cce1
+Current phase: 2   Last updated: 2026-11-11   Branch: roadmap2/phase-2-regression   HEAD: a4c2df2bd37b44082b0bd4a69f22943e5da0a648
 
 ## Phase table
 
@@ -21,7 +21,11 @@ Current phase: 2   Last updated: 2026-11-11   Branch: roadmap2/phase-1-security 
 - [x] T1.4 `npm audit --omit=dev`: 0 vulnerabilities.
 - [x] T1.5 `npm test` ran 3 consecutive times: each 181 passed, 1 Windows skip, 0 failed; each terminated normally.
 - [x] Phase 1 standard verification passed: lint, build, 39 individual test files, full suite 3x, `git diff --check`; evidence at `docs/roadmap/evidence/phase2-1-security.md`.
-- [ ] T2.1–T2.5 Regression model documentation and controlled false-/true-positive studies in progress.
+- [x] T2.1 Documented the actual fingerprint, owner-scoped comparable-run filter, last-five baseline window, minimum three samples, median/MAD bands, thresholds, and verdicts in `docs/REGRESSION_MODEL.md`.
+- [ ] T2.2 CLI-driven 20-run stable-target false-positive study; harness added, live repetitions pending.
+- [ ] T2.3 Controlled +10%/+25%/+50% latency study with five independent trials each; harness added, live repetitions pending.
+- [ ] T2.4 Noise reduction will be based on the measured studies; no detector thresholds changed yet.
+- [x] T2.5 API response now includes baseline window size; CLI and PR comment disclose used/available baseline window and minimum, with metric bands. Missing measurements remain unavailable and yield `insufficient_data`.
 - [ ] Phase 3 tasks T3.1–T3.4 remain pending Phase 2 gate.
 - [ ] Phase 4 tasks T4.0–T4.4 require approved pilot repositories.
 - [ ] Phase 5 and Phase 6 remain gated on real pilot evidence and owner decisions.
@@ -41,6 +45,9 @@ Current phase: 2   Last updated: 2026-11-11   Branch: roadmap2/phase-1-security 
 | Preserve `docs/roadmap/PROGRESS.md` and historical evidence. | This is a separate roadmap and must not overwrite earlier runbook artifacts. |
 | Fixed campaign cancel ownership check after reproducing wrong-owner HTTP 409. | Wrong-owner actions must be consistently hidden with 404 before the resource state is checked. |
 | Use cryptographically random per-run credentials in account-creating tests and scripts. | Removes reusable hardcoded passwords while preserving production password-policy coverage. |
+| Validate regression model through the CLI instead of only calling the detector directly. | Matches the real adoption pipeline; raw study results include the CLI report and comparison bands. |
+| Do not tune detector thresholds before measuring controlled behavior. | T2.4 changes must be evidence-driven and followed by remeasurement. |
+| Promote only the disposable temporary study account to the existing paid tier. | The first real CLI study hit the Free lifetime cap at 15 runs; the 20-run baseline needs room, and production quotas remain unchanged. The incomplete run produced no study artifact. |
 
 ## BLOCKED items
 

@@ -18,7 +18,7 @@ test('CLI submits a run, waits for results, and emits a JSON summary', async () 
       res.writeHead(200, { 'content-type': 'application/json' }); res.end(JSON.stringify({ id: 'r1', status: 'completed', totalRequests: 10, successCount: 10, failedCount: 0, rps: 10, p50: 2, p95: 4, p99: 5, errorRate: 0 })); return;
     }
     if (req.method === 'GET' && req.url === '/api/v1/runs/r1/regression') {
-      res.writeHead(200, { 'content-type': 'application/json' }); res.end(JSON.stringify({ verdict: 'pass', baselineCount: 3, minimumBaselineRuns: 3 })); return;
+      res.writeHead(200, { 'content-type': 'application/json' }); res.end(JSON.stringify({ verdict: 'pass', baselineCount: 3, historySize: 5, minimumBaselineRuns: 3 })); return;
     }
     res.writeHead(404); res.end('{}');
   });
@@ -30,7 +30,9 @@ test('CLI submits a run, waits for results, and emits a JSON summary', async () 
     child.stdout.on('data', chunk => stdout += chunk); child.stderr.on('data', chunk => stderr += chunk);
     const code = await new Promise((resolve, reject) => { child.once('error', reject); child.once('close', resolve); });
     assert.equal(code, 0, stderr);
-    assert.equal(JSON.parse(stdout).totalRequests, 10);
+    const result = JSON.parse(stdout);
+    assert.equal(result.totalRequests, 10);
+    assert.equal(result.regression.historySize, 5);
   } finally {
     await new Promise(resolve => server.close(resolve));
     await fs.rm(temp, { recursive: true, force: true });
