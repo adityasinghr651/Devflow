@@ -23,7 +23,8 @@ runs:
         DEVFLOW_TOKEN: ${{ inputs.token }}
         DEVFLOW_CONFIG: ${{ inputs.config }}
       run: node "$GITHUB_ACTION_PATH/bin/devflow.js" run --config "$GITHUB_WORKSPACE/$DEVFLOW_CONFIG" --api "$DEVFLOW_API" --token "$DEVFLOW_TOKEN" --json > "$GITHUB_WORKSPACE/devflow-result.json"
-    - uses: actions/upload-artifact@v4
+    - id: result-artifact
+      uses: actions/upload-artifact@v4
       if: always()
       with:
         name: devflow-result
@@ -35,25 +36,13 @@ runs:
         github-token: ${{ inputs.github-token }}
         script: |
           const fs = require('fs');
-          const marker = '<!-- devflow-performance-result -->';
+          const { buildPullRequestComment, upsertPullRequestComment } = require(`${process.env.GITHUB_ACTION_PATH}/tools/github-action-comment.cjs`);
           const file = `${process.env.GITHUB_WORKSPACE}/devflow-result.json`;
-          const fence = String.fromCharCode(96).repeat(3);
-          let summary = 'Run failed before producing a result.';
+          let report = null;
           if (fs.existsSync(file)) {
-            try {
-              const report = JSON.parse(fs.readFileSync(file, 'utf8'));
-              const metrics = report.regression?.metrics || {};
-              const rows = ['rps', 'p95', 'p99', 'errorRate'].map(key => {
-                const metric = metrics[key];
-                return metric ? `| ${key} | ${metric.observed} | ${metric.band ? `${metric.band.lower}–${metric.band.upper}` : 'n/a'} | ${metric.verdict} |` : `| ${key} | n/a | n/a | insufficient_data |`;
-              }).join('\n');
-              summary = `**Verdict:** ${report.regression?.verdict || 'unavailable'} (${report.regression?.baselineCount || 0}/${report.regression?.historySize || 0} most recent comparable runs; ${report.regression?.minimumBaselineRuns || 0} minimum required)\n\nRequests: ${report.totalRequests} (${report.successCount} passed, ${report.failedCount} failed; ${report.assertionFailureCount} assertion failures)\n\n| Metric | Observed | Decision band | Verdict |\n|---|---:|---:|---|\n${rows}\n\n<details><summary>Full JSON report</summary>\n\n${fence}json\n${JSON.stringify(report, null, 2)}\n${fence}\n\n</details>`;
-            } catch { summary = 'Run finished but its result JSON could not be parsed.'; }
+            try { report = JSON.parse(fs.readFileSync(file, 'utf8')); } catch {}
           }
-          const body = `${marker}\n## DevFlow performance result\n\n${summary}`;
-          const { owner, repo } = context.repo;
-          const issue_number = context.issue.number;
-          const comments = await github.rest.issues.listComments({ owner, repo, issue_number });
-          const existing = comments.data.find(comment => comment.body.includes(marker));
-          if (existing) await github.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body });
-          else await github.rest.issues.createComment({ owner, repo, issue_number, body });
+          const body = buildPullRequestComment(report, process.env.DEVFLOW_ARTIFACT_URL);
+          await upsertPullRequestComment(github, context, body);
+      env:
+        DEVFLOW_ARTIFACT_URL: ${{ steps.result-artifact.outputs.artifact-url }}

@@ -5,7 +5,7 @@ import { parseArgs as parseNodeArgs } from 'node:util';
 function parseArgs(args) {
   const parsed = parseNodeArgs({ args, allowPositionals: true, strict: true, options: {
     config: { type: 'string', short: 'c' }, api: { type: 'string' }, token: { type: 'string' },
-    wait: { type: 'string' }, json: { type: 'boolean', default: false },
+    wait: { type: 'string' }, json: { type: 'boolean', default: false }, init: { type: 'boolean', default: false },
   } });
   return { ...parsed.values, _: parsed.positionals };
 }
@@ -14,26 +14,51 @@ async function main() {
   let args;
   try { args = parseArgs(process.argv.slice(2)); }
   catch (err) { console.error(err.message); process.exitCode = 2; return; }
-  if (args._[0] !== 'run' || !args.config || !args.api || !args.token) {
-    console.error('Usage: devflow run -c devflow.config.json --api http://localhost:4000/api/v1 --token <token> [--wait 120] [--json]');
+  const command = args._[0];
+  if (!['run', 'check'].includes(command) || (command === 'run' && args.init) || (command === 'run' && (!args.config || !args.api || !args.token))) {
+    console.error('Usage: devflow check [--init] [-c devflow.config.json] [--api <url>] [--token <token>] [--wait 120] [--json]');
+    console.error('       devflow run -c devflow.config.json --api <url> --token <token> [--wait 120] [--json]');
     process.exitCode = 2; return;
   }
+  const configPath = args.config || (command === 'check' ? 'devflow.config.json' : '');
+  if (args.init) {
+    const starter = {
+      apiUrl: 'http://127.0.0.1:4000/api/v1',
+      targetId: 'replace-with-your-saved-target-id',
+      path: '/health', method: 'GET', concurrency: 2, durationSec: 5, workerCount: 1, authorized: true,
+    };
+    try {
+      await fs.writeFile(configPath, `${JSON.stringify(starter, null, 2)}\n`, { flag: 'wx' });
+      console.log(`Created ${configPath}. Set targetId to a saved DevFlow target and export DEVFLOW_TOKEN before running devflow check.`);
+    } catch (err) {
+      console.error(err.code === 'EEXIST' ? `${configPath} already exists; it was not overwritten.` : `Cannot create ${configPath}: ${err.message}`);
+      process.exitCode = 2;
+    }
+    return;
+  }
   let config;
-  try { config = JSON.parse(await fs.readFile(args.config, 'utf8')); }
-  catch (err) { console.error(`Cannot read config ${args.config}: ${err.message}`); process.exitCode = 2; return; }
+  try { config = JSON.parse(await fs.readFile(configPath, 'utf8')); }
+  catch (err) { console.error(`Cannot read config ${configPath}: ${err.message}`); process.exitCode = 2; return; }
   if (typeof config.targetId !== 'string' || !config.targetId.trim() || !Number.isInteger(config.concurrency) || config.concurrency < 1 || !Number.isInteger(config.durationSec) || config.durationSec < 1 || config.durationSec > 3600) {
     console.error('Config must include a non-empty targetId, positive integer concurrency, and durationSec from 1 to 3600.'); process.exitCode = 2; return;
   }
   const waitSeconds = Number(args.wait || 120);
   if (!Number.isFinite(waitSeconds) || waitSeconds < 1) { console.error('--wait must be a positive number of seconds.'); process.exitCode = 2; return; }
-  const base = args.api.replace(/\/$/, '');
+  const apiUrl = args.api || (command === 'check' ? config.apiUrl || process.env.DEVFLOW_API || 'http://127.0.0.1:4000/api/v1' : '');
+  const token = args.token || (command === 'check' ? process.env.DEVFLOW_TOKEN : '');
+  if (!apiUrl || !token) {
+    console.error('Set --api and --token, or for devflow check set apiUrl in the config and export DEVFLOW_TOKEN.');
+    process.exitCode = 2; return;
+  }
+  const { apiUrl: _apiUrl, token: _configToken, tokenEnv: _tokenEnv, ...runConfig } = config;
+  const base = apiUrl.replace(/\/$/, '');
   const request = async (url, init = {}) => {
-    const response = await fetch(url, { ...init, headers: { Authorization: `Bearer ${args.token}`, 'Content-Type': 'application/json', ...init.headers } });
+    const response = await fetch(url, { ...init, headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', ...init.headers } });
     if (!response.ok) throw new Error(`API ${response.status}: ${(await response.text()).slice(0, 300)}`);
     return response.json();
   };
   try {
-    const created = await request(`${base}/runs`, { method: 'POST', body: JSON.stringify(config) });
+    const created = await request(`${base}/runs`, { method: 'POST', body: JSON.stringify(runConfig) });
     const deadline = Date.now() + waitSeconds * 1000;
     let run = created;
     while (!['completed', 'failed', 'cancelled', 'timed_out'].includes(run.status) && Date.now() < deadline) {

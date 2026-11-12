@@ -1,6 +1,6 @@
 # Regression-Gate Roadmap Progress
 
-Current phase: 3   Last updated: 2026-11-11   Branch: roadmap2/phase-2-regression   HEAD: f33e6919a2c40f765a36b5fc696f43e4b47d1b1c
+Current phase: 4   Last updated: 2026-11-12   Branch: roadmap2/phase-3-adoption   HEAD: a5b864ee9e10fa00f0455a3923af705f2fb2c9ad
 
 ## Phase table
 
@@ -8,8 +8,8 @@ Current phase: 3   Last updated: 2026-11-11   Branch: roadmap2/phase-2-regressio
 |---|---|---|---|
 | 1 | done | pass with documented local credential exception | docs/roadmap/evidence/phase2-1-security.md |
 | 2 | done | pass with documented +10% sensitivity limitation | docs/roadmap/evidence/phase2-2-regression-studies.md |
-| 3 | in progress | pending | docs/roadmap/evidence/phase2-3-adoption.md |
-| 4 | not started | blocked pending owner approval and repo list | docs/roadmap/evidence/phase2-4-pilot.md |
+| 3 | done | pass with live Action not verified | docs/roadmap/evidence/phase2-3-adoption.md |
+| 4 | blocked | owner has not approved pilot or supplied repositories | docs/roadmap/evidence/phase2-4-pilot.md |
 | 5 | not started | gated on real Phase 4 signal | docs/roadmap/evidence/phase2-5-positioning.md |
 | 6 | not started | gated on Phases 4 and 5 | docs/roadmap/evidence/phase2-6-monetization.md |
 
@@ -27,8 +27,12 @@ Current phase: 3   Last updated: 2026-11-11   Branch: roadmap2/phase-2-regressio
 - [x] T2.4 Kept policy unchanged: observed stable false-positive count was 0/17; the +10% miss agrees with the documented 19.3563% minimum p95 change and this sample is too small to safely retune.
 - [x] T2.5 API response now includes baseline window size; CLI and PR comment disclose used/available baseline window and minimum, with metric bands. Missing measurements remain unavailable and yield `insufficient_data`.
 - [x] Phase 2 standard verification passed: lint, build, 39 individual test files, full suite twice (183 tests per run; 182 pass, 1 Windows skip, 0 fail); evidence at `docs/roadmap/evidence/phase2-2-regression-studies.md`.
-- [ ] Phase 3 tasks T3.1–T3.4 in progress after Phase 2 gate.
-- [ ] Phase 4 tasks T4.0–T4.4 require approved pilot repositories.
+- [x] T3.1 Added `devflow check` with config defaults, `--init`, safe environment-token usage, verdict/count output and tested exit codes.
+- [x] T3.2 Action now links its JSON artifact and upserts a single PR comment; mocked GitHub API create/update tests pass. Live CI remains NOT VERIFIED.
+- [x] T3.3 Clean-install Windows quickstart completed `devflow check` in 42 seconds: 5,779 successes, 0 failures, first-run `insufficient_data` verdict.
+- [x] T3.4 Added `docs/WHY_DEVFLOW.md` with honest local evidence and sourced k6/Locust/Bencher comparisons. README/landing rewrite awaits Phase 4 evidence.
+- [x] Phase 3 standard verification passed: lint, build, 40 per-file suites, full suite twice (188 each, 187 pass, 1 Windows skip, 0 failures); evidence at `docs/roadmap/evidence/phase2-3-adoption.md`.
+- [ ] T4.0–T4.4 blocked until owner supplies 3–10 real repos and approves adding the Action/CLI to their CI.
 - [ ] Phase 5 and Phase 6 remain gated on real pilot evidence and owner decisions.
 
 ## Security findings
@@ -36,6 +40,7 @@ Current phase: 3   Last updated: 2026-11-11   Branch: roadmap2/phase-2-regressio
 - Untracked pre-existing `demo/` contains a separate Saleor sample application with `changeme` environment placeholders and hardcoded sample/test passwords; it is outside DevFlow source and was not changed/staged.
 - The local owner-created administrator account uses a short password selected earlier at the owner's request. It is hashed in the loopback-only local database and absent from tracked source. Change it before exposing the instance beyond localhost; the value is intentionally not recorded.
 - Fixed test passwords were found in account-creation fixtures and quickstart/experiment scripts; those fixtures now generate random credentials. Remaining tracked literals are a common-password denylist and weak-password rejection fixtures/direct hash unit test.
+- Full `npm audit` during clean-install quickstart reports 3 moderate findings through dev dependency `autocannon@8` → `hyperid` → `uuid <11.1.1` (GHSA-w5hq-g745-h8pq). Production dependency audit remains clean (`npm audit --omit=dev`: 0 vulnerabilities). npm's suggested fix forces `autocannon@9`, a breaking upgrade; defer that compatibility change for a separate review rather than applying it without testing.
 
 ## Decision log
 
@@ -49,6 +54,8 @@ Current phase: 3   Last updated: 2026-11-11   Branch: roadmap2/phase-2-regressio
 | Validate regression model through the CLI instead of only calling the detector directly. | Matches the real adoption pipeline; raw study results include the CLI report and comparison bands. |
 | Do not tune detector thresholds before measuring controlled behavior. | T2.4 changes must be evidence-driven and followed by remeasurement. |
 | Promote only the disposable temporary study account to the existing paid tier. | The first real CLI study hit the Free lifetime cap at 15 runs; the 20-run baseline needs room, and production quotas remain unchanged. The incomplete run produced no study artifact. |
+| Defer README/landing-page repositioning until the pilot gate. | Phase 5 requires real pilot evidence; Phase 3 creates a separate evidence-aware Why page without claiming adoption. |
+| Keep Phase 4 blocked and do not run an external Action. | `PILOT_REPOS_APPROVED=false` and no owner repository list was provided. |
 
 ## BLOCKED items
 

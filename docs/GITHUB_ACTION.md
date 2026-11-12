@@ -1,6 +1,6 @@
 # GitHub Action
 
-The composite Action runs the DevFlow CLI against an existing API. Store `DEVFLOW_API_URL` and `DEVFLOW_TOKEN` as repository or environment secrets and grant `pull-requests: write` only if you want the Action to maintain its summary comment.
+The composite Action runs the DevFlow CLI against an existing API. Store `DEVFLOW_API_URL` and `DEVFLOW_TOKEN` as repository or environment secrets. Grant `pull-requests: write` if you want the Action to maintain its result comment.
 
 ```yaml
 - uses: adityasinghr651/Devflow@main
@@ -11,4 +11,6 @@ The composite Action runs the DevFlow CLI against an existing API. Store `DEVFLO
     github-token: ${{ secrets.GITHUB_TOKEN }}
 ```
 
-It uploads `devflow-result.json` and creates or updates one PR comment. Baseline comparisons are not automatic. Hosted runners and shared targets introduce noise; use a stable dedicated target, repeat measurements, and treat small changes as inconclusive. Do not expose a production token to untrusted fork pull requests.
+It runs the configured workload, compares it with matching history, uploads `devflow-result.json`, and creates or updates one PR comment. Hosted runners and shared targets introduce noise; use a stable dedicated target, repeat unexpected measurements, and treat small changes as inconclusive. Do not expose a production token to untrusted fork pull requests.
+
+For a copy-paste workflow, see [the GitHub Action quickstart](../examples/github-action-quickstart.yml). The maintained comment states the verdict, number of comparable runs and minimum, per-metric decision bands, and a direct link to the uploaded JSON artifact. The Action behavior is covered by mocked GitHub API tests; it has not yet been run in an approved external pilot repository.
