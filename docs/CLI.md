@@ -1,6 +1,26 @@
 # CLI
 
-The `devflow` binary submits a run to an existing DevFlow API and waits for its final result.
+The `devflow` binary submits a run to an existing DevFlow API, waits for its final result, and compares it with matching history.
+
+## One-command project check
+
+From a project with a saved DevFlow target, scaffold a starter config once:
+
+```sh
+npm link
+devflow check --init
+```
+
+Set `targetId` in `devflow.config.json` to your saved target ID, then provide the API token through the environment and run:
+
+```sh
+export DEVFLOW_TOKEN="<your-token>"
+devflow check
+```
+
+The check reads `devflow.config.json` by default. It uses `apiUrl` from that file, then `DEVFLOW_API`, then `http://127.0.0.1:4000/api/v1`. `--config`, `--api`, `--token`, `--wait`, and `--json` override the defaults. The config contains workload settings only; do not save tokens in it. `--init` refuses to overwrite an existing file. Use `--json` for machine-readable output.
+
+## Explicit run
 
 ```sh
 npm link

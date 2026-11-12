@@ -12,6 +12,7 @@ import { getRunnerManager } from '../../server/runner/manager.js';
 import { hashPassword, generateToken } from '../../server/security/auth.js';
 import { createTestTargetServer, TARGET_CONFIG } from '../../tools/test-target.js';
 import { config } from '../../server/config.js';
+import { createTestPassword } from '../helpers/test-credentials.js';
 
 test('Phase 2: security headers, body size, quota enforcement, stream tickets, and audit isolation', async t => {
   process.env.RUNNER_ENGINE = 'node';
@@ -26,8 +27,11 @@ test('Phase 2: security headers, body size, quota enforcement, stream tickets, a
   await new Promise(resolve => apiServer.listen(0, '127.0.0.1', resolve));
   const api = `http://127.0.0.1:${apiServer.address().port}/api`;
   const targetUrl = `http://${TARGET_CONFIG.host}:${targetServer.address().port}`;
-  const userA = await storage.createUser({ email: 'phase2a@example.test', passwordHash: await hashPassword('ValidPhase2Password123!'), name: 'Phase 2 A' });
-  const userB = await storage.createUser({ email: 'phase2b@example.test', passwordHash: await hashPassword('ValidPhase2Password123!'), name: 'Phase 2 B' });
+  const passwordA = createTestPassword();
+  const passwordB = createTestPassword();
+  const wrongPassword = createTestPassword();
+  const userA = await storage.createUser({ email: 'phase2a@example.test', passwordHash: await hashPassword(passwordA), name: 'Phase 2 A' });
+  const userB = await storage.createUser({ email: 'phase2b@example.test', passwordHash: await hashPassword(passwordB), name: 'Phase 2 B' });
   const tokenA = generateToken(userA);
   const tokenB = generateToken(userB);
   const target = await storage.createTarget({ id: randomUUID(), userId: userA.id, name: 'Loopback fixture', url: targetUrl, verified: true });
@@ -51,22 +55,22 @@ test('Phase 2: security headers, body size, quota enforcement, stream tickets, a
 
   const missingLogin = await fetch(`${api}/auth/login`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email: 'missing@example.test', password: 'wrong-password' }),
+    body: JSON.stringify({ email: 'missing@example.test', password: wrongPassword }),
   });
-  const wrongPassword = await fetch(`${api}/auth/login`, {
+  const wrongPasswordLogin = await fetch(`${api}/auth/login`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email: userA.email, password: 'wrong-password' }),
+    body: JSON.stringify({ email: userA.email, password: wrongPassword }),
   });
   assert.equal(missingLogin.status, 401);
-  assert.equal(wrongPassword.status, 401);
-  assert.equal((await missingLogin.json()).error, (await wrongPassword.json()).error);
+  assert.equal(wrongPasswordLogin.status, 401);
+  assert.equal((await missingLogin.json()).error, (await wrongPasswordLogin.json()).error);
   assert.equal((await fetch(`${api}/audit-events`)).status, 401);
   assert.equal((await fetch(`${api}/targets`)).status, 401);
   assert.equal((await fetch(`${api}/runs`)).status, 401);
 
   const duplicateRegistration = await fetch(`${api}/auth/register`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email: userA.email, name: 'Duplicate', password: 'ValidPhase2Password123!' }),
+    body: JSON.stringify({ email: userA.email, name: 'Duplicate', password: passwordA }),
   });
   assert.equal(duplicateRegistration.status, 409);
   assert.equal((await duplicateRegistration.json()).error, 'An account with this email already exists.');

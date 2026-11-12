@@ -1,0 +1,21 @@
+name: Performance regression check
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  devflow:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compare this commit with DevFlow history
+        uses: adityasinghr651/Devflow@main
+        with:
+          api-url: ${{ secrets.DEVFLOW_API_URL }}
+          token: ${{ secrets.DEVFLOW_TOKEN }}
+          config: examples/devflow.config.json
+          github-token: ${{ secrets.GITHUB_TOKEN }}

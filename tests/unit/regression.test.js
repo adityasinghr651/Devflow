@@ -32,6 +32,7 @@ test('fewer than three comparable runs returns insufficient_data with exact expl
   const result = evaluateRunRegression(makeRun('current'), history().slice(0, 2));
   assert.equal(result.verdict, 'insufficient_data');
   assert.equal(result.baselineCount, 2);
+  assert.equal(result.historySize, 5);
   assert.equal(result.minimumBaselineRuns, 3);
   assert.match(result.reason, /found 2/);
 });
@@ -51,6 +52,7 @@ test('same-distribution run passes and includes median, MAD band, and the actual
   const result = evaluateRunRegression(makeRun('current'), history());
   assert.equal(result.verdict, 'pass');
   assert.equal(result.baselineCount, 5);
+  assert.equal(result.historySize, 5);
   assert.deepEqual(result.baselineRunIds, ['baseline-5', 'baseline-4', 'baseline-3', 'baseline-2', 'baseline-1']);
   assert.equal(result.metrics.rps.median, 100);
   assert.ok(result.metrics.rps.mad > 0);
@@ -87,4 +89,12 @@ test('latency/error regressions and meaningful improvements have correct directi
 test('incomplete run cannot be declared passing', () => {
   const result = evaluateRunRegression(makeRun('partial-current', { partialWorkers: [0] }), history());
   assert.equal(result.verdict, 'insufficient_data');
+});
+
+test('missing measurements remain unavailable instead of being converted to zero', () => {
+  const current = makeRun('current', { p95: null });
+  const result = evaluateRunRegression(current, history());
+  assert.equal(result.verdict, 'insufficient_data');
+  assert.equal(result.metrics.p95.verdict, 'insufficient_data');
+  assert.equal(result.metrics.p95.observed, null);
 });

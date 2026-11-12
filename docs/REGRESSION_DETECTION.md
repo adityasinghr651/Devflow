@@ -1,6 +1,6 @@
 # Statistical regression detection
 
-DevFlow compares a completed run with up to its five most recent completed runs that share its target and workload fingerprint. Fewer than three matching baselines returns `insufficient_data`; no verdict is inferred from one or two runs. Demo, partial-worker, and incomplete-histogram records are excluded.
+DevFlow compares a completed run with the five most recent completed runs that share its target and workload fingerprint (`historySize: 5`). Fewer than three matching baselines returns `insufficient_data`; no verdict is inferred from one or two runs. Demo, partial-worker, and incomplete-histogram records are excluded. Missing metric values are kept as unavailable (`null`) and also produce `insufficient_data`, never a synthetic zero.
 
 ## Fingerprint and baseline
 
@@ -15,7 +15,7 @@ For RPS, p95, p99, and error rate, DevFlow calculates the baseline median and me
 | p99 | Above baseline | 19.36%, using p95 variance as the closest Phase 1 tail-latency measurement |
 | Error rate | Above baseline | 25% relative plus a 0.01 percentage-point floor; Phase 1's controlled samples had no failures, so they cannot estimate error-rate variance |
 
-The final decision threshold is the larger of the three-scaled-MAD band, the metric minimum change, and the error-rate floor where applicable. For zero baseline error rate, an increase must exceed 0.01 percentage points to count as a regression. The API returns the exact baseline run IDs, observed metric, median, MAD, decision band, and minimum change used.
+The final decision threshold is the larger of the three-scaled-MAD band, the metric minimum change, and the error-rate floor where applicable. For zero baseline error rate, an increase must exceed 0.01 percentage points to count as a regression. The API returns `baselineCount`, `historySize`, `minimumBaselineRuns`, exact baseline run IDs, observed metric, median, MAD, decision band, and minimum change used. CLI output and the GitHub PR comment state the used/available baseline window and show each metric's decision band. Insufficient history is named explicitly.
 
 ## Use it
 
@@ -25,4 +25,4 @@ The final decision threshold is the larger of the three-scaled-MAD band, the met
 
 Results depend on recent comparable history and local host noise. Different fingerprints and missing history are reported as insufficient rather than compared. Baseline history is scoped to one DevFlow owner and target. This feature was evaluated using a local controlled HTTP target on one host; it does not establish false-positive or detection rates across teams, machines, cloud runners, or production workloads. Use stable targets and repeat an unexpected result before acting on it.
 
-The local experiment's raw run data and measured false-positive/detection rates are saved under `benchmarks/results/regression-experiment-*.json` after it is run with `npm run regression:experiment`.
+The earlier local experiment's raw run data remains under `benchmarks/results/regression-experiment-*.json`. The Phase 2 CLI-driven controlled studies are saved in `benchmarks/results/false-positive-study.md`, `benchmarks/results/true-positive-study.md`, and `benchmarks/results/regression-study-raw.json` after `npm run regression:study`. On the recorded Windows host, the run observed 0 false regressions in 17 eligible stable comparisons, detected +25% and +50% added latency in 5/5 trials each, and did not detect +10% in 0/5 trials. These small local counts are not broad accuracy claims; +10% sensitivity is a known limit of the current decision threshold.

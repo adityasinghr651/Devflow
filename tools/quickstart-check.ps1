@@ -2,7 +2,7 @@ $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
 $tmp = Join-Path ([System.IO.Path]::GetTempPath()) ("devflow-quickstart-" + [guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $tmp | Out-Null
-$envNames = @('API_PORT', 'API_HOST', 'DATA_DIR', 'ALLOW_LOCAL_TARGETS', 'JWT_SECRET')
+$envNames = @('API_PORT', 'API_HOST', 'DATA_DIR', 'ALLOW_LOCAL_TARGETS', 'JWT_SECRET', 'DEVFLOW_TOKEN')
 $oldEnv = @{}
 foreach ($name in $envNames) { $oldEnv[$name] = [Environment]::GetEnvironmentVariable($name, 'Process') }
 $api = $null; $target = $null
@@ -29,17 +29,23 @@ try {
   } while ((Get-Date) -lt $deadline)
   if ((Get-Date) -ge $deadline) { throw 'API did not become ready.' }
   $email = "quick-$([guid]::NewGuid().ToString('N'))@example.test"
-  $user = Invoke-RestMethod "$base/auth/register" -Method Post -ContentType 'application/json' -Body (@{ name='Quickstart'; email=$email; password='QuickstartPass123!' } | ConvertTo-Json)
+  $randomBytes = [byte[]]::new(24)
+  $randomGenerator = [System.Security.Cryptography.RandomNumberGenerator]::Create()
+  try { $randomGenerator.GetBytes($randomBytes) } finally { $randomGenerator.Dispose() }
+  $randomPart = [Convert]::ToBase64String($randomBytes).TrimEnd('=').Replace('+','A').Replace('/','b')
+  $password = 'Df!' + $randomPart + '9A'
+  $user = Invoke-RestMethod "$base/auth/register" -Method Post -ContentType 'application/json' -Body (@{ name='Quickstart'; email=$email; password=$password } | ConvertTo-Json)
   $headers = @{ Authorization = "Bearer $($user.token)" }
   $savedTarget = Invoke-RestMethod "$base/targets" -Method Post -Headers $headers -ContentType 'application/json' -Body (@{ name='Quickstart target'; url='http://127.0.0.1:5050'; environment='local' } | ConvertTo-Json)
-  $run = Invoke-RestMethod "$base/runs" -Method Post -Headers $headers -ContentType 'application/json' -Body (@{ targetId=$savedTarget.id; path='/health'; method='GET'; concurrency=2; durationSec=2; workerCount=1; authorized=$true } | ConvertTo-Json)
-  $deadline = (Get-Date).AddSeconds(20)
-  do {
-    Start-Sleep -Milliseconds 250
-    $run = Invoke-RestMethod "$base/runs/$($run.id)" -Headers $headers
-  } while ($run.status -notin @('completed','failed','cancelled','timed_out') -and (Get-Date) -lt $deadline)
+  $configPath = Join-Path $tmp 'devflow.config.json'
+  @{ apiUrl=$base; targetId=$savedTarget.id; path='/health'; method='GET'; concurrency=2; durationSec=2; workerCount=1; authorized=$true } | ConvertTo-Json | Set-Content -LiteralPath $configPath
+  $env:DEVFLOW_TOKEN = $user.token
+  $checkOutput = & node bin/devflow.js check --config $configPath --json
+  if ($LASTEXITCODE -ne 0) { throw "devflow check failed with exit code $LASTEXITCODE" }
+  $report = ($checkOutput -join "`n") | ConvertFrom-Json
+  $run = $report
   if ($run.status -ne 'completed') { throw "Run did not complete: $($run.status)" }
-  [pscustomobject]@{ status=$run.status; runId=$run.id; totalRequests=$run.totalRequests; successCount=$run.successCount; failedCount=$run.failedCount } | ConvertTo-Json -Compress
+  [pscustomobject]@{ status=$run.status; runId=$run.runId; totalRequests=$run.totalRequests; successCount=$run.successCount; failedCount=$run.failedCount; regressionVerdict=$run.regression.verdict } | ConvertTo-Json -Compress
   Write-Output "Quickstart elapsed: $([int]((Get-Date)-$started).TotalSeconds) seconds"
 } finally {
   foreach ($proc in @($api, $target)) { if ($proc -and -not $proc.HasExited) { Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue } }

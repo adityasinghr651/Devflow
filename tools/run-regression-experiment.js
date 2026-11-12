@@ -2,7 +2,7 @@ import { createServer } from 'node:http';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { randomUUID } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 import { JsonStorage } from '../server/storage/json-storage.js';
 import { setStorage } from '../server/storage/index.js';
 import { getRunnerManager } from '../server/runner/manager.js';
@@ -32,10 +32,11 @@ async function main() {
   const api = `http://127.0.0.1:${apiServer.address().port}/api/v1`;
   const runner = getRunnerManager(storage);
   const outputs = [];
+  const password = `Df!${randomBytes(24).toString('base64url')}9A`;
   try {
     const register = await fetch(`${api}/auth/register`, {
       method: 'POST', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ name: 'Regression experiment', email: `experiment-${randomUUID()}@example.test`, password: 'ExperimentPass123!' }),
+      body: JSON.stringify({ name: 'Regression experiment', email: `experiment-${randomUUID()}@example.test`, password }),
     });
     if (!register.ok) throw new Error(`Register failed (${register.status}): ${await register.text()}`);
     const session = await register.json();

@@ -15,6 +15,10 @@ export const REGRESSION_POLICY = Object.freeze({
 
 const METRICS = ['rps', 'p95', 'p99', 'errorRate'];
 const TERMINAL_QUALITY = run => run.status === 'completed' && !run.isDemo && !(run.partialWorkers?.length) && run.histogramComplete !== false;
+const observedValue = run => Object.fromEntries(METRICS.map(metric => {
+  const value = run[metric];
+  return [metric, value !== null && value !== undefined && Number.isFinite(Number(value)) ? Number(value) : null];
+}));
 
 function normalizePath(run) {
   try {
@@ -53,8 +57,12 @@ function median(values) {
 }
 
 function metricVerdict(metric, observed, baselineRuns, minimumBaselineRuns) {
-  const values = baselineRuns.map(run => Number(run[metric])).filter(Number.isFinite);
+  const values = baselineRuns.map(run => run[metric])
+    .filter(value => value !== null && value !== undefined && Number.isFinite(Number(value)))
+    .map(Number);
   if (values.length < minimumBaselineRuns) return { verdict: 'insufficient_data', observed };
+  if (observed === null || observed === undefined || !Number.isFinite(Number(observed))) return { verdict: 'insufficient_data', observed: null };
+  observed = Number(observed);
   const center = median(values);
   const mad = median(values.map(value => Math.abs(value - center)));
   const robustSpread = 1.4826 * mad;
@@ -108,10 +116,11 @@ export function evaluateRunRegression(run, allRuns, options = {}) {
       verdict: 'insufficient_data',
       reason: 'Only complete, non-demo runs with complete worker histograms can be evaluated.',
       baselineCount: baselineRuns.length,
+      historySize,
       minimumBaselineRuns,
       baselineRunIds,
       mismatchedRunCount,
-      metrics: Object.fromEntries(METRICS.map(metric => [metric, { verdict: 'insufficient_data', observed: Number(run[metric]) || 0 }]))
+      metrics: Object.fromEntries(METRICS.map(metric => [metric, { verdict: 'insufficient_data', observed: observedValue(run)[metric] }]))
     };
   }
   if (baselineRuns.length < minimumBaselineRuns) {
@@ -123,13 +132,16 @@ export function evaluateRunRegression(run, allRuns, options = {}) {
       verdict: 'insufficient_data',
       reason: `Need ${minimumBaselineRuns} completed comparable baseline runs; found ${baselineRuns.length}.${mismatchedRunCount ? ` ${mismatchedRunCount} completed run(s) for this target have a different workload fingerprint.` : ''}`,
       baselineCount: baselineRuns.length,
+      historySize,
       minimumBaselineRuns,
       baselineRunIds,
       mismatchedRunCount,
-      metrics: Object.fromEntries(METRICS.map(metric => [metric, { verdict: 'insufficient_data', observed: Number(run[metric]) || 0 }]))
+      metrics: Object.fromEntries(METRICS.map(metric => [metric, { verdict: 'insufficient_data', observed: observedValue(run)[metric] }]))
     };
   }
-  const metrics = Object.fromEntries(METRICS.map(metric => [metric, metricVerdict(metric, Number(run[metric]) || 0, baselineRuns, minimumBaselineRuns)]));
+  const metrics = Object.fromEntries(METRICS.map(metric => {
+    return [metric, metricVerdict(metric, observedValue(run)[metric], baselineRuns, minimumBaselineRuns)];
+  }));
   const values = Object.values(metrics).map(metric => metric.verdict);
   const verdict = values.includes('insufficient_data') ? 'insufficient_data' : values.includes('regression') ? 'regression' : values.includes('improvement') ? 'improvement' : 'pass';
   return {
@@ -140,6 +152,7 @@ export function evaluateRunRegression(run, allRuns, options = {}) {
     verdict,
     reason: 'A regression requires a 3× scaled-MAD band violation and the metric-specific minimum change.',
     baselineCount: baselineRuns.length,
+    historySize,
     minimumBaselineRuns,
     baselineRunIds,
     mismatchedRunCount,

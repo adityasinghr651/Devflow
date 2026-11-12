@@ -8,6 +8,7 @@ import { createApp } from '../../server/app.js';
 import { JsonStorage } from '../../server/storage/json-storage.js';
 import { setStorage } from '../../server/storage/index.js';
 import { getRunnerManager } from '../../server/runner/manager.js';
+import { createTestPassword } from '../helpers/test-credentials.js';
 
 test('Cancellation Test Matrix: Multi-worker lifecycle and cleanup audit', async (t) => {
   // 1. Controlled Local HTTP Target
@@ -36,6 +37,8 @@ test('Cancellation Test Matrix: Multi-worker lifecycle and cleanup audit', async
   await new Promise(resolve => apiServer.listen(0, '127.0.0.1', resolve));
   const apiPort = apiServer.address().port;
   const apiBase = `http://127.0.0.1:${apiPort}/api`;
+  const passwordA = createTestPassword();
+  const passwordB = createTestPassword();
 
   t.after(async () => {
     await new Promise(resolve => apiServer.close(resolve)).catch(() => {});
@@ -49,14 +52,14 @@ test('Cancellation Test Matrix: Multi-worker lifecycle and cleanup audit', async
   const userARes = await fetch(`${apiBase}/auth/register`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name: 'User A', email: 'userA@example.com', password: 'ValidPassword123!' }),
+    body: JSON.stringify({ name: 'User A', email: 'userA@example.com', password: passwordA }),
   });
   const { token: tokenA, user: userA } = await userARes.json();
 
   const userBRes = await fetch(`${apiBase}/auth/register`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name: 'User B', email: 'userB@example.com', password: 'ValidPassword123!' }),
+    body: JSON.stringify({ name: 'User B', email: 'userB@example.com', password: passwordB }),
   });
   const { token: tokenB } = await userBRes.json();
 
