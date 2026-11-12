@@ -1,6 +1,6 @@
 <div align="center">
 
-  <img src="docs/assets/devflow-banner.svg" alt="DevFlow: High-Performance API Load Testing Platform" width="100%" />
+  <img src="docs/assets/devflow-banner.svg" alt="DevFlow: API Performance Regression Checks" width="100%" />
 
   <br />
   <br />
@@ -13,12 +13,13 @@
   [![PRs Welcome](https://img.shields.io/badge/PRs-Welcome-C6F432?style=for-the-badge&logo=git&logoColor=0B0B0C)](CONTRIBUTING.md)
 
   <p align="center">
-    <strong>A modern, self-hosted API load testing and resilience benchmarking platform.</strong><br />
-    Exercise your APIs with multi-worker concurrency, stream live telemetry over SSE, and record exact sub-millisecond bounded histograms without event loop starvation.
+    <strong>An open-source HTTP performance regression gate for CI.</strong><br />
+    Run a repeatable API workload, compare it with matching historical runs, and surface possible regressions on pull requests. DevFlow's self-hosted load-testing platform powers the checks.
   </p>
 
   <p align="center">
     <a href="#quickstart">Quickstart</a> •
+    <a href="#catch-performance-regressions-in-ci">CI Regression Checks</a> •
     <a href="#ui-design--live-telemetry">UI &amp; Visual Tour</a> •
     <a href="#api-testing-walkthrough">API Testing Example</a> •
     <a href="#how-devflow-works">Architecture</a> •
@@ -32,7 +33,7 @@
 ---
 
 > [!NOTE]
-> **Project Scope:** DevFlow runs locally on a single host using isolated child-process workers. It is engineered to give developers a predictable, private, and self-hosted load-testing suite. **Run tests only against systems you own or are explicitly authorized to test.**
+> **Project Scope:** DevFlow is evolving from an API load-testing platform into a CI performance regression gate. Its load generator, saved run history, CLI, and GitHub Action work together to compare a pull request's run with a baseline. The pilot with external repositories is not complete, and current detector evidence comes from a controlled local target. Run checks only against systems you own or are explicitly authorized to test.
 
 ---
 
@@ -44,7 +45,7 @@
   │  🔄 Zero-Polling Telemetry     │ Out-of-process Node workers push live SSE  │
   │  🛡️ Cryptographic Verification│ DNS TXT & HTTP challenge proofs block SSRF │
   │  🔀 Multi-Worker Isolation     │ Partitioned concurrency across CPU cores   │
-  │  📈 Regression Gates           │ Median & MAD statistical bounds for CI/CD  │
+  │  📈 CI Regression Checks        │ Compare API runs against matching history │
   │  💾 Dual Storage Engine        │ Zero-config JSON or PostgreSQL persistence │
   └─────────────────────────────────────────────────────────────────────────────┘
 ```
@@ -54,6 +55,54 @@
 - **Process Isolation:** Load generation child processes operate in dedicated Node.js event loops, preventing benchmark traffic from starving the API server or distorting measurements.
 - **Safety by Design:** Target endpoints require verification before testing remote hosts. Loopback addresses are restricted to local development environments.
 - **Unified 1-Command Startup:** Launch the API, Vite React frontend, and local controlled test target together with `npm run dev:all`.
+
+---
+
+## Catch Performance Regressions in CI
+
+DevFlow started as a way to generate controlled HTTP load and inspect API performance. The next step is to make those measurements useful during code review: run the same workload for a pull request, compare its results with recent comparable runs, and report a possible performance regression before the change reaches production.
+
+The CI check uses DevFlow's own runner and history. It currently does not import results from k6, Locust, or other load-testing tools. A first run may return `insufficient_data`; DevFlow needs at least three comparable completed runs before it can make a statistical comparison. The GitHub Action uploads the report and adds or updates a pull request comment with the verdict and metric bands.
+
+### How a check flows
+
+```text
+Pull request → GitHub Actions → `devflow check` → DevFlow API
+                                      │                 ├─ runs the configured HTTP workload
+                                      │                 ├─ saves run results and compares history
+                                      └─ PR summary ←───┴─ returns pass, regression, or insufficient data
+```
+
+The target must be reachable from the CI runner. Use a dedicated test or staging environment, keep the workload within its capacity, and get authorization from its owner. Do not point CI load tests at public services or production systems without explicit approval.
+
+### Try it locally first
+
+Start DevFlow and its controlled test target with `npm run dev:all`, create an account, and save the local target. Then set up the CLI check:
+
+```sh
+npm link
+devflow check --init
+```
+
+Set the `targetId` in `devflow.config.json` to the saved target, then run:
+
+```sh
+# macOS / Linux
+export DEVFLOW_TOKEN="<your-token>"
+devflow check
+```
+
+```powershell
+# Windows PowerShell
+$env:DEVFLOW_TOKEN = "<your-token>"
+devflow check
+```
+
+For GitHub Actions setup and configuration, see the [CLI guide](docs/CLI.md), [GitHub Action example](examples/github-action-quickstart.yml), and [regression detection policy](docs/REGRESSION_DETECTION.md). Keep tokens in repository or environment secrets, not in committed config files.
+
+### Current evidence and project status
+
+The local controlled study recorded zero false regression verdicts in 17 eligible stable comparisons, detected all five +25% and all five +50% injected slowdowns, and detected none of five +10% slowdowns. These small results came from one Windows machine and a controlled loopback target; they are not broad accuracy guarantees. No real-repository pilot has run yet. See the [study report](docs/roadmap/evidence/phase2-2-regression-studies.md) and [roadmap status](docs/roadmap/FINAL_REPORT2.md). The project is seeking repository owners who are willing to approve a scoped CI pilot.
 
 ---
 
