@@ -1,6 +1,6 @@
 # Regression-Gate Roadmap Progress
 
-Current phase: 4   Last updated: 2026-11-12   Branch: roadmap2/phase-3-adoption   HEAD: a5b864ee9e10fa00f0455a3923af705f2fb2c9ad
+Current phase: 4   Last updated: 2026-11-12   Branch: roadmap2/phase-4-pilot   HEAD: 956ea5d6b58297edd3d8c901ee0d170ad9a64b15
 
 ## Phase table
 
@@ -9,9 +9,9 @@ Current phase: 4   Last updated: 2026-11-12   Branch: roadmap2/phase-3-adoption 
 | 1 | done | pass with documented local credential exception | docs/roadmap/evidence/phase2-1-security.md |
 | 2 | done | pass with documented +10% sensitivity limitation | docs/roadmap/evidence/phase2-2-regression-studies.md |
 | 3 | done | pass with live Action not verified | docs/roadmap/evidence/phase2-3-adoption.md |
-| 4 | blocked | owner has not approved pilot or supplied repositories | docs/roadmap/evidence/phase2-4-pilot.md |
-| 5 | not started | gated on real Phase 4 signal | docs/roadmap/evidence/phase2-5-positioning.md |
-| 6 | not started | gated on Phases 4 and 5 | docs/roadmap/evidence/phase2-6-monetization.md |
+| 4 | blocked | NOT VERIFIED: owner has not approved pilot or supplied repositories | docs/roadmap/evidence/phase2-4-pilot.md |
+| 5 | blocked | Phase 4 has no real pilot signal | docs/roadmap/evidence/phase2-5-positioning.md |
+| 6 | blocked | Phases 4 and 5 are gated; owner decisions pending | docs/roadmap/evidence/phase2-6-monetization.md |
 
 ## Task checklist
 
@@ -32,7 +32,7 @@ Current phase: 4   Last updated: 2026-11-12   Branch: roadmap2/phase-3-adoption 
 - [x] T3.3 Clean-install Windows quickstart completed `devflow check` in 42 seconds: 5,779 successes, 0 failures, first-run `insufficient_data` verdict.
 - [x] T3.4 Added `docs/WHY_DEVFLOW.md` with honest local evidence and sourced k6/Locust/Bencher comparisons. README/landing rewrite awaits Phase 4 evidence.
 - [x] Phase 3 standard verification passed: lint, build, 40 per-file suites, full suite twice (188 each, 187 pass, 1 Windows skip, 0 failures); evidence at `docs/roadmap/evidence/phase2-3-adoption.md`.
-- [ ] T4.0–T4.4 blocked until owner supplies 3–10 real repos and approves adding the Action/CLI to their CI.
+- [ ] T4.0–T4.4 blocked: `PILOT_REPOS_APPROVED=false`; no owner list of 3–10 repositories was supplied. No external repo or target was touched; reason recorded in `docs/roadmap/evidence/phase2-4-pilot.md`.
 - [ ] Phase 5 and Phase 6 remain gated on real pilot evidence and owner decisions.
 
 ## Security findings
@@ -66,3 +66,4 @@ Current phase: 4   Last updated: 2026-11-12   Branch: roadmap2/phase-3-adoption 
 
 - Any live OAuth verification is limited to mocked provider endpoints unless real provider credentials are provided.
 - A real external-repository CI pilot is not authorized or configured.
+- The hosted GitHub Action, real PR artifact download, and comment update lifecycle remain NOT VERIFIED until an approved external pilot runs.
