@@ -24,7 +24,7 @@ runs:
         DEVFLOW_CONFIG: ${{ inputs.config }}
       run: node "$GITHUB_ACTION_PATH/bin/devflow.js" run --config "$GITHUB_WORKSPACE/$DEVFLOW_CONFIG" --api "$DEVFLOW_API" --token "$DEVFLOW_TOKEN" --json > "$GITHUB_WORKSPACE/devflow-result.json"
     - id: result-artifact
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       if: always()
       with:
         name: devflow-result
