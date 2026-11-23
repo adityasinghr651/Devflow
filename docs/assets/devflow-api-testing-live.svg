@@ -66,7 +66,7 @@
     <circle cx="54" cy="21" r="5" fill="#10B981" opacity="0.8"/>
 
     <!-- Title / Breadcrumb -->
-    <text x="76" y="25" fill="#71717A" font-size="12" font-family="sans-serif">ServerTest <tspan fill="#3F3F46">/</tspan> <tspan fill="#FFFFFF" font-weight="600">Live Metrics &amp; Telemetry Stream</tspan></text>
+    <text x="76" y="25" fill="#71717A" font-size="12" font-family="sans-serif">DevFlow <tspan fill="#3F3F46">/</tspan> <tspan fill="#FFFFFF" font-weight="600">Live Metrics &amp; Telemetry Stream</tspan></text>
 
     <!-- Host Indicator -->
     <g transform="translate(1010, 10)">
