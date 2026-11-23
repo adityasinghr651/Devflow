@@ -45,7 +45,7 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
     {
       label: 'REGRESSION GATE',
       items: [
-        { name: 'CI Setup', target: 'Documentation', icon: GitBranch },
+        { name: 'CI Setup Guide', target: 'Documentation', icon: GitBranch },
         { name: 'Comparisons', icon: BarChart3 },
       ],
     },
@@ -181,7 +181,7 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
             }}
           >
             <BookOpen size={15} />
-            <span>Documentation</span>
+            <span>User Guide &amp; Help</span>
           </button>
 
           <a

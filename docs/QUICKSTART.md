@@ -18,4 +18,6 @@ This starts the API, web UI, and controlled local test target together. Open `ht
 
 Create an account in the UI, add `http://127.0.0.1:5050` as a target, and run a small GET `/health` test with 2 virtual users for 5 seconds. Local targets are enabled by default outside production. Never enable them on a public instance.
 
+For the full browser walkthrough—including sign-in, target verification, results, CI history, storage, billing, and troubleshooting—see the [DevFlow User Guide](USER_GUIDE.md). The in-app **User Guide & Help** page covers the same core workflow.
+
 For a scripted clean-install check, run `bash tools/quickstart-check.sh` (Git Bash or Linux/macOS shell) or `powershell -ExecutionPolicy Bypass -File tools/quickstart-check.ps1` on Windows. It starts local services, saves a target, calls `devflow check`, and prints the regression verdict (normally `insufficient_data` on the first run). Docker packaging is in [Docker deployment](DOCKER.md).

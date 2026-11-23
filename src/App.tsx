@@ -977,7 +977,7 @@ export default function App() {
             <ComparisonsView completed={completed} token={token} hasMore={hasMoreRuns} onLoadMore={() => { void loadMoreRuns(); }} />
           )}
 
-          {page === 'Documentation' && <DocsView />}
+          {page === 'Documentation' && <DocsView onNavigate={(destination) => navigateTo(destination)} />}
 
           {page === 'Billing & Plans' && <BillingView user={user} token={token} api={API} onUserUpdated={setUser} onSignIn={() => setShowAuth(true)} />}
 

@@ -113,6 +113,7 @@ export const TestConfigModal: React.FC<TestConfigModalProps> = ({
           <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
             Quick Workload Presets
           </span>
+          <p style={{ margin: '4px 0 0', fontSize: '11px', lineHeight: 1.5, color: 'var(--text-muted)' }}>A virtual user (VU) sends requests concurrently. Start small on a safe, preferably read-only route; higher VUs and longer durations send more traffic.</p>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', marginTop: '6px' }}>
             <button
               type="button"
@@ -164,6 +165,7 @@ export const TestConfigModal: React.FC<TestConfigModalProps> = ({
         {error && <div className="warning-box" role="alert">{error}</div>}
         <label>
           Target Endpoint
+          <span style={{ display: 'block', margin: '4px 0 6px', fontSize: 11, lineHeight: 1.5, color: 'var(--text-muted)' }}>Select a saved target. The path below is appended to its base URL. Localhost means the machine running the DevFlow API.</span>
           <select
             required
             className="cyber-input"
