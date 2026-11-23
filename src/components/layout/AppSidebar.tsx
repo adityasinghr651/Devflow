@@ -6,6 +6,7 @@ import {
   BookOpen,
   ChevronDown,
   Code2,
+  CreditCard,
   GitBranch,
   History,
   Home,
@@ -65,6 +66,10 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
         { name: 'Settings', icon: Settings },
         ...(user?.role === 'admin' ? [{ name: 'Admin', icon: Settings }] : []),
       ],
+    },
+    {
+      label: 'BILLING',
+      items: [{ name: 'Billing & Plans', icon: CreditCard }],
     },
   ];
 

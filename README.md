@@ -10,22 +10,22 @@
   [![TypeScript](https://img.shields.io/badge/TypeScript-5.9-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
   [![React & Vite](https://img.shields.io/badge/React_19-Vite_8-61DAFB?style=for-the-badge&logo=vite&logoColor=white)](https://vitejs.dev/)
   [![PostgreSQL](https://img.shields.io/badge/Storage-PostgreSQL_|_JSON-4169E1?style=for-the-badge&logo=postgresql&logoColor=white)](https://www.postgresql.org/)
-  [![PRs Welcome](https://img.shields.io/badge/PRs-Welcome-C6F432?style=for-the-badge&logo=git&logoColor=0B0B0C)](CONTRIBUTING.md)
+  [![License: MIT](https://img.shields.io/badge/License-MIT-C6F432?style=for-the-badge&logo=git&logoColor=0B0B0C)](LICENSE)
 
   <p align="center">
-    <strong>An open-source HTTP performance regression gate for CI.</strong><br />
-    Run a repeatable API workload, compare it with matching historical runs, and surface possible regressions on pull requests. DevFlow's self-hosted load-testing platform powers the checks.
+    <strong>An open-source HTTP performance regression gate &amp; load testing platform.</strong><br />
+    Run repeatable API workloads, stream real-time sub-millisecond telemetry via Server-Sent Events, compare performance against historical baselines, and catch latency regressions before merging pull requests.
   </p>
 
   <p align="center">
-    <a href="#quickstart">Quickstart</a> •
-    <a href="#catch-performance-regressions-in-ci">CI Regression Checks</a> •
+    <a href="#quickstart-local-setup">Local Setup</a> •
+    <a href="#using-devflow-via-hosted-web-app">Using via Hosted Link</a> •
+    <a href="#how-to-test-the-platform">How to Test the Platform</a> •
     <a href="#ui-design--live-telemetry">UI &amp; Visual Tour</a> •
-    <a href="#api-testing-walkthrough">API Testing Example</a> •
+    <a href="#catch-performance-regressions-in-ci">CI Regression Checks</a> •
     <a href="#how-devflow-works">Architecture</a> •
     <a href="#rest-api-reference">REST API</a> •
-    <a href="#configuration-reference">Configuration</a> •
-    <a href="#contributing">Contributing</a>
+    <a href="#configuration-reference">Configuration</a>
   </p>
 
 </div>
@@ -33,13 +33,13 @@
 ---
 
 > [!NOTE]
-> **Project Scope:** DevFlow is evolving from an API load-testing platform into a CI performance regression gate. Its load generator, saved run history, CLI, and GitHub Action work together to compare a pull request's run with a baseline. The pilot with external repositories is not complete, and current detector evidence comes from a controlled local target. Run checks only against systems you own or are explicitly authorized to test.
+> **Project Scope:** DevFlow is an API load-testing platform and CI performance regression gate. Its load generator, saved run history, CLI (`devflow check`), and GitHub Action work together to compare a pull request's run with a baseline. Run checks only against systems you own or are explicitly authorized to test.
 
 ---
 
 ## Highlights & Engineering Principles
 
-```
+```text
   ┌─────────────────────────────────────────────────────────────────────────────┐
   │  ⚡ Bounded-Memory Histograms │ Exact O(1) memory across 6,801 buckets      │
   │  🔄 Zero-Polling Telemetry     │ Out-of-process Node workers push live SSE  │
@@ -50,168 +50,91 @@
   └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
-- **Sub-Millisecond Bounded Histograms:** Percentiles (p50, p95, p99) are computed from exact nearest-rank buckets spanning 0.1 ms to 60,000 ms with fixed $O(1)$ memory guarantees—never by taking an inaccurate average of percentiles.
-- **Real-Time Zero-Polling SSE Stream:** The backend runner coordinator broadcasts cumulative progress, throughput, and latency to open browser connections via Server-Sent Events (SSE).
-- **Process Isolation:** Load generation child processes operate in dedicated Node.js event loops, preventing benchmark traffic from starving the API server or distorting measurements.
+- **Sub-Millisecond Bounded Histograms:** Percentiles (p50, p90, p95, p99) are computed from exact nearest-rank buckets spanning 0.1 ms to 60,000 ms with fixed $O(1)$ memory guarantees—never by taking an inaccurate average of percentiles.
+- **Real-Time Zero-Polling SSE Stream:** The backend runner coordinator broadcasts cumulative progress, throughput, and latency to browser connections via Server-Sent Events (SSE).
+- **Process Isolation:** Dedicated Node.js worker child processes run the load generation loops, preventing benchmark traffic from starving the API server or distorting measurements.
 - **Safety by Design:** Target endpoints require verification before testing remote hosts. Loopback addresses are restricted to local development environments.
 - **Unified 1-Command Startup:** Launch the API, Vite React frontend, and local controlled test target together with `npm run dev:all`.
 
 ---
 
-## Catch Performance Regressions in CI
+## Using DevFlow via Hosted Web App
 
-DevFlow started as a way to generate controlled HTTP load and inspect API performance. The next step is to make those measurements useful during code review: run the same workload for a pull request, compare its results with recent comparable runs, and report a possible performance regression before the change reaches production.
+If you are using DevFlow through a **deployed or hosted link** (e.g. `https://devflow.your-domain.com` or a cloud-hosted deployment), follow these steps to test endpoints directly from your browser:
 
-The CI check uses DevFlow's own runner and history. It currently does not import results from k6, Locust, or other load-testing tools. A first run may return `insufficient_data`; DevFlow needs at least three comparable completed runs before it can make a statistical comparison. The GitHub Action uploads the report and adds or updates a pull request comment with the verdict and metric bands.
+### 1. Access & Sign-In
+1. Navigate to the hosted DevFlow URL in your web browser.
+2. Select your access mode:
+   - **1-Click Instant Demo:** Click **Try Demo** on the landing page. This generates a temporary 24-hour session cookie with no registration required (limited to 10 runs, 2 Virtual Users, and up to 10 seconds duration).
+   - **Registered Account:** Click **Sign In / Register** and create an account with an email and password (minimum 10 characters) for full concurrency and permanent run history.
 
-### How a check flows
+### 2. Register Your API Target & Complete Domain Verification
+To prevent Server-Side Request Forgery (SSRF) and protect third-party infrastructure, DevFlow requires domain ownership proof before running traffic against remote domains:
 
-```text
-Pull request → GitHub Actions → `devflow check` → DevFlow API
-                                      │                 ├─ runs the configured HTTP workload
-                                      │                 ├─ saves run results and compares history
-                                      └─ PR summary ←───┴─ returns pass, regression, or insufficient data
-```
+1. In the left navigation, click **API Targets** (`/targets`).
+2. Click **+ Add API Target**.
+3. Fill in the target details:
+   - **Target Name:** An identifiable name (e.g., `Staging Checkout Service`).
+   - **Base URL:** The HTTP/HTTPS root URL of your service (e.g., `https://api.staging.example.com`).
+   - **Environment:** Select `Staging`, `Production`, or `Development`.
+4. Click **Add Target**.
+5. The target will display an **Unverified** status with a verification token (e.g. `st_tok_...`).
+6. Click **Verify Target** and select one of the two proof methods:
+   - **DNS TXT Record:** Add a TXT record to your DNS zone:
+     ```text
+     Host:  _devflow.api.staging.example.com
+     Value: devflow-verification=st_tok_xxxxxxxxxxxx
+     ```
+   - **HTTP Challenge:** Place a static file accessible at:
+     ```text
+     https://api.staging.example.com/.well-known/devflow-challenge.txt
+     ```
+     containing the verification token as plain text.
+7. Click **Confirm Verification**. Once verified, the target turns green and is unlocked for load testing.
 
-The target must be reachable from the CI runner. Use a dedicated test or staging environment, keep the workload within its capacity, and get authorization from its owner. Do not point CI load tests at public services or production systems without explicit approval.
+### 3. Configure and Launch a Test Run
+1. Go to **Test Runs** (`/runs`) or click **Run Test +** in the top navigation.
+2. Configure your test scenario:
+   - **Target:** Choose your verified API target.
+   - **Path:** Specify the endpoint path (e.g., `/v1/products` or `/health`).
+   - **HTTP Method:** `GET`, `POST`, `PUT`, `PATCH`, or `DELETE`.
+   - **Concurrency (VUs):** Number of concurrent Virtual Users.
+   - **Duration:** Test duration in seconds (e.g., `10s` or `30s`).
+   - **Worker Count:** Number of partitioned worker processes (1, 2, or 4).
+   - **Headers / Body:** (Optional) Add custom authorization headers or JSON payloads.
+   - **Assertions:** (Optional) Define latency thresholds (e.g. `p95 < 150ms`) or expected status codes (`status == 200`).
+3. Check the **"I confirm authorization to test this target"** checkbox.
+4. Click **Launch Test**.
 
-### Try it locally first
+### 4. Monitor Live Telemetry in Real Time
+1. The app automatically opens **Live Metrics** (`/live`).
+2. Watch the live execution stream powered by Server-Sent Events (SSE):
+   - **Execution Progress:** Active progress bar with real-time countdown.
+   - **Throughput Gauge:** Live requests/second (RPS) saturation.
+   - **Bounded Latency Histogram:** Dynamic p50, p90, p95, and p99 percentiles updated every second.
+   - **Status Breakdown:** Real-time counts of HTTP 2xx, 4xx, and 5xx responses.
+3. Click **Stop Execution** at any time to gracefully terminate child worker processes and finalize the run.
 
-Start DevFlow and its controlled test target with `npm run dev:all`, create an account, and save the local target. Then set up the CLI check:
-
-```sh
-npm link
-devflow check --init
-```
-
-Set the `targetId` in `devflow.config.json` to the saved target, then run:
-
-```sh
-# macOS / Linux
-export DEVFLOW_TOKEN="<your-token>"
-devflow check
-```
-
-```powershell
-# Windows PowerShell
-$env:DEVFLOW_TOKEN = "<your-token>"
-devflow check
-```
-
-For GitHub Actions setup and configuration, see the [CLI guide](docs/CLI.md), [GitHub Action example](examples/github-action-quickstart.yml), and [regression detection policy](docs/REGRESSION_DETECTION.md). Keep tokens in repository or environment secrets, not in committed config files.
-
-### Current evidence and project status
-
-The local controlled study recorded zero false regression verdicts in 17 eligible stable comparisons, detected all five +25% and all five +50% injected slowdowns, and detected none of five +10% slowdowns. These small results came from one Windows machine and a controlled loopback target; they are not broad accuracy guarantees. No real-repository pilot has run yet. See the [study report](docs/roadmap/evidence/phase2-2-regression-studies.md) and [roadmap status](docs/roadmap/FINAL_REPORT2.md). The project is seeking repository owners who are willing to approve a scoped CI pilot.
-
----
-
-## UI Design & Live Telemetry
-
-DevFlow features a visual interface inspired by modern developer products, built on a high-contrast palette of **Midnight Black (`#0B0B0C`)**, **Pure White (`#FFFFFF`)**, and **Electric Lime (`#C6F432`)**.
-
-### Interactive Playground & Simulator
-
-The landing experience provides an interactive simulator equipped with live workload curve generation and real-time histogram previews:
-
-<p align="center">
-  <img src="docs/assets/devflow-ui-preview.svg" alt="DevFlow Interactive Load Test Playground and Modern UI" width="100%" />
-</p>
-
----
-
-## API Testing Walkthrough
-
-DevFlow includes a controlled loopback target helper (`tools/test-target.js`) that responds with deterministic latency for safe, predictable verification.
-
-### Real Load Test in Action
-
-The preview below illustrates an active load test against `http://127.0.0.1:5050/slow?ms=50` with 5 Virtual Users, streaming real-time throughput and bounded latency percentiles:
-
-<p align="center">
-  <img src="docs/assets/devflow-api-testing-live.svg" alt="DevFlow Live API Load Test Execution and SSE Telemetry Stream" width="100%" />
-</p>
-
-### Step-by-Step Walkthrough
-
-1. **Start all services** in one terminal:
-   ```bash
-   npm run dev:all
-   ```
-2. Open **<http://localhost:3000>** (or `3001` if port 3000 is occupied).
-3. Sign in or register a local developer account.
-4. Navigate to **API Targets** and confirm `Local test target` (`http://127.0.0.1:5050`) is verified.
-5. Click **Run Test** and configure your workload:
-   - **Target:** `Local test target`
-   - **HTTP Method:** `GET`
-   - **Path:** `/slow?ms=50`
-   - **Concurrency:** `5 Virtual Users`
-   - **Duration:** `5 seconds`
-   - **Worker Count:** `1 worker`
-6. Click **Launch Test** to start the execution.
-7. Open **Live Metrics** to watch the real-time progress bar, throughput gauge, and live SSE event stream.
-8. Review the final metrics: verify that `p95` latency measures approximately `50–53 ms`, reflecting the real endpoint delay.
+### 5. Analyze Results & Compare Against Baselines
+1. Open **Test Runs** (`/runs`) or **History** to review finished executions.
+2. Click any run to inspect its detailed summary:
+   - 6,801-bucket latency distribution curve.
+   - Exact percentiles, minimum/maximum/mean latency, and standard deviation.
+   - Environment and worker process metadata.
+3. **Compare Runs (`/comparisons`):** Select two completed runs against the same target to view a side-by-side delta showing whether throughput and latency degraded or improved.
+4. **Export JSON Report:** Click **Export Report** to download the complete audit trail and metrics payload.
 
 ---
 
-## 1M Request Benchmark Campaign
+## Quickstart: Local Setup
 
-Benchmark Campaigns runs four separate quota based tests through DevFlow's existing worker coordinator: **250,000**, **500,000**, **750,000**, then **1,000,000** measured requests. Every stage receives a new run ID and fresh worker processes. Warm-up requests are shown separately from the measured request quota. The campaign stops on a failed, cancelled, incomplete, or quality threshold failing stage.
-
-### Run from the UI
-
-Start the local app with `npm run dev:all`, sign in, and open **Benchmark Campaigns**. Select a saved authorized target, enter concurrency for each stage, configure workers, timeout, optional warm-up and ramp-up, then confirm authorization. Stage 1 starts after creation. Each later stage waits for your explicit approval after its report is persisted. You can cancel a running campaign or retry the current failed stage. The report button downloads the saved JSON report for any stage with a result, including partial failed results.
-
-Stage success requires the exact measured request target, internally consistent response and histogram counts, complete worker summaries, valid persisted metrics, a saved report, and an error rate within the configured maximum. A technically finished run that exceeds that threshold is shown as `completed with errors` and stops progression. No cross-stage RPS or latency values are fabricated; Stage 1 reports that no prior stage is available.
-
-### Opt-in controlled local campaign
-
-The opt-in command requires `--confirm-large`, authenticates to the local DevFlow API, and targets only the controlled loopback test server at `127.0.0.1:5050`. It creates or reuses that local target, runs each stage through the same API and real worker processes as the UI, writes each persisted report under `benchmarks/results/`, and asks for approval before each next stage. Start the app and target first:
-
-```bash
-npm ci
-Copy-Item .env.example .env
-npm run dev:all
-```
-
-In a second terminal, set credentials and explicit workload settings, then start the campaign:
-
-```powershell
-$env:DEVFLOW_EMAIL = "your-local-account@example.com"
-$env:DEVFLOW_PASSWORD = "your-local-password"
-$env:DEVFLOW_CAMPAIGN_CONCURRENCY = "4,8,12,16"
-$env:DEVFLOW_CAMPAIGN_WORKERS = "4"
-npm run bench:campaign -- --confirm-large --path /health --method GET
-```
-
-The concurrency values above are an example profile only; choose values suitable for your machine and the controlled target. Optional inputs include `--timeout-ms`, `--warmup-sec`, `--ramp-up-sec`, `--max-error-rate`, `--output`, and `DEVFLOW_CAMPAIGN_HEADERS` (JSON). To use an existing session token instead of email/password, set `DEVFLOW_TOKEN`. Press Ctrl+C to request cancellation of the active campaign stage.
-
-### Measurement and limitations
-
-- The bounded HDR histogram remains fixed size; no raw per-request samples are retained. Workers reserve their assigned request quota before starting each HTTP call, preventing concurrency from exceeding the stage's target.
-- Stage reports use persisted run summaries and include the target/method, per-stage concurrency, worker count, request timeout, warm-up and ramp-up settings, actual and planned requests, response errors, RPS, latency percentiles, minimum/maximum/mean latency, validation, environment metadata, and comparison to the previous successful stage. CPU model and host memory are recorded; live CPU and memory utilization are not yet sampled.
-- Reports are persisted with the owner scoped campaign record and downloadable as JSON. A server restart marks an interrupted stage failed and preserves its partial run and report for inspection/retry.
-- A million requests is an opt-in manual benchmark, never part of the normal test suite. Results depend on the target, machine, network, Node version, concurrency, and workers. **No 1M benchmark result is claimed until a real campaign has been run and its saved reports reviewed.**
-
-## Sign-in, demo access, and plans
-
-Email/password registration requires a 10–128 character strong password. GitHub and Google sign-in use provider authorization-code exchanges; email-only claims are rejected. Existing password accounts are not silently linked to OAuth identities.
-
-The **Try Demo** action creates a signed HttpOnly-cookie session that expires after 24 hours. Demo history is temporary and lazily removed after expiry; demo accounts are limited to 10 accepted runs per session and IP, concurrency 2, and 10-second duration. Demo traffic still passes target ownership and SSRF checks.
-
-New registered users get Free: 15 accepted runs over the account lifetime and saved history. Pro is administrator assigned, with a configurable 10,000-run lifetime quota (`PAID_RUN_QUOTA`), own-run deletion, benchmark campaigns, and duration up to the server ceiling. Admin accounts bypass per-user run quotas, can delete any finished run, and can manage users and plans. Global worker capacity still applies. See [docs/PRICING.md](docs/PRICING.md). No payment processor is connected.
-
-To bootstrap the first administrator, set `ADMIN_BOOTSTRAP_EMAIL` and `ADMIN_BOOTSTRAP_PASSWORD` in a private environment, then run `npm run admin:bootstrap`. The password must meet the same strength rules as signup. The script refuses to create an admin if one already exists. OAuth setup uses `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, and optionally `OAUTH_REDIRECT_BASE_URL` / `OAUTH_FRONTEND_SUCCESS_URL`; placeholders are listed in `.env.example`.
-
----
-
-## Quickstart
+Follow these steps to run DevFlow locally on your development machine.
 
 ### Prerequisites
 
 - **Node.js**: `20.19+` or `22.12+` (LTS recommended)
 - **npm**: `10+`
-- **PostgreSQL** *(optional)*: Only required if using database persistence. By default, DevFlow uses local JSON storage.
+- **PostgreSQL** *(optional)*: Local JSON file storage is enabled by default with zero configuration.
 
 ### 1. Clone & Install
 
@@ -235,23 +158,154 @@ Copy-Item .env.example .env
 
 ### 3. Launch All Services
 
+Start the API, the React Web UI, and the controlled mock test target together with a single command:
+
 ```bash
 npm run dev:all
 ```
 
 | Service | Port | Endpoint | Description |
 | :--- | :--- | :--- | :--- |
-| **Web UI** | `3000` / `3001` | `http://localhost:3000` | React 19 + Vite dashboard |
+| **Web UI** | `3000` / `3001` | `http://localhost:3000` | React 19 + Vite modern dashboard |
 | **Express API** | `4000` | `http://127.0.0.1:4000/api` | REST API &amp; SSE event broadcaster |
-| **Test Target** | `5050` | `http://127.0.0.1:5050` | Controlled mock target with delay endpoints |
+| **Controlled Test Target** | `5050` | `http://127.0.0.1:5050` | Mock server with predictable latency &amp; status endpoints |
 
-*(Press `Ctrl+C` to stop all running processes).*
+*(Press `Ctrl+C` in your terminal to stop all running services).*
+
+---
+
+## How to Test the Platform
+
+DevFlow provides several ways to test and verify the platform, from interactive UI tests to automated unit and validation suites.
+
+### 1. End-to-End Test with the Mock Target (`tools/test-target.js`)
+
+When running `npm run dev:all`, DevFlow starts a controlled loopback target on port `5050` with deterministic responses:
+
+1. Open `http://localhost:3000` and click **Try Demo**.
+2. Go to **API Targets** and confirm the `Local test target` (`http://127.0.0.1:5050`) is verified.
+3. Click **Run Test** and select `http://127.0.0.1:5050`.
+4. Test any of the following mock endpoints:
+
+| Endpoint | Purpose | Expected Behavior |
+| :--- | :--- | :--- |
+| **`GET /slow?ms=50`** | Controlled Delay | Injects an exact 50ms delay. In **Live Metrics**, verify `p95` measures **`50–53 ms`**. |
+| **`GET /health`** | Fast Baseline | Instant 200 OK response. Throughput saturates with sub-millisecond latency. |
+| **`GET /status/500`** | Server Error | Returns HTTP 500. UI indicates **100% Error Rate** and highlights 5xx errors. |
+| **`GET /mixed`** | Flaky Traffic | Alternates between 200 OK and 500 error. UI reports **50% Error Rate**. |
+| **`GET /flaky?everyN=5`** | Deterministic Failure | Every 5th request returns 500. UI records an exact **20% Error Rate**. |
+| **`GET /big?bytes=65536`** | Large Payloads | Returns a 64 KB octet-stream payload for payload handling and bandwidth testing. |
+| **`GET /hang`** | Client Timeouts | Holds the connection open indefinitely until client `timeoutMs` triggers. |
+
+### 2. Run the Measurement Validation Suite
+
+Verifies latency measurement mathematics, worker isolation, and assertions across real child processes:
+
+```bash
+npm run test:validation
+```
+
+### 3. Run Unit and Integration Tests
+
+```bash
+# Run all unit tests (bounded histogram, auth, SSRF, migrations, CLI)
+node --test tests/unit/*.test.js
+
+# Run integration tests (E2E workflows, SSE streams, cancellation, storage)
+node --test tests/integration/*.test.js
+
+# Run full project test suite
+npm test
+```
+
+---
+
+## UI Design & Live Telemetry
+
+DevFlow features a visual interface inspired by modern developer products, built on a high-contrast palette of **Midnight Black (`#0B0B0C`)**, **Pure White (`#FFFFFF`)**, and **Electric Lime (`#C6F432`)**.
+
+### Interactive Playground & Simulator
+
+The landing experience provides an interactive simulator equipped with live workload curve generation and real-time histogram previews:
+
+<p align="center">
+  <img src="docs/assets/devflow-ui-preview.svg" alt="DevFlow Interactive Load Test Playground and Modern UI" width="100%" />
+</p>
+
+### Real Load Test in Action
+
+The telemetry dashboard displays an active load test against `http://127.0.0.1:5050/slow?ms=50` with 5 Virtual Users, streaming real-time throughput and bounded latency percentiles:
+
+<p align="center">
+  <img src="docs/assets/devflow-api-testing-live.svg" alt="DevFlow Live API Load Test Execution and SSE Telemetry Stream" width="100%" />
+</p>
+
+---
+
+## Catch Performance Regressions in CI
+
+DevFlow brings performance testing into pull request review: run the configured workload for a PR, compare its results with recent comparable runs, and detect performance regressions before deployment.
+
+### How a CI Check Flows
+
+```text
+Pull request → GitHub Actions → `devflow check` → DevFlow API
+                                      │                 ├─ runs configured HTTP workload
+                                      │                 ├─ saves run results & compares history
+                                      └─ PR summary ←───┴─ returns pass, regression, or insufficient data
+```
+
+### CLI One-Command Project Check
+
+1. Link the CLI globally:
+   ```bash
+   npm link
+   ```
+
+2. Initialize a starter configuration in your repository:
+   ```bash
+   devflow check --init
+   ```
+   This generates `devflow.config.json`.
+
+3. Set your `targetId` and export your authentication token:
+   ```powershell
+   # Windows PowerShell
+   $env:DEVFLOW_TOKEN = "<your-token>"
+   devflow check
+   ```
+
+   ```bash
+   # Linux / macOS
+   export DEVFLOW_TOKEN="<your-token>"
+   devflow check
+   ```
+
+For GitHub Actions workflows, see [docs/CLI.md](docs/CLI.md), [examples/github-action-quickstart.yml](examples/github-action-quickstart.yml), and [docs/REGRESSION_DETECTION.md](docs/REGRESSION_DETECTION.md).
+
+---
+
+## 1M Request Benchmark Campaign
+
+Benchmark Campaigns run four quota-based tests through DevFlow's worker coordinator: **250,000**, **500,000**, **750,000**, then **1,000,000** measured requests. Every stage receives a new run ID and fresh worker processes.
+
+### Run an Opt-in Local Campaign
+
+```powershell
+$env:DEVFLOW_EMAIL = "your-account@example.com"
+$env:DEVFLOW_PASSWORD = "your-password"
+$env:DEVFLOW_CAMPAIGN_CONCURRENCY = "4,8,12,16"
+$env:DEVFLOW_CAMPAIGN_WORKERS = "4"
+npm run bench:campaign -- --confirm-large --path /health --method GET
+```
+
+Each stage completes, persists a full report under `benchmarks/results/`, and asks for approval before proceeding to the next stage.
 
 ---
 
 ## How DevFlow Works
 
-```
+```text
                                   DEVFLOW HOST (Single Machine)
   ┌─────────────────────────────────────────────────────────────────────────────────────────┐
   │                                                                                         │
@@ -312,8 +366,8 @@ GET /api/health
 {
   "status": "ok",
   "version": "0.1.0",
-  "storage": "postgresql",
-  "persistence": "database"
+  "storage": "json",
+  "persistence": "file"
 }
 ```
 
@@ -325,8 +379,8 @@ Authorization: Bearer <token>
 Content-Type: application/json
 
 {
-  "targetId": "target_default_local",
-  "url": "http://127.0.0.1:5050/slow?ms=50",
+  "targetId": "target_uuid",
+  "path": "/slow?ms=50",
   "method": "GET",
   "concurrency": 5,
   "durationSec": 5,
@@ -340,7 +394,7 @@ Content-Type: application/json
 ### Live SSE Telemetry Stream
 
 ```http
-GET /api/runs/:id/events
+GET /api/runs/:id/events?ticket=<stream-ticket>
 Accept: text/event-stream
 ```
 
@@ -365,32 +419,6 @@ data: {
 ```http
 POST /api/runs/:id/cancel
 Authorization: Bearer <token>
-```
-
----
-
-## Testing & Quality Assurance
-
-DevFlow features a comprehensive test suite powered by Node.js's native test runner (`node:test`).
-
-```bash
-# Run full unit and integration test suite
-npm test
-
-# Run TypeScript static type check (lint)
-npm run lint
-
-# Build production bundle with Vite
-npm run build
-
-# Focused bounded-memory latency histogram validation
-node --test tests/unit/latency-histogram.test.js
-
-# Real worker and telemetry integration test against loopback HTTP fixture
-node --test tests/integration/real-run-telemetry.test.js
-
-# Automated throughput benchmark against controlled target
-npm run bench:ci
 ```
 
 ---

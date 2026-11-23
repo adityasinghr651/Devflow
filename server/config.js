@@ -16,8 +16,9 @@ const jwtSecret = process.env.JWT_SECRET || (isProduction
   ? (() => { throw new Error('FATAL: JWT_SECRET environment variable is mandatory in production.'); })()
   : defaultJwtSecret);
 
-if (isProduction && (jwtSecret === defaultJwtSecret || jwtSecret.length < 32)) {
-  throw new Error('FATAL: Production JWT_SECRET must be a non-default secret of at least 32 characters.');
+const jwtSecretIsPlaceholder = /^(replace|generate|placeholder|<)|[<>]/i.test(jwtSecret);
+if (isProduction && (jwtSecret === defaultJwtSecret || jwtSecret.length < 32 || jwtSecretIsPlaceholder)) {
+  throw new Error('FATAL: Production JWT_SECRET must be a unique generated secret of at least 32 characters; placeholders are not allowed.');
 }
 
 const corsOrigins = (process.env.CORS_ORIGINS || process.env.CORS_ORIGIN || 'http://localhost:3000')
