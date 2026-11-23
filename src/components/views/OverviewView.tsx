@@ -10,7 +10,6 @@ import {
   Server,
   ShieldCheck,
   TrendingUp,
-  Zap,
 } from 'lucide-react';
 import { Target, Run } from '../../types/index.ts';
 import { StatusBadge } from '../ui/StatusBadge.tsx';
@@ -41,7 +40,6 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
   onSelectRun,
   onShowTargetModal,
   onShowTestModal,
-  onSimulateRun,
   setTestTarget,
   fmt,
 }) => {
@@ -80,33 +78,30 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <b style={{ color: 'var(--text-primary)', fontSize: '14px' }}>
-                Bounded-Memory Latency Histograms
+                CI Performance Regression Check
               </b>
-              <span className="status-pill completed">
-                <i /> Phase 6.1 Validated
+              <span className="status-pill warning">
+                <i /> Pilot pending
               </span>
             </div>
             <p style={{ margin: '3px 0 0', fontSize: '12px', color: 'var(--text-muted)' }}>
-              Sub-millisecond latency histograms with guaranteed fixed O(1) memory and real-time Server-Sent Events push.
+              Use a repeatable test or staging workload. CI needs at least 3 matching completed runs before it can return a statistical verdict. Hosted CI still needs an external pilot.
             </p>
           </div>
         </div>
 
         <div style={{ display: 'flex', gap: '10px' }}>
-          {onSimulateRun && (
-            <button
-              type="button"
-              className="btn btn-secondary btn-sm"
-              onClick={onSimulateRun}
-              title="Trigger a real-time live test simulation"
-            >
-              <Zap size={13} style={{ color: 'var(--color-blue)' }} />
-              <span>Simulate Live Run</span>
-            </button>
-          )}
           <button
             type="button"
             className="btn btn-primary btn-sm"
+            onClick={() => onNavigate('Documentation')}
+          >
+            <ArrowRight size={14} />
+            <span>CI Setup</span>
+          </button>
+          <button
+            type="button"
+            className="btn btn-secondary btn-sm"
             onClick={onShowTestModal}
           >
             <Plus size={14} />
@@ -114,6 +109,32 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
           </button>
         </div>
       </div>
+
+      {(targets.length === 0 || completed.length === 0) && (
+        <section className="dev-card" aria-labelledby="overview-getting-started" style={{ padding: 20 }}>
+          <div style={{ marginBottom: 14 }}>
+            <h3 id="overview-getting-started" style={{ margin: '0 0 4px', color: 'var(--text-primary)', fontSize: 15 }}>Start here</h3>
+            <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: 12 }}>Complete these steps to get a real result in your workspace.</p>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: 12 }}>
+            <div style={{ padding: 14, border: '1px solid var(--border-subtle)', borderRadius: 10 }}>
+              <b style={{ color: 'var(--text-primary)', fontSize: 13 }}>1. Save your API target</b>
+              <p style={{ color: 'var(--text-muted)', fontSize: 12, lineHeight: 1.6 }}>Use a target you own. The API server must be able to reach the URL.</p>
+              <button type="button" className="btn btn-secondary btn-sm" onClick={() => targets.length ? onNavigate('API Targets') : onShowTargetModal()}>{targets.length ? 'Review targets' : 'Add target'}</button>
+            </div>
+            <div style={{ padding: 14, border: '1px solid var(--border-subtle)', borderRadius: 10 }}>
+              <b style={{ color: 'var(--text-primary)', fontSize: 13 }}>2. Run a small test</b>
+              <p style={{ color: 'var(--text-muted)', fontSize: 12, lineHeight: 1.6 }}>Start with Quick Ping: 5 virtual users for 5 seconds on a safe route.</p>
+              <button type="button" className="btn btn-secondary btn-sm" onClick={onShowTestModal} disabled={targets.length === 0}>{targets.length ? 'Configure first test' : 'Add a target first'}</button>
+            </div>
+            <div style={{ padding: 14, border: '1px solid var(--border-subtle)', borderRadius: 10 }}>
+              <b style={{ color: 'var(--text-primary)', fontSize: 13 }}>3. Add CI when ready</b>
+              <p style={{ color: 'var(--text-muted)', fontSize: 12, lineHeight: 1.6 }}>Run the same workload repeatedly; three comparable results are required for a verdict.</p>
+              <button type="button" className="btn btn-secondary btn-sm" onClick={() => onNavigate('Documentation')}>Read setup guide</button>
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* 2. Compact Dashboard Metric Cards (Requirement 5) */}
       <div className="overview-metric-grid">

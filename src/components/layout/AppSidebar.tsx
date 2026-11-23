@@ -6,6 +6,8 @@ import {
   BookOpen,
   ChevronDown,
   Code2,
+  CreditCard,
+  GitBranch,
   History,
   Home,
   LayoutDashboard,
@@ -39,22 +41,36 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
   onNewTestClick,
   connectionStatus,
 }) => {
-  // Required Sidebar items:
-  // - Overview
-  // - API Targets
-  // - Test Runs
-  // - Live Metrics
-  // - History
-  // - Settings
-  const navItems = [
-    { name: 'Overview', icon: LayoutDashboard },
-    { name: 'API Targets', icon: Server },
-    { name: 'Test Runs', icon: Activity, badge: activeRunsCount },
-    ...(['paid', 'admin'].includes(user?.tier || '') ? [{ name: 'Benchmark Campaigns', icon: BarChart3 }] : []),
-    { name: 'Live Metrics', icon: Radio },
-    { name: 'History', icon: History },
-    { name: 'Settings', icon: Settings },
-    ...(user?.role === 'admin' ? [{ name: 'Admin', icon: Settings }] : []),
+  const navGroups = [
+    {
+      label: 'REGRESSION GATE',
+      items: [
+        { name: 'CI Setup Guide', target: 'Documentation', icon: GitBranch },
+        { name: 'Comparisons', icon: BarChart3 },
+      ],
+    },
+    {
+      label: 'LOAD TESTING',
+      items: [
+        { name: 'Overview', icon: LayoutDashboard },
+        { name: 'API Targets', icon: Server },
+        { name: 'Test Runs', icon: Activity, badge: activeRunsCount },
+        ...(['paid', 'admin'].includes(user?.tier || '') ? [{ name: 'Benchmark Campaigns', icon: BarChart3 }] : []),
+        { name: 'Live Metrics', icon: Radio },
+        { name: 'History', icon: History },
+      ],
+    },
+    {
+      label: 'WORKSPACE',
+      items: [
+        { name: 'Settings', icon: Settings },
+        ...(user?.role === 'admin' ? [{ name: 'Admin', icon: Settings }] : []),
+      ],
+    },
+    {
+      label: 'BILLING',
+      items: [{ name: 'Billing & Plans', icon: CreditCard }],
+    },
   ];
 
   return (
@@ -109,32 +125,37 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
 
         {/* Navigation List */}
         <nav className="sidebar-nav">
-          <div className="sidebar-section-label">PLATFORM</div>
-          {navItems.map((item) => {
-            const Icon = item.icon;
-            const isActive =
-              currentPage === item.name ||
-              (item.name === 'API Targets' && currentPage === 'Servers & Targets') ||
-              (item.name === 'History' && (currentPage === 'Reports' || currentPage === 'Comparisons' || currentPage === 'Performance Analysis'));
+          {navGroups.map((group) => (
+            <React.Fragment key={group.label}>
+              <div className="sidebar-section-label">{group.label}</div>
+              {group.items.map((item) => {
+                const Icon = item.icon;
+                const target = 'target' in item && item.target ? item.target : item.name;
+                const isActive =
+                  currentPage === target ||
+                  (item.name === 'API Targets' && currentPage === 'Servers & Targets') ||
+                  (item.name === 'History' && (currentPage === 'Reports' || currentPage === 'Performance Analysis'));
 
-            return (
-              <button
-                key={item.name}
-                type="button"
-                className={`sidebar-nav-item ${isActive ? 'active' : ''}`}
-                onClick={() => {
-                  onMobileClose();
-                  onNavigate(item.name);
-                }}
-              >
-                <Icon size={16} />
-                <span>{item.name}</span>
-                {item.badge && item.badge > 0 ? (
-                  <span className="sidebar-badge">{item.badge}</span>
-                ) : null}
-              </button>
-            );
-          })}
+                return (
+                  <button
+                    key={item.name}
+                    type="button"
+                    className={`sidebar-nav-item ${isActive ? 'active' : ''}`}
+                    onClick={() => {
+                      onMobileClose();
+                      onNavigate(target);
+                    }}
+                  >
+                    <Icon size={16} />
+                    <span>{item.name}</span>
+                    {'badge' in item && item.badge && item.badge > 0 ? (
+                      <span className="sidebar-badge">{item.badge}</span>
+                    ) : null}
+                  </button>
+                );
+              })}
+            </React.Fragment>
+          ))}
         </nav>
 
         {/* Bottom Resources & Footer */}
@@ -160,7 +181,7 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
             }}
           >
             <BookOpen size={15} />
-            <span>Documentation</span>
+            <span>User Guide &amp; Help</span>
           </button>
 
           <a

@@ -6,6 +6,7 @@ import { targetsRouter } from './routes/targets.js';
 import { runsRouter } from './routes/runs.js';
 import { campaignsRouter } from './routes/campaigns.js';
 import { adminRouter } from './routes/admin.js';
+import { billingRouter } from './routes/billing.js';
 import { randomUUID } from 'node:crypto';
 
 export function createApp() {
@@ -60,6 +61,7 @@ export function createApp() {
     app.use(prefix, runsRouter);
     app.use(prefix, campaignsRouter);
     app.use(prefix, adminRouter);
+    app.use(prefix, billingRouter);
   }
 
   // Error handling middleware

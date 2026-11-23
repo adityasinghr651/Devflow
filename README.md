@@ -305,7 +305,7 @@ DevFlow uses zero-config JSON file storage by default. For team deployments or p
 - **Supabase PostgreSQL:** Set `DATABASE_URL` with your pooler connection string and enable TLS: `DB_SSL=true`.
 - **Supabase Authentication:** Configure `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY` in your `.env`. Supabase verifies email/password identity, and DevFlow maps it to a local application profile with roles, quotas, and target ownership.
 
-See the [database setup guide](https://github.com/adityasinghr651/Devflow/blob/devflow-2.0/docs/DATABASE_SETUP.md) for detailed configuration.
+See [docs/DATABASE_SETUP.md](docs/DATABASE_SETUP.md) for detailed configuration.
 
 ---
 
@@ -314,7 +314,7 @@ See the [database setup guide](https://github.com/adityasinghr651/Devflow/blob/d
 DevFlow is self-hosted open-source software. Use the documented Docker Compose setup for deployment:
 
 1. **Host Setup:** Deploy on a Linux host with Docker, Docker Compose, and persistent PostgreSQL storage.
-2. **Environment Configuration:** Copy the [production environment template](https://github.com/adityasinghr651/Devflow/blob/devflow-2.0/.env.production.example) to `.env` on your deployment server.
+2. **Environment Configuration:** Copy [.env.production.example](.env.production.example) to `.env` on your deployment server.
 3. **Security Hardening:**
    - Set `NODE_ENV=production`.
    - Set a unique, random 32+ character `JWT_SECRET`.
@@ -504,7 +504,7 @@ All environment variables can be configured via `.env`:
 | `RAZORPAY_KEY_ID` / `RAZORPAY_KEY_SECRET` | *(unset)* | Optional server-side one-time checkout |
 | `UPGRADE_PLAN_PRICE_INR` | `199` | One-time Pro checkout price in INR when Razorpay is enabled |
 
-For the complete production template, see the [production environment example](https://github.com/adityasinghr651/Devflow/blob/devflow-2.0/.env.production.example).
+For the complete production template, see [.env.production.example](.env.production.example).
 
 ---
 

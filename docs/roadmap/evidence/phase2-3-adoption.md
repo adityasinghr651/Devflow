@@ -35,7 +35,7 @@ QUICKSTART_EXIT=0
 
 ## T3.4 New positioning documentation
 
-Added [Why DevFlow](../../WHY_DEVFLOW.md), which leads with the product goal of catching performance regressions on PRs and reports the measured local sensitivity limits. It compares DevFlow with manual k6/Locust workflows and Bencher without claiming superiority. `README.md`/landing-page positioning remains gated on Phase 4 pilot signal, as directed by the runbook.
+Added [Why DevFlow](../../WHY_DEVFLOW.md), which leads with the product goal of catching performance regressions on PRs and reports the measured local sensitivity limits. It compares DevFlow with manual k6/Locust workflows and Bencher without claiming superiority. At Phase 3 completion, README/landing changes were deferred pending the pilot. The owner later requested pre-pilot framing; that work and its explicit caveats are documented in [Phase 5 evidence](phase2-5-positioning.md).
 
 The new GitHub Action example is [github-action-quickstart.yml](../../../examples/github-action-quickstart.yml). Local documentation links were checked with `node tools/check-doc-links.js`: 18 documentation files checked, no broken local links.
 

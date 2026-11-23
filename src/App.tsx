@@ -31,6 +31,7 @@ import { SettingsView } from './components/views/SettingsView.tsx';
 import { LiveMetricsView } from './components/views/LiveMetricsView.tsx';
 import { BenchmarkCampaignsView } from './components/views/BenchmarkCampaignsView.tsx';
 import { AdminView } from './components/views/AdminView.tsx';
+import { BillingView } from './components/views/BillingView.tsx';
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:4000/api';
 const fmt = (n: number) => new Intl.NumberFormat('en-US').format(n || 0);
@@ -59,6 +60,10 @@ const ROUTE_MAP: Record<string, string> = {
   'docs': 'Documentation',
   'documentation': 'Documentation',
   'settings': 'Settings',
+  'billing': 'Billing & Plans',
+  'billing-plans': 'Billing & Plans',
+  'plans': 'Billing & Plans',
+  'upgrade': 'Billing & Plans',
   'admin': 'Admin',
 };
 
@@ -76,6 +81,7 @@ const PAGE_TO_HASH: Record<string, string> = {
   'Benchmark Campaigns': '/campaigns',
   'Documentation': '/docs',
   'Settings': '/settings',
+  'Billing & Plans': '/billing',
   'Admin': '/admin',
 };
 
@@ -428,10 +434,17 @@ export default function App() {
     setAuthError('');
     try {
       if (authMode === 'register') {
-        const res = await request<{ user: User; token: string }>('/auth/register', {
+        const res = await request<{ user?: User; token?: string; requiresEmailConfirmation?: boolean; message?: string }>('/auth/register', {
           method: 'POST',
           body: JSON.stringify({ email: authEmail, password: authPassword, name: authName }),
         });
+        if (res.requiresEmailConfirmation) {
+          setAuthMode('login');
+          setAuthPassword('');
+          setAuthError(res.message || 'Check your email to confirm your account, then sign in.');
+          return;
+        }
+        if (!res.user || !res.token) throw new Error('The server did not return a complete sign-in session.');
         localStorage.removeItem('servertest-demo-mode');
         localStorage.setItem('servertest-token', res.token);
         setToken(res.token);
@@ -770,6 +783,7 @@ export default function App() {
           user={user}
           onNavigateDocs={() => navigateTo('Documentation')}
           onNavigatePage={(p) => navigateTo(p)}
+          onPaymentOptions={() => navigateTo(user ? 'Billing & Plans' : 'Login')}
         />
 
         {modalElements}
@@ -836,6 +850,8 @@ export default function App() {
                   ? 'Test Runs'
                   : page === 'Benchmark Campaigns'
                   ? '1M Request Campaigns'
+                  : page === 'Billing & Plans'
+                  ? 'Billing & Plans'
                   : page === 'Live Metrics'
                   ? 'Live Metrics'
                   : page === 'History'
@@ -844,7 +860,7 @@ export default function App() {
               </h1>
               <p>
                 {page === 'Overview'
-                  ? 'Run load tests, observe real-time metrics, and inspect API reliability.'
+                  ? 'Set up CI regression checks and review comparable API runs; use the load-testing tools to inspect or tune workloads.'
                   : page === 'API Targets' || page === 'Servers & Targets'
                   ? 'Manage authorized target endpoints and cryptographic ownership proofs.'
                   : page === 'Test Runs'
@@ -855,6 +871,8 @@ export default function App() {
                   ? 'Durable performance snapshots and execution comparisons.'
                   : page === 'Benchmark Campaigns'
                   ? 'Run staged, request-counted benchmarks with validated reports and manual stage approval.'
+                  : page === 'Billing & Plans'
+                  ? 'View your current access plan and choose a secure payment method for Pro.'
                   : 'A modern developer platform for repeatable performance benchmarks.'}
               </p>
             </div>
@@ -966,7 +984,9 @@ export default function App() {
             <ComparisonsView completed={completed} token={token} hasMore={hasMoreRuns} onLoadMore={() => { void loadMoreRuns(); }} />
           )}
 
-          {page === 'Documentation' && <DocsView />}
+          {page === 'Documentation' && <DocsView onNavigate={(destination) => navigateTo(destination)} />}
+
+          {page === 'Billing & Plans' && <BillingView user={user} token={token} api={API} onUserUpdated={setUser} onSignIn={() => setShowAuth(true)} />}
 
           {page === 'Settings' && (
             <SettingsView
@@ -975,6 +995,7 @@ export default function App() {
               setTheme={setTheme}
               handleLogout={handleLogout}
               setShowAuth={setShowAuth}
+              onOpenBilling={() => navigateTo('Billing & Plans')}
             />
           )}
         </div>

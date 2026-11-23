@@ -58,6 +58,7 @@ export const TargetModal: React.FC<TargetModalProps> = ({
         </label>
         <label>
           Base URL
+          <span className="form-hint" style={{ display: 'block', margin: '4px 0 6px' }}>Enter the service root only, for example http://127.0.0.1:5050. Choose the route, such as /health, when you configure a test.</span>
           <input
             required
             type="url"
@@ -82,7 +83,7 @@ export const TargetModal: React.FC<TargetModalProps> = ({
         </label>
         <div className="form-hint">
           <ShieldCheck size={16} />
-          <span>Non-local targets will require domain verification before running tests.</span>
+          <span>Test only systems you own or have permission to assess. DevFlow’s API server must be able to reach this URL. Remote domains require verification before a test can run.</span>
         </div>
         <div className="modal-actions">
           <Button type="button" variant="secondary" onClick={onClose}>
