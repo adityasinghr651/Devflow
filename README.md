@@ -6,7 +6,7 @@
   <br />
 
   [![CI Build](https://img.shields.io/badge/CI-Passing-10B981?style=for-the-badge&logo=githubactions&logoColor=white)](https://github.com/adityasinghr651/Devflow/actions)
-  [![Node Runtime](https://img.shields.io/badge/Node.js-20.19+_|_22.12+-339933?style=for-the-badge&logo=node.js&logoColor=white)](https://nodejs.org/)
+  [![Node Runtime](https://img.shields.io/badge/Node.js-22.x-339933?style=for-the-badge&logo=node.js&logoColor=white)](https://nodejs.org/)
   [![TypeScript](https://img.shields.io/badge/TypeScript-5.9-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
   [![React & Vite](https://img.shields.io/badge/React_19-Vite_8-61DAFB?style=for-the-badge&logo=vite&logoColor=white)](https://vitejs.dev/)
   [![PostgreSQL](https://img.shields.io/badge/Storage-PostgreSQL_|_JSON-4169E1?style=for-the-badge&logo=postgresql&logoColor=white)](https://www.postgresql.org/)
@@ -20,6 +20,8 @@
   <p align="center">
     <a href="#quickstart">Quickstart</a> •
     <a href="#using-devflow-in-the-web-ui">Using the Web UI</a> •
+    <a href="#supabase-setup">Supabase Setup</a> •
+    <a href="#self-hosted-production-deployment">Production Deployment</a> •
     <a href="#catch-performance-regressions-in-ci">CI Regression Checks</a> •
     <a href="#ui-design--live-telemetry">UI &amp; Visual Tour</a> •
     <a href="#api-testing-walkthrough">API Testing Example</a> •
@@ -34,7 +36,7 @@
 ---
 
 > [!NOTE]
-> **Project Scope:** DevFlow is evolving from an API load-testing platform into a CI performance regression gate. Its load generator, saved run history, CLI, and GitHub Action work together to compare a pull request's run with a baseline. The pilot with external repositories is not complete, and current detector evidence comes from a controlled local target. Run checks only against systems you own or are explicitly authorized to test.
+> **Project Scope:** DevFlow is an open-source, self-hosted API performance platform, evolving from interactive load tests into a CI regression gate. The browser UI, isolated workers, saved history, CLI, and GitHub Action work together to run a repeatable workload and compare it with matching history. External repository pilots are not complete; current detector evidence comes from controlled local workloads. Treat results as an engineering signal and test only systems you own or are explicitly authorized to assess.
 
 ---
 
@@ -54,23 +56,24 @@
 - **Sub-Millisecond Bounded Histograms:** Percentiles (p50, p95, p99) are computed from exact nearest-rank buckets spanning 0.1 ms to 60,000 ms with fixed $O(1)$ memory guarantees—never by taking an inaccurate average of percentiles.
 - **Real-Time Zero-Polling SSE Stream:** The backend runner coordinator broadcasts cumulative progress, throughput, and latency to open browser connections via Server-Sent Events (SSE).
 - **Process Isolation:** Load generation child processes operate in dedicated Node.js event loops, preventing benchmark traffic from starving the API server or distorting measurements.
-- **Safety by Design:** Target endpoints require verification before testing remote hosts. Loopback addresses are restricted to local development environments.
+- **Safety by Design:** Target endpoints require verification before remote testing. Production disables loopback targets by default; keep the runner restricted to authorized systems.
 - **Unified 1-Command Startup:** Launch the API, Vite React frontend, and local controlled test target together with `npm run dev:all`.
 
 ---
 
 ## Using DevFlow in the Web UI
 
-DevFlow is self-hosted software; this repository does not provide a public hosted app URL. Follow [Quickstart](#quickstart), then open `http://localhost:3000` (or the URL configured for your deployment). For a detailed walkthrough, see the [step-by-step User Guide](https://github.com/adityasinghr651/Devflow/blob/devflow-2.0/docs/USER_GUIDE.md), also available in the app as **User Guide & Help**.
+DevFlow is open-source, self-hosted software. This repository does not provide a public hosted app URL or managed SaaS plan. Follow [Quickstart](#quickstart), then open `http://localhost:3000` (or the HTTPS URL configured for your deployment). For the full workflow, see the [step-by-step User Guide](https://github.com/adityasinghr651/Devflow/blob/devflow-2.0/docs/USER_GUIDE.md), also available in the app as **User Guide & Help**.
 
 1. **Sign in or create an account** to save targets and test history. Demo mode is temporary and read-only.
+   Email/password identity can use Supabase Auth when `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY` are set on the API. Supabase verifies identity; DevFlow owns workspace roles, plan access, quotas, and target/run ownership. Email confirmation follows the Supabase project's Auth settings.
 2. **Add an API target** from **API Targets**. Enter the service root URL, such as `http://127.0.0.1:5050`; choose the endpoint path later in the test form. Remote domains require ownership verification.
 3. **Run a small test** against an authorized, preferably read-only route such as `/health`. Start with **Quick Ping** (5 virtual users for 5 seconds). The DevFlow API server must be able to reach the target.
 4. **Review live and saved results** in **Live Metrics**, **Test Runs**, or **History**. Check throughput, p95 latency, and request failures together.
 5. **Build a comparison baseline** by repeating the same target and workload. A statistical CI verdict requires at least three completed matching runs.
 6. **Connect CI** using the [CLI guide](https://github.com/adityasinghr651/Devflow/blob/devflow-2.0/docs/CLI.md) and [GitHub Action guide](https://github.com/adityasinghr651/Devflow/blob/devflow-2.0/docs/GITHUB_ACTION.md). Save the API URL and token as repository secrets and do not expose them to untrusted fork workflows.
 
-For storage and deployment, read [Database Setup](https://github.com/adityasinghr651/Devflow/blob/devflow-2.0/docs/DATABASE_SETUP.md). JSON-file storage is the zero-setup local default; self-hosted PostgreSQL and Supabase are supported. Billing and one-time plan upgrades are described in the in-app guide and [Pricing](https://github.com/adityasinghr651/Devflow/blob/devflow-2.0/docs/PRICING.md).
+For storage and deployment, read [Database Setup](https://github.com/adityasinghr651/Devflow/blob/devflow-2.0/docs/DATABASE_SETUP.md). JSON-file storage is the zero-setup local default; self-hosted PostgreSQL and Supabase Postgres are supported. The Billing & Plans page supports Razorpay Standard Checkout when configured and a manual-review UPI QR path. Checkout is one-time payment, not recurring billing; QR payments do not activate access automatically. See [Pricing and current plan limits](https://github.com/adityasinghr651/Devflow/blob/devflow-2.0/docs/PRICING.md).
 
 > **Safety:** Test only systems you own or are authorized to assess. Begin in development or staging with low concurrency. `localhost` means the machine running the DevFlow API, not necessarily your browser or a hosted CI runner.
 
@@ -78,7 +81,7 @@ For storage and deployment, read [Database Setup](https://github.com/adityasingh
 
 ## Catch Performance Regressions in CI
 
-DevFlow started as a way to generate controlled HTTP load and inspect API performance. The next step is to make those measurements useful during code review: run the same workload for a pull request, compare its results with recent comparable runs, and report a possible performance regression before the change reaches production.
+DevFlow makes repeatable HTTP measurements available during code review: run the same workload for a pull request, compare its results with recent comparable runs, and report a possible performance regression before the change reaches production.
 
 The CI check uses DevFlow's own runner and history. It currently does not import results from k6, Locust, or other load-testing tools. A first run may return `insufficient_data`; DevFlow needs at least three comparable completed runs before it can make a statistical comparison. The GitHub Action uploads the report and adds or updates a pull request comment with the verdict and metric bands.
 
@@ -126,22 +129,26 @@ The local controlled study recorded zero false regression verdicts in 17 eligibl
 
 ## UI Design & Live Telemetry
 
-DevFlow features a visual interface inspired by modern developer products, built on a high-contrast palette of **Midnight Black (`#0B0B0C`)**, **Pure White (`#FFFFFF`)**, and **Electric Lime (`#C6F432`)**.
+DevFlow includes a web workspace for onboarding, target management, test configuration, live telemetry, history, comparisons, CI setup, billing, and help. The UI supports dark and light themes.
 
-### Interactive Playground & Simulator
+### Current workspace and first-run checklist
 
-The landing experience provides an interactive simulator equipped with live workload curve generation and real-time histogram previews:
+The dashboard guides a new user through saving an authorized API target, running a small test, and collecting comparable history before using the CI regression check.
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/adityasinghr651/Devflow/devflow-2.0/docs/assets/devflow-ui-preview.png" alt="DevFlow current public landing page and interactive load testing overview" width="100%" />
+  <img src="https://raw.githubusercontent.com/adityasinghr651/Devflow/devflow-2.0/docs/assets/devflow-workspace-preview.png" alt="Latest DevFlow workspace dashboard and onboarding checklist" width="100%" />
 </p>
 
-### Current workspace onboarding and CI status
+### In-app guide and Supabase sign-in
 
-The workspace dashboard includes a first-run checklist for saving a target, launching a small test, and building comparable CI history.
+The guide explains the workflow inside the application. The sign-in screen uses the existing UI with Supabase-backed email identity when configured on the API server.
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/adityasinghr651/Devflow/devflow-2.0/docs/assets/devflow-workspace-preview.png" alt="DevFlow current workspace dashboard with onboarding checklist and CI setup status" width="100%" />
+  <img src="https://raw.githubusercontent.com/adityasinghr651/Devflow/devflow-2.0/docs/assets/devflow-guide-preview.png" alt="Latest DevFlow in-app step-by-step documentation view" width="100%" />
+</p>
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/adityasinghr651/Devflow/devflow-2.0/docs/assets/devflow-auth-preview.png" alt="Latest DevFlow sign-in interface with Supabase identity and DevFlow access explanation" width="70%" />
 </p>
 
 ---
@@ -152,7 +159,7 @@ DevFlow includes a controlled loopback target helper (`tools/test-target.js`) th
 
 ### Real Load Test in Action
 
-The preview below illustrates an active load test against `http://127.0.0.1:5050/slow?ms=50` with 5 Virtual Users, streaming real-time throughput and bounded latency percentiles:
+This visual is an illustrative telemetry preview for a controlled `GET /slow?ms=50` workload; it is not a captured benchmark result:
 
 <p align="center">
   <img src="docs/assets/devflow-api-testing-live.svg" alt="DevFlow Live API Load Test Execution and SSE Telemetry Stream" width="100%" />
@@ -221,11 +228,11 @@ The concurrency values above are an example profile only; choose values suitable
 
 ## Sign-in, demo access, and plans
 
-Email/password registration requires a 10–128 character strong password. GitHub and Google sign-in use provider authorization-code exchanges; email-only claims are rejected. Existing password accounts are not silently linked to OAuth identities.
+Email/password registration requires a 10–128 character strong password. When Supabase Auth is configured, Supabase verifies email/password identity and DevFlow maps it to a local application profile; otherwise the existing local password authentication is used. GitHub and Google sign-in use provider authorization-code exchanges; email-only claims are rejected. Existing accounts are not silently linked by email.
 
 The **Try Demo** action creates a signed HttpOnly-cookie session that expires after 24 hours. Demo history is temporary and lazily removed after expiry; demo accounts are limited to 10 accepted runs per session and IP, concurrency 2, and 10-second duration. Demo traffic still passes target ownership and SSRF checks.
 
-New registered users get Free: 15 accepted runs over the account lifetime and saved history. Pro is administrator assigned, with a configurable 10,000-run lifetime quota (`PAID_RUN_QUOTA`), own-run deletion, benchmark campaigns, and duration up to the server ceiling. Admin accounts bypass per-user run quotas, can delete any finished run, and can manage users and plans. Global worker capacity still applies. See [docs/PRICING.md](docs/PRICING.md). No payment processor is connected.
+New registered users get Free: 15 accepted runs over the account lifetime and saved history. Pro has a configurable 10,000-run lifetime quota (`PAID_RUN_QUOTA`), own-run deletion, benchmark campaigns, and duration up to the server ceiling. Admin accounts bypass per-user run quotas, can delete any finished run, and can manage users and plans. Global worker capacity still applies. Razorpay Standard Checkout can grant Pro after server-side order and signature verification. The UPI QR option requires administrator review. Subscription renewal, refunds, and payment webhooks are not implemented. See [Pricing](https://github.com/adityasinghr651/Devflow/blob/devflow-2.0/docs/PRICING.md).
 
 To bootstrap the first administrator, set `ADMIN_BOOTSTRAP_EMAIL` and `ADMIN_BOOTSTRAP_PASSWORD` in a private environment, then run `npm run admin:bootstrap`. The password must meet the same strength rules as signup. The script refuses to create an admin if one already exists. OAuth setup uses `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, and optionally `OAUTH_REDIRECT_BASE_URL` / `OAUTH_FRONTEND_SUCCESS_URL`; placeholders are listed in `.env.example`.
 
@@ -235,7 +242,7 @@ To bootstrap the first administrator, set `ADMIN_BOOTSTRAP_EMAIL` and `ADMIN_BOO
 
 ### Prerequisites
 
-- **Node.js**: `20.19+` or `22.12+` (LTS recommended)
+- **Node.js**: `22.x` (see `package.json` for the supported range)
 - **npm**: `10+`
 - **PostgreSQL** *(optional)*: Only required if using database persistence. By default, DevFlow uses local JSON storage.
 
@@ -271,7 +278,33 @@ npm run dev:all
 | **Express API** | `4000` | `http://127.0.0.1:4000/api` | REST API &amp; SSE event broadcaster |
 | **Test Target** | `5050` | `http://127.0.0.1:5050` | Controlled mock target with delay endpoints |
 
-*(Press `Ctrl+C` to stop all running processes).*
+Open the UI at **http://localhost:3000**. Create an account to keep saved targets and runs; the demo is temporary and read-only. Add the bundled target `http://127.0.0.1:5050`, then run a read-only `GET /health` with the **Quick Ping** preset (5 virtual users, 5 seconds). Use `GET /slow?ms=50` when you want to see latency in the result. In PowerShell, stop the services with Ctrl+C.
+
+For a longer guide to sign-in, targets, live results, CI, billing, and troubleshooting, read the [DevFlow User Guide](https://github.com/adityasinghr651/Devflow/blob/devflow-2.0/docs/USER_GUIDE.md).
+
+## Supabase Setup
+
+DevFlow can use Supabase for managed PostgreSQL **and** optional email/password identity. These are separate settings:
+
+- **Database:** set `DATABASE_URL` to the Supabase PostgreSQL direct or session-pooler URI and `DB_SSL=true`. DevFlow applies its SQL migrations at API startup. Local JSON storage remains the zero-setup default when `DATABASE_URL` is empty.
+- **Authentication:** set `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY` on the API server. The registration and sign-in forms then authenticate with Supabase Auth. DevFlow creates an application profile after the first successful sign-in and continues to enforce its own account roles, plans, quotas, and resource ownership.
+
+Enable Email in Supabase **Authentication → Providers**, set the Site URL and allowed redirect URLs to the real frontend origin, then restart the API. If email confirmation is enabled, users must click the confirmation email before signing in. DevFlow does not silently link a new Supabase identity to an existing account by email.
+
+Use the project's **publishable** key for this auth flow. Never expose a Supabase **secret** key in frontend variables or commit it to Git; privileged keys bypass database Row Level Security and are not required here. See the detailed [Database and Supabase setup guide](https://github.com/adityasinghr651/Devflow/blob/devflow-2.0/docs/DATABASE_SETUP.md) and [User Guide](https://github.com/adityasinghr651/Devflow/blob/devflow-2.0/docs/USER_GUIDE.md).
+
+## Self-Hosted Production Deployment
+
+DevFlow is a self-hosted open-source project; no public managed service is provided. The Docker Compose deployment is the documented production-oriented path:
+
+1. Use a Linux host or container platform with persistent PostgreSQL storage. Keep database backups and test restores.
+2. Configure a private server `.env` or deployment secret manager. Start from [.env.production.example](https://github.com/adityasinghr651/Devflow/blob/devflow-2.0/.env.production.example); replace every placeholder with real values and never commit the resulting file.
+3. Set `NODE_ENV=production`, a unique generated `JWT_SECRET` (at least 32 random characters), exact `CORS_ORIGIN` values, the production frontend `VITE_API_URL`, `DATABASE_URL`, and `DB_SSL=true` for Supabase/managed Postgres. Set `ALLOW_LOCAL_TARGETS=false`.
+4. Configure optional `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY` for Supabase Auth. Keep Razorpay credentials (`RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`) on the backend only; set `UPGRADE_PLAN_PRICE_INR` if enabling one-time checkout.
+5. Put the app behind HTTPS with trusted ingress, restrict database and API network access, and configure the frontend URL in Supabase Auth. Keep access to the host, logs, and database backups limited.
+6. Deploy with the documented Compose setup: `docker compose up --build -d`. Check `/api/health` and `/api/ready`, then sign in and verify a small authorized staging test before enabling CI.
+
+Start with the project's [Docker deployment instructions](https://github.com/adityasinghr651/Devflow/blob/devflow-2.0/docs/DOCKER.md) and [operations guide](https://github.com/adityasinghr651/Devflow/blob/devflow-2.0/docs/OPERATIONS.md). Production-oriented configuration does not mean the service is horizontally scalable as-is: authentication rate limits and several runner/SSE coordination structures are process-local. Run a single API instance unless you add and validate shared coordination. External repository pilot testing remains pending.
 
 ---
 
@@ -432,14 +465,21 @@ All environment variables can be configured via `.env`:
 | `TARGET_PORT` | `5050` | Port for the controlled test target helper |
 | `CORS_ORIGIN` | `http://localhost:3000` | Allowed browser origins (comma-separated for multi-port) |
 | `VITE_API_URL` | `http://localhost:4000/api` | API endpoint used by the React web client |
-| `ALLOW_LOCAL_TARGETS` | `true` | Allows testing loopback endpoints (`127.0.0.1`, `localhost`) |
+| `ALLOW_LOCAL_TARGETS` | `true` locally | Allows loopback targets; explicitly set `false` in production |
 | `JWT_SECRET` | *(development string)* | Secret for signing auth tokens (**change in production**) |
 | `JWT_EXPIRES_IN` | `24h` | Validity duration of issued session tokens |
 | `DATABASE_URL` | *(unset)* | PostgreSQL connection string. When unset, uses local JSON |
+| `DB_SSL` | `false` | Enables TLS for managed Postgres; use `true` with Supabase |
+| `SUPABASE_URL` | *(unset)* | Optional Supabase Auth project URL (server-side) |
+| `SUPABASE_PUBLISHABLE_KEY` | *(unset)* | Optional Supabase Auth application key (safe to expose; secret key not needed) |
 | `DATA_DIR` | `./data` | Directory for `store.json` when using JSON file storage |
 | `MAX_ACTIVE_RUNS` | `1` | Maximum simultaneous test runs managed by this instance |
 | `REQUEST_TIMEOUT_MS` | `5000` | Default per-request timeout for worker HTTP clients |
 | `RUNNER_ENGINE` | `auto` | Engine selection: `auto`, `node`, or `k6` |
+| `RAZORPAY_KEY_ID` / `RAZORPAY_KEY_SECRET` | *(unset)* | Optional server-side one-time checkout; never expose the secret to the browser |
+| `UPGRADE_PLAN_PRICE_INR` | `199` | One-time Pro checkout price in INR when Razorpay is enabled |
+
+For the complete production environment list, use [.env.production.example](https://github.com/adityasinghr651/Devflow/blob/devflow-2.0/.env.production.example) as a placeholder template and configure real values through a secret manager.
 
 ---
 
