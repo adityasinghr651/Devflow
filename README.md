@@ -159,7 +159,7 @@ The CI check uses DevFlow's internal runner and history. A first run may return 
    ```bash
    devflow check --init
    ```
-   This creates [devflow.config.json](devflow.config.json). Set `targetId` to your saved DevFlow target.
+   This creates `devflow.config.json` in the repository where you run the command. Set `targetId` to your saved DevFlow target.
 
 3. Export your authentication token and run the check:
    ```powershell
