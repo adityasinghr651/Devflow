@@ -19,6 +19,7 @@
 
   <p align="center">
     <a href="#quickstart">Quickstart</a> •
+    <a href="#using-devflow-in-the-web-ui">Using the Web UI</a> •
     <a href="#catch-performance-regressions-in-ci">CI Regression Checks</a> •
     <a href="#ui-design--live-telemetry">UI &amp; Visual Tour</a> •
     <a href="#api-testing-walkthrough">API Testing Example</a> •
@@ -55,6 +56,23 @@
 - **Process Isolation:** Load generation child processes operate in dedicated Node.js event loops, preventing benchmark traffic from starving the API server or distorting measurements.
 - **Safety by Design:** Target endpoints require verification before testing remote hosts. Loopback addresses are restricted to local development environments.
 - **Unified 1-Command Startup:** Launch the API, Vite React frontend, and local controlled test target together with `npm run dev:all`.
+
+---
+
+## Using DevFlow in the Web UI
+
+DevFlow is self-hosted software; this repository does not provide a public hosted app URL. Follow [Quickstart](#quickstart), then open `http://localhost:3000` (or the URL configured for your deployment). For a detailed walkthrough, see the [step-by-step User Guide](https://github.com/adityasinghr651/Devflow/blob/devflow-2.0/docs/USER_GUIDE.md), also available in the app as **User Guide & Help**.
+
+1. **Sign in or create an account** to save targets and test history. Demo mode is temporary and read-only.
+2. **Add an API target** from **API Targets**. Enter the service root URL, such as `http://127.0.0.1:5050`; choose the endpoint path later in the test form. Remote domains require ownership verification.
+3. **Run a small test** against an authorized, preferably read-only route such as `/health`. Start with **Quick Ping** (5 virtual users for 5 seconds). The DevFlow API server must be able to reach the target.
+4. **Review live and saved results** in **Live Metrics**, **Test Runs**, or **History**. Check throughput, p95 latency, and request failures together.
+5. **Build a comparison baseline** by repeating the same target and workload. A statistical CI verdict requires at least three completed matching runs.
+6. **Connect CI** using the [CLI guide](https://github.com/adityasinghr651/Devflow/blob/devflow-2.0/docs/CLI.md) and [GitHub Action guide](https://github.com/adityasinghr651/Devflow/blob/devflow-2.0/docs/GITHUB_ACTION.md). Save the API URL and token as repository secrets and do not expose them to untrusted fork workflows.
+
+For storage and deployment, read [Database Setup](https://github.com/adityasinghr651/Devflow/blob/devflow-2.0/docs/DATABASE_SETUP.md). JSON-file storage is the zero-setup local default; self-hosted PostgreSQL and Supabase are supported. Billing and one-time plan upgrades are described in the in-app guide and [Pricing](https://github.com/adityasinghr651/Devflow/blob/devflow-2.0/docs/PRICING.md).
+
+> **Safety:** Test only systems you own or are authorized to assess. Begin in development or staging with low concurrency. `localhost` means the machine running the DevFlow API, not necessarily your browser or a hosted CI runner.
 
 ---
 
@@ -115,7 +133,15 @@ DevFlow features a visual interface inspired by modern developer products, built
 The landing experience provides an interactive simulator equipped with live workload curve generation and real-time histogram previews:
 
 <p align="center">
-  <img src="docs/assets/devflow-ui-preview.svg" alt="DevFlow Interactive Load Test Playground and Modern UI" width="100%" />
+  <img src="https://raw.githubusercontent.com/adityasinghr651/Devflow/devflow-2.0/docs/assets/devflow-ui-preview.png" alt="DevFlow current public landing page and interactive load testing overview" width="100%" />
+</p>
+
+### Current workspace onboarding and CI status
+
+The workspace dashboard includes a first-run checklist for saving a target, launching a small test, and building comparable CI history.
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/adityasinghr651/Devflow/devflow-2.0/docs/assets/devflow-workspace-preview.png" alt="DevFlow current workspace dashboard with onboarding checklist and CI setup status" width="100%" />
 </p>
 
 ---
