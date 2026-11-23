@@ -24,6 +24,7 @@ interface HomeViewProps {
   user: User | null;
   onNavigateDocs?: () => void;
   onNavigatePage?: (page: string) => void;
+  onPaymentOptions?: () => void;
 }
 
 export const HomeView: React.FC<HomeViewProps> = ({
@@ -32,6 +33,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
   user,
   onNavigateDocs,
   onNavigatePage,
+  onPaymentOptions,
 }) => {
   // Interactive Simulator State
   const [simRunning, setSimRunning] = useState(true);
@@ -603,7 +605,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
           <span className="section-eyebrow">CURRENT ACCESS & FUTURE OPTIONS</span>
           <h2 className="section-title">Current tiers and a hosted-service hypothesis</h2>
           <p className="section-subtitle">
-            DevFlow has no checkout or paid hosted service. Current account limits are enforced by the platform; future hosted features are only a pre-pilot hypothesis.
+            A one-time Razorpay checkout can activate Pro when the operator configures the server credentials and price. A hosted team service remains under evaluation.
           </p>
         </div>
 
@@ -613,22 +615,22 @@ export const HomeView: React.FC<HomeViewProps> = ({
               <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-blue)', textTransform: 'uppercase' }}>Implemented access tiers</div>
               <div style={{ fontSize: '28px', fontWeight: 700, color: 'var(--text-primary)', marginTop: '4px' }}>Free &amp; Pro</div>
               <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginTop: '8px' }}>
-                Free is available at signup. Pro is currently admin-assigned; no checkout or subscription billing is connected.
+                Free is available at signup. Pro can be activated by an administrator or a verified one-time Razorpay payment when checkout is configured.
               </p>
             </div>
             <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '13px', color: 'var(--text-secondary)' }}>
               <li style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><CheckCircle2 size={15} style={{ color: 'var(--color-lime)' }} /> Free: 15 accepted runs over the account lifetime</li>
               <li style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><CheckCircle2 size={15} style={{ color: 'var(--color-lime)' }} /> Pro: 10,000 runs by default, configurable by the operator</li>
               <li style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><CheckCircle2 size={15} style={{ color: 'var(--color-lime)' }} /> Pro includes campaigns and own-run deletion</li>
-              <li style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><CheckCircle2 size={15} style={{ color: 'var(--color-lime)' }} /> No payment required; self-hosted platform</li>
+              <li style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><CheckCircle2 size={15} style={{ color: 'var(--color-lime)' }} /> Pro checkout is one-time; no recurring subscription</li>
             </ul>
             <button
               type="button"
               className="btn-hero-primary full-button"
               style={{ marginTop: 'auto' }}
-              onClick={onStart}
+              onClick={onPaymentOptions || onStart}
             >
-              <span>Get Started</span>
+              <span>{user ? 'View plans & payment options' : 'Sign in to view plans'}</span>
               <ArrowRight size={14} />
             </button>
           </div>

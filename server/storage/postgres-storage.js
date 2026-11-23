@@ -4,6 +4,32 @@ import { config } from '../config.js';
 
 const { Pool } = pg;
 
+function removeSslModeParameter(connectionString) {
+  try {
+    const url = new URL(connectionString);
+    url.searchParams.delete('sslmode');
+    return url.toString();
+  } catch {
+    // libpq-style key/value connection strings are also accepted by node-postgres.
+    return String(connectionString).replace(/(^|\s)sslmode=[^\s]+/gi, '$1').trim();
+  }
+}
+
+export function buildPoolConfig(connectionString, poolOptions = {}, env = process.env) {
+  const useSsl = String(env.DB_SSL || '').toLowerCase() === 'true'
+    || String(connectionString || '').toLowerCase().includes('sslmode=require');
+  return {
+    // pg-connection-string parses sslmode=require into its own SSL object and may
+    // replace the `ssl` option, so remove it after deriving the TLS requirement.
+    connectionString: useSsl ? removeSslModeParameter(connectionString) : connectionString,
+    max: poolOptions.max || 10,
+    min: poolOptions.min || 2,
+    idleTimeoutMillis: poolOptions.idleTimeoutMillis || 30000,
+    connectionTimeoutMillis: poolOptions.connectionTimeoutMillis || 5000,
+    ...(useSsl ? { ssl: { rejectUnauthorized: false } } : {}),
+  };
+}
+
 function mapTargetFromDb(row) {
   if (!row) return null;
   return {
@@ -78,13 +104,7 @@ function mapRunFromDb(row) {
 
 export class PgStorage {
   constructor(connectionString, poolOptions = {}) {
-    this.pool = new Pool({
-      connectionString,
-      max: poolOptions.max || 10,
-      min: poolOptions.min || 2,
-      idleTimeoutMillis: poolOptions.idleTimeoutMillis || 30000,
-      connectionTimeoutMillis: poolOptions.connectionTimeoutMillis || 5000,
-    });
+    this.pool = new Pool(buildPoolConfig(connectionString, poolOptions));
     this.initialized = false;
   }
 

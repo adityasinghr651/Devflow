@@ -31,6 +31,7 @@ import { SettingsView } from './components/views/SettingsView.tsx';
 import { LiveMetricsView } from './components/views/LiveMetricsView.tsx';
 import { BenchmarkCampaignsView } from './components/views/BenchmarkCampaignsView.tsx';
 import { AdminView } from './components/views/AdminView.tsx';
+import { BillingView } from './components/views/BillingView.tsx';
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:4000/api';
 const fmt = (n: number) => new Intl.NumberFormat('en-US').format(n || 0);
@@ -59,6 +60,10 @@ const ROUTE_MAP: Record<string, string> = {
   'docs': 'Documentation',
   'documentation': 'Documentation',
   'settings': 'Settings',
+  'billing': 'Billing & Plans',
+  'billing-plans': 'Billing & Plans',
+  'plans': 'Billing & Plans',
+  'upgrade': 'Billing & Plans',
   'admin': 'Admin',
 };
 
@@ -76,6 +81,7 @@ const PAGE_TO_HASH: Record<string, string> = {
   'Benchmark Campaigns': '/campaigns',
   'Documentation': '/docs',
   'Settings': '/settings',
+  'Billing & Plans': '/billing',
   'Admin': '/admin',
 };
 
@@ -770,6 +776,7 @@ export default function App() {
           user={user}
           onNavigateDocs={() => navigateTo('Documentation')}
           onNavigatePage={(p) => navigateTo(p)}
+          onPaymentOptions={() => navigateTo(user ? 'Billing & Plans' : 'Login')}
         />
 
         {modalElements}
@@ -836,6 +843,8 @@ export default function App() {
                   ? 'Test Runs'
                   : page === 'Benchmark Campaigns'
                   ? '1M Request Campaigns'
+                  : page === 'Billing & Plans'
+                  ? 'Billing & Plans'
                   : page === 'Live Metrics'
                   ? 'Live Metrics'
                   : page === 'History'
@@ -855,6 +864,8 @@ export default function App() {
                   ? 'Durable performance snapshots and execution comparisons.'
                   : page === 'Benchmark Campaigns'
                   ? 'Run staged, request-counted benchmarks with validated reports and manual stage approval.'
+                  : page === 'Billing & Plans'
+                  ? 'View your current access plan and choose a secure payment method for Pro.'
                   : 'A modern developer platform for repeatable performance benchmarks.'}
               </p>
             </div>
@@ -968,6 +979,8 @@ export default function App() {
 
           {page === 'Documentation' && <DocsView />}
 
+          {page === 'Billing & Plans' && <BillingView user={user} token={token} api={API} onUserUpdated={setUser} onSignIn={() => setShowAuth(true)} />}
+
           {page === 'Settings' && (
             <SettingsView
               user={user}
@@ -975,6 +988,7 @@ export default function App() {
               setTheme={setTheme}
               handleLogout={handleLogout}
               setShowAuth={setShowAuth}
+              onOpenBilling={() => navigateTo('Billing & Plans')}
             />
           )}
         </div>
