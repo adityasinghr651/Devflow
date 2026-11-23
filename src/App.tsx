@@ -844,7 +844,7 @@ export default function App() {
               </h1>
               <p>
                 {page === 'Overview'
-                  ? 'Run load tests, observe real-time metrics, and inspect API reliability.'
+                  ? 'Set up CI regression checks and review comparable API runs; use the load-testing tools to inspect or tune workloads.'
                   : page === 'API Targets' || page === 'Servers & Targets'
                   ? 'Manage authorized target endpoints and cryptographic ownership proofs.'
                   : page === 'Test Runs'

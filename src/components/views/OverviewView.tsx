@@ -10,7 +10,6 @@ import {
   Server,
   ShieldCheck,
   TrendingUp,
-  Zap,
 } from 'lucide-react';
 import { Target, Run } from '../../types/index.ts';
 import { StatusBadge } from '../ui/StatusBadge.tsx';
@@ -41,7 +40,6 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
   onSelectRun,
   onShowTargetModal,
   onShowTestModal,
-  onSimulateRun,
   setTestTarget,
   fmt,
 }) => {
@@ -80,33 +78,30 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <b style={{ color: 'var(--text-primary)', fontSize: '14px' }}>
-                Bounded-Memory Latency Histograms
+                CI Performance Regression Check
               </b>
-              <span className="status-pill completed">
-                <i /> Phase 6.1 Validated
+              <span className="status-pill warning">
+                <i /> Pilot pending
               </span>
             </div>
             <p style={{ margin: '3px 0 0', fontSize: '12px', color: 'var(--text-muted)' }}>
-              Sub-millisecond latency histograms with guaranteed fixed O(1) memory and real-time Server-Sent Events push.
+              The CLI and GitHub Action compare a configured HTTP run with matching history. Three comparable runs are required before a statistical verdict; hosted CI has not been pilot-verified.
             </p>
           </div>
         </div>
 
         <div style={{ display: 'flex', gap: '10px' }}>
-          {onSimulateRun && (
-            <button
-              type="button"
-              className="btn btn-secondary btn-sm"
-              onClick={onSimulateRun}
-              title="Trigger a real-time live test simulation"
-            >
-              <Zap size={13} style={{ color: 'var(--color-blue)' }} />
-              <span>Simulate Live Run</span>
-            </button>
-          )}
           <button
             type="button"
             className="btn btn-primary btn-sm"
+            onClick={() => onNavigate('Documentation')}
+          >
+            <ArrowRight size={14} />
+            <span>CI Setup</span>
+          </button>
+          <button
+            type="button"
+            className="btn btn-secondary btn-sm"
             onClick={onShowTestModal}
           >
             <Plus size={14} />

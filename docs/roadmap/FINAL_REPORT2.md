@@ -1,8 +1,8 @@
 # DevFlow regression-gate reposition runbook — final report
 
-Date: 2026-11-12
-Execution branch: `roadmap2/phase-4-pilot`
-Changes are committed locally on the `roadmap2/phase-1-security`, `roadmap2/phase-2-regression`, `roadmap2/phase-3-adoption`, and `roadmap2/phase-4-pilot` branches. Nothing was pushed.
+Original evidence run: 2026-11-12. Status update: 2026-11-23.
+Pre-pilot positioning and monetization groundwork: `roadmap2/phase-5-positioning-prepilot` (local).
+The README framing was pushed to `main` in `95014f9`; the landing, sidebar, docs, and settings changes remain on the local phase branch.
 
 ## A. Phase status
 
@@ -11,9 +11,9 @@ Changes are committed locally on the `roadmap2/phase-1-security`, `roadmap2/phas
 | 1 — Security and correctness | Done; pass with a documented local-account exception | [Phase 1 evidence](evidence/phase2-1-security.md) |
 | 2 — Regression detector trust | Done; pass with a measured +10% sensitivity limitation | [Phase 2 evidence](evidence/phase2-2-regression-studies.md) |
 | 3 — Adoption | Done; pass locally; live hosted Action not verified | [Phase 3 evidence](evidence/phase2-3-adoption.md) |
-| 4 — Real pilot | Blocked; not verified because owner approval and repository list are absent | [Phase 4 status](evidence/phase2-4-pilot.md) |
-| 5 — Product repositioning | Blocked on Phase 4 signal; no README/landing rewrite or case study was made | — |
-| 6 — Monetization groundwork | Blocked on Phases 4 and 5; no pilot learnings or pricing changes | — |
+| 4 — Real pilot | Deferred by owner; three candidate repositories supplied and access verified, but no CI run or target traffic has occurred | [Phase 4 status](evidence/phase2-4-pilot.md) |
+| 5 — Product repositioning | Partial: pre-pilot README/landing/nav/docs work done with explicit pilot caveat; case study and evidence review pending | [Phase 5 status](evidence/phase2-5-positioning.md) |
+| 6 — Monetization groundwork | Partial: clearly labeled feature hypothesis and current access-plan view prepared; pilot interview validation pending | [Phase 6 status](evidence/phase2-6-monetization.md) |
 
 ## B. Phase 1 security prerequisite
 
@@ -40,13 +40,13 @@ The +10% miss is consistent with the current 19.3563% p95 minimum-change thresho
 
 ## D. Pilot results — no external pilot was run
 
-`PILOT_REPOS_APPROVED=false`, and no 3–10 repository list was supplied. No external repository was modified and no external target received load. Consequently there are no pilot PR counts, owner-confirmed alarms, developer-retention responses, or willingness-to-pay feedback. Those values are **NOT VERIFIED**, not zero. Phase 4's blocked status is documented in [the pilot evidence](evidence/phase2-4-pilot.md).
+The owner supplied three candidate repositories and the connected GitHub account was verified as an admin on each. At the owner's request, testing is deferred. No external repository was modified and no external target received load. Consequently there are no pilot PR counts, owner-confirmed alarms, developer-retention responses, or willingness-to-pay feedback. Those values are **NOT VERIFIED**, not zero. The remaining URL, hosted API, secret, and workflow requirements are listed in [the pilot evidence](evidence/phase2-4-pilot.md).
 
 ## E. Adoption work and positioning
 
 Added `devflow check` with config defaults, `--init`, environment-token support, report counts/bands, and exit codes. The Action uploads a JSON artifact and maintains one PR comment with the verdict, baseline window, decision bands, and a direct artifact link. Mocked tests cover comment creation and update. A clean Windows install-to-first-check took 42 seconds and completed 5,779 requests with zero failures; its expected first-run verdict was `insufficient_data`.
 
-Added [Why DevFlow](../WHY_DEVFLOW.md) with careful k6, Locust, and Bencher comparisons and the local study limitations. The README headline, landing hero, and a pilot case study remain untouched because Phase 5 requires real Phase 4 evidence.
+Added [Why DevFlow](../WHY_DEVFLOW.md) with careful k6, Locust, and Bencher comparisons and the local study limitations. Following the owner's request to prepare the remaining phases before testing, the README and landing hero now lead with the CI regression-check workflow while explicitly saying the hosted pilot has not run. The app navigation/docs put CI setup before exploratory load-testing screens. No pilot case study was written. The free-vs-hosted split in [PRICING.md](../PRICING.md) is labeled as an unvalidated hypothesis with no price or launch commitment.
 
 ## F. Verification, limitations, and owner actions
 
@@ -57,7 +57,7 @@ Added [Why DevFlow](../WHY_DEVFLOW.md) with careful k6, Locust, and Bencher comp
 - `npm audit` (including dev dependencies) reported three moderate findings in `autocannon@8` → `hyperid` → `uuid <11.1.1`; npm's suggested remedy forces breaking `autocannon@9`. Production-only audit remains clean. Review and test that upgrade separately.
 - The study covers one Windows host, one loopback fixed-delay endpoint, and one workload. No other machines, CI hosts, production applications, or teams were measured.
 
-Required owner input is listed in [HUMAN_ACTIONS.md](HUMAN_ACTIONS.md): provide 3–10 pilot repositories and explicitly approve adding DevFlow to their CI. Also review the dev-dependency upgrade and change the local admin password before exposing that local instance.
+Remaining pilot setup is listed in [HUMAN_ACTIONS.md](HUMAN_ACTIONS.md): supply approved target URLs and a reachable hosted DevFlow API, configure repository secrets, and review the exact workflow changes. `Buy-or-Wait` needs an HTTP adapter or replacement candidate. Also review the dev-dependency upgrade and change the local admin password before exposing that local instance.
 
 ## G. Evidence checklist
 
@@ -70,9 +70,9 @@ Required owner input is listed in [HUMAN_ACTIONS.md](HUMAN_ACTIONS.md): provide 
 | True-positive rate | PASS for this local study only; +10% was missed | [Study](../../benchmarks/results/true-positive-study.md) |
 | CLI + Action tested | PASS locally with mocked GitHub API | [Phase 3](evidence/phase2-3-adoption.md) |
 | Quickstart timing | PASS, 42 seconds on Windows | [Phase 3](evidence/phase2-3-adoption.md) |
-| Real pilot run | NOT VERIFIED; blocked pending approval and repo list | [Phase 4](evidence/phase2-4-pilot.md) |
-| Repositioned docs | PARTIAL; Why page exists, README/landing/case study await pilot | [Why DevFlow](../WHY_DEVFLOW.md) |
-| Pricing draft based on pilot | NOT VERIFIED; Phase 6 remains gated | — |
+| Real pilot run | NOT VERIFIED; owner supplied candidates but requested testing later | [Phase 4](evidence/phase2-4-pilot.md) |
+| Pre-pilot positioning | PARTIAL; README/landing/nav/docs changed; case study and pilot validation pending | [Phase 5](evidence/phase2-5-positioning.md) |
+| Pricing draft | PRE-PILOT HYPOTHESIS; no prices and no pilot feedback yet | [Phase 6](evidence/phase2-6-monetization.md), [PRICING.md](../PRICING.md) |
 
 ## H. Truthful project summary
 

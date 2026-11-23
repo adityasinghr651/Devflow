@@ -19,6 +19,16 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   handleLogout,
   setShowAuth,
 }) => {
+  const currentTier = user?.tier || 'free';
+  const tierLabel = currentTier === 'paid' ? 'Pro' : currentTier[0].toUpperCase() + currentTier.slice(1);
+  const tierDescription = currentTier === 'admin'
+    ? 'Administrator access; user-level run quotas do not apply.'
+    : currentTier === 'paid'
+    ? '10,000 accepted runs by default, configurable by the platform operator; includes campaigns and own-run deletion.'
+    : currentTier === 'demo'
+    ? 'Temporary demo access: up to 10 runs during this session, with demo workload limits.'
+    : '15 accepted runs over the account lifetime, with saved run history.';
+
   return (
     <Card className="full-panel settings-panel page-animate">
       <PanelTitle
@@ -41,6 +51,14 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             Sign In
           </Button>
         )}
+      </div>
+
+      <div className="setting-row">
+        <div>
+          <b>Current access plan</b>
+          <p>{user ? `${tierDescription} Paid subscriptions and billing are not connected; Pro access is assigned by an administrator.` : 'Sign in to view the access plan for your account.'}</p>
+        </div>
+        <span className="env-pill">{user ? tierLabel : 'Signed out'}</span>
       </div>
 
       {/* Theme Selection: Light, Dark, System */}

@@ -1,10 +1,30 @@
 import React from 'react';
-import { BookOpen, Code2, Radio, ShieldCheck } from 'lucide-react';
+import { BookOpen, Code2, GitBranch, Radio, ShieldCheck } from 'lucide-react';
 import { Card } from '../ui/Card.tsx';
 
 export const DocsView: React.FC = () => {
   return (
     <div className="docs-grid page-animate">
+      <Card className="doc-card">
+        <div style={{ color: 'var(--color-lime)', marginBottom: '12px' }}>
+          <GitBranch size={24} />
+        </div>
+        <h3 style={{ fontSize: '15px', fontWeight: 700, margin: '0 0 8px', color: 'var(--text-primary)' }}>
+          CI performance regression check
+        </h3>
+        <p style={{ fontSize: '12px', lineHeight: 1.7, color: 'var(--text-muted)' }}>
+          Save an authorized target and workload in DevFlow, then configure the CLI or GitHub Action with a workload config and API token from repository secrets. The check runs the HTTP workload, compares matching history, and uploads a JSON report with a pull request summary.
+        </p>
+        <code style={{ display: 'block', marginTop: '10px', background: 'var(--bg-subtle)', padding: '10px 14px', borderRadius: '6px', fontSize: '11px', fontFamily: 'var(--font-mono)', lineHeight: 1.8, color: 'var(--color-blue-light)' }}>
+          npm link<br />
+          devflow check --init<br />
+          devflow check
+        </code>
+        <p style={{ fontSize: '12px', lineHeight: 1.7, color: 'var(--text-muted)', marginTop: '10px' }}>
+          Use a stable test or staging endpoint that the DevFlow server can reach. At least three comparable completed runs are needed for a statistical verdict; otherwise the result is <code>insufficient_data</code>. Hosted CI pilot behavior is not yet verified.
+        </p>
+      </Card>
+
       <Card className="doc-card">
         <div style={{ color: 'var(--color-blue-light)', marginBottom: '12px' }}>
           <BookOpen size={24} />
