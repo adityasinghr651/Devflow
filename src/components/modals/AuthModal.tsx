@@ -49,7 +49,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   return (
     <Modal
       title={authMode === 'login' ? 'Welcome Back to ServerTest' : 'Create Your Engineering Account'}
-      subtitle="Sign in to manage saved targets and tests, or start a temporary demo session."
+      subtitle="Sign in to manage saved targets and tests, or start a temporary demo session. Supabase can manage email identity; DevFlow controls workspace roles and access."
       onClose={onClose}
     >
       <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }} className="modal-animate">

@@ -74,6 +74,7 @@ export const DocsView: React.FC<DocsViewProps> = ({ onNavigate }) => {
       <GuideCard icon={<Database size={24} />} title="5. Save and retain your data">
         <p>Sign in to save targets and runs to your account. Demo mode is temporary and read-only; create an account for persistent records.</p>
         <p>With <code>DATABASE_URL</code> unset, the API uses local JSON files under <code>DATA_DIR</code>. PostgreSQL and Supabase are also supported; set <code>DB_SSL=true</code> for managed Postgres.</p>
+        <p>Optional Supabase Auth handles email identity when <code>SUPABASE_URL</code> and <code>SUPABASE_PUBLISHABLE_KEY</code> are configured on the API. DevFlow still controls roles and workspace access.</p>
         <a href="https://github.com/adityasinghr651/Devflow/blob/devflow-2.0/docs/DATABASE_SETUP.md" target="_blank" rel="noreferrer" className="btn btn-secondary btn-sm">Read database setup</a>
       </GuideCard>
 

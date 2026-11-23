@@ -434,10 +434,17 @@ export default function App() {
     setAuthError('');
     try {
       if (authMode === 'register') {
-        const res = await request<{ user: User; token: string }>('/auth/register', {
+        const res = await request<{ user?: User; token?: string; requiresEmailConfirmation?: boolean; message?: string }>('/auth/register', {
           method: 'POST',
           body: JSON.stringify({ email: authEmail, password: authPassword, name: authName }),
         });
+        if (res.requiresEmailConfirmation) {
+          setAuthMode('login');
+          setAuthPassword('');
+          setAuthError(res.message || 'Check your email to confirm your account, then sign in.');
+          return;
+        }
+        if (!res.user || !res.token) throw new Error('The server did not return a complete sign-in session.');
         localStorage.removeItem('servertest-demo-mode');
         localStorage.setItem('servertest-token', res.token);
         setToken(res.token);

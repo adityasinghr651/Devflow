@@ -83,13 +83,33 @@ For pull requests from forks, GitHub does not expose repository secrets to the s
 
 If the API runs in Docker, its `DATA_DIR` or database must use persistent storage or records may be lost when the container is replaced. Back up production data and use a private database network where possible.
 
-## 8. Billing and plan access
+## 8. Enable Supabase email authentication
+
+Supabase Auth is optional. When the API server has both `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY`, the existing **Create Account** and **Sign In** forms use Supabase Auth for email/password identity. If either value is absent, DevFlow uses its existing local account authentication.
+
+1. In the Supabase dashboard, confirm email/password sign-in is enabled under **Authentication → Providers → Email**. Choose whether users must confirm their email before signing in.
+2. Set the project URL and publishable key in the **server's** `.env` (or deployment secret manager):
+
+   ```dotenv
+   SUPABASE_URL=https://YOUR_PROJECT_REF.supabase.co
+   SUPABASE_PUBLISHABLE_KEY=sb_publishable_...
+   ```
+
+3. Restart the API server. If email confirmation is enabled, set the Supabase **Site URL** and allowed redirect URLs to the frontend's real origin in **Authentication → URL Configuration**.
+4. Create a test account in DevFlow. With confirmation enabled, use the link sent by Supabase, return to DevFlow, then sign in. The first successful sign-in creates a DevFlow profile and the app issues its API session.
+5. Verify the account can save a target and its data appears under that account, then sign out and sign in again.
+
+Supabase verifies the email/password identity. DevFlow stores its own user profile and remains the authority for workspace roles, plan/tier, target/run ownership, and quotas; client-side user metadata never grants admin access. Existing DevFlow users are not silently linked by email: duplicate addresses require an explicit future account-linking flow. Profiles and test records use the configured DevFlow storage (`DATABASE_URL` for Postgres/Supabase, otherwise local JSON).
+
+Only the publishable key is needed for this server-mediated email-auth flow. Do not put a Supabase secret key in the frontend or Git. A secret key bypasses database Row Level Security and is unnecessary here. If a secret key has been exposed, rotate it in Supabase before using it for any privileged server function.
+
+## 9. Billing and plan access
 
 Open **Billing & Plans** from the navigation to see the available plan and configured price. If the operator has configured Razorpay, use **Checkout** to complete and verify a payment. The UPI QR path is handled separately and requires administrator review before Pro access is activated. It is a one-time upgrade flow, not recurring subscription billing.
 
 If payment controls are unavailable, the deployment operator needs to configure the server-side Razorpay credentials and `UPGRADE_PLAN_PRICE_INR`. Never share or commit the Razorpay secret. See [Pricing](PRICING.md).
 
-## 9. Common problems
+## 10. Common problems
 
 | What you see | What to check |
 | --- | --- |
@@ -100,5 +120,8 @@ If payment controls are unavailable, the deployment operator needs to configure 
 | Regression says `insufficient_data` | Record at least three completed runs with the same target and workload fingerprint. |
 | Old records disappear after deployment | Configure persistent JSON volume or PostgreSQL and verify backups. |
 | Billing is missing | Confirm server payment variables and the enabled plan configuration; restart/redeploy after changing environment values. |
+| Supabase sign-up asks for email confirmation | Confirm the message was delivered, the Supabase Site URL/redirect allowlist matches the frontend, and then sign in after confirming. |
+| Supabase authentication is unavailable | Confirm both server variables are set, the project URL is correct, the API can reach Supabase, and the Supabase project is healthy. |
+| Supabase profile conflicts with an existing DevFlow account | Use the account's existing sign-in method; automatic email-based account linking is intentionally blocked. |
 
 See [Troubleshooting](TROUBLESHOOTING.md) and [FAQ](FAQ.md) for more detail. For development and architecture, see [Architecture](ARCHITECTURE.md) and [Concepts](CONCEPTS.md).

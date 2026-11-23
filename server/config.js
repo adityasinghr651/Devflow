@@ -52,6 +52,8 @@ export const config = {
   workerNoProgressTimeoutMs: positiveInteger('WORKER_NO_PROGRESS_TIMEOUT_MS', 15000),
   workerMemoryMb: positiveInteger('WORKER_MEMORY_MB', 512),
   databaseUrl: process.env.DATABASE_URL || '',
+  supabaseUrl: (process.env.SUPABASE_URL || '').replace(/\/+$/, ''),
+  supabasePublishableKey: process.env.SUPABASE_PUBLISHABLE_KEY || '',
   jwtSecret,
   jwtExpiresIn: process.env.JWT_EXPIRES_IN || '24h',
   authRateLimitWindowMs: Number(process.env.AUTH_RATE_LIMIT_WINDOW_MS || 60000), // 1 min
@@ -63,6 +65,10 @@ export const config = {
   dbPoolMin: Number(process.env.DB_POOL_MIN || 2),
   dbPoolMax: Number(process.env.DB_POOL_MAX || 10),
 };
+
+if (Boolean(config.supabaseUrl) !== Boolean(config.supabasePublishableKey)) {
+  throw new Error('FATAL: Configure both SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY, or leave both unset.');
+}
 
 if (config.maxDurationSec > 3600) {
   throw new Error('FATAL: MAX_DURATION_SEC cannot exceed 3600.');

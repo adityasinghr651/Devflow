@@ -11,6 +11,7 @@ import {
   authRateLimiter,
   validatePassword,
 } from '../security/auth.js';
+import { isSupabaseAuthEnabled, supabaseSignIn, supabaseSignUp } from '../security/supabase-auth.js';
 
 export const authRouter = express.Router();
 
@@ -20,6 +21,51 @@ const DEMO_TTL_MS = 24 * 60 * 60 * 1000;
 const OAUTH_COOKIE = 'devflow_oauth_session';
 function cookieValue(req, name) { return req.headers.cookie?.split(';').map(value => value.trim()).find(value => value.startsWith(`${name}=`))?.slice(name.length + 1) || ''; }
 function cookieFlags() { return `HttpOnly; SameSite=Lax; Path=/api; Max-Age=600${process.env.NODE_ENV === 'production' ? '; Secure' : ''}`; }
+
+async function issueSupabaseBackedSession(identity, req, res, statusCode = 200) {
+  const email = typeof identity?.email === 'string' ? identity.email.trim().toLowerCase() : '';
+  if (!identity?.id || !EMAIL_REGEX.test(email)) return res.status(401).json({ error: 'Supabase did not return a valid authenticated account.' });
+
+  const storage = getStorage();
+  let user = await storage.getUserByOAuth('supabase', String(identity.id));
+  if (!user) {
+    const existing = await storage.getUserByEmail(email);
+    if (existing) return res.status(409).json({ error: 'An account already uses this email. Sign in with its existing method; account linking requires explicit confirmation.' });
+    const name = typeof identity.user_metadata?.full_name === 'string' && identity.user_metadata.full_name.trim()
+      ? identity.user_metadata.full_name.trim().slice(0, 80)
+      : email.split('@')[0].slice(0, 80);
+    try {
+      user = await storage.createUser({
+        email,
+        passwordHash: await hashPassword(`${randomUUID()}-Aa9!`),
+        name,
+        role: 'user',
+        tier: 'free',
+        plan: 'free',
+        oauthProvider: 'supabase',
+        oauthProviderId: String(identity.id),
+      });
+    } catch (error) {
+      if (error.code === '23505' || /email already registered/i.test(error.message)) {
+        const linked = await storage.getUserByOAuth('supabase', String(identity.id));
+        if (linked) user = linked;
+        else return res.status(409).json({ error: 'An account already uses this email. Sign in with its existing method; account linking requires explicit confirmation.' });
+      } else throw error;
+    }
+    await recordAuditEvent(storage, { userId: user.id, action: 'USER_SUPABASE_REGISTER', resourceType: 'user', resourceId: user.id, details: { email }, ipAddress: req.ip });
+  }
+
+  const safeUser = {
+    id: user.id,
+    email: user.email,
+    name: user.name,
+    role: user.role,
+    tier: user.tier || (user.role === 'admin' ? 'admin' : 'free'),
+    plan: user.plan || (user.role === 'admin' ? 'admin' : 'free'),
+  };
+  if (statusCode === 200) await recordAuditEvent(storage, { userId: user.id, action: 'USER_SUPABASE_LOGIN', resourceType: 'user', resourceId: user.id, details: { email }, ipAddress: req.ip });
+  return res.status(statusCode).json({ user: safeUser, token: generateToken(safeUser) });
+}
 
 // POST /api/auth/register
 authRouter.post('/auth/register', authRateLimiter, async (req, res, next) => {
@@ -36,6 +82,18 @@ authRouter.post('/auth/register', authRateLimiter, async (req, res, next) => {
 
     const passwordValidation = validatePassword(password);
     if (!passwordValidation.valid) return res.status(400).json({ error: passwordValidation.error, field: 'password' });
+
+    if (isSupabaseAuthEnabled()) {
+      const result = await supabaseSignUp({ email: email.trim().toLowerCase(), password, name: name.trim() });
+      if (!result.access_token || !result.user) {
+        return res.status(202).json({
+          requiresEmailConfirmation: true,
+          email: email.trim().toLowerCase(),
+          message: 'Check your email for the Supabase confirmation link, then return here and sign in.',
+        });
+      }
+      return issueSupabaseBackedSession(result.user, req, res, 201);
+    }
 
     const storage = getStorage();
     const normalizedEmail = email.trim().toLowerCase();
@@ -68,6 +126,7 @@ authRouter.post('/auth/register', authRateLimiter, async (req, res, next) => {
     const token = generateToken(safeUser);
     res.status(201).json({ user: safeUser, token });
   } catch (err) {
+    if (err.statusCode) return res.status(err.statusCode).json({ error: err.message });
     next(err);
   }
 });
@@ -90,6 +149,12 @@ authRouter.post('/auth/login', authRateLimiter, async (req, res, next) => {
 
     if (typeof email !== 'string' || !EMAIL_REGEX.test(email.trim()) || email.length > 255) return res.status(400).json({ error: 'A valid email address is required.', field: 'email' });
     if (typeof password !== 'string' || password.length < 1 || password.length > 128) return res.status(400).json({ error: 'Password must be between 1 and 128 characters.', field: 'password' });
+
+    if (isSupabaseAuthEnabled()) {
+      const result = await supabaseSignIn({ email: email.trim().toLowerCase(), password });
+      if (!result.access_token || !result.user) return res.status(401).json({ error: 'Supabase did not create a valid session. Confirm your email and try again.' });
+      return issueSupabaseBackedSession(result.user, req, res);
+    }
 
     const storage = getStorage();
     const normalizedEmail = email.trim().toLowerCase();
@@ -134,6 +199,7 @@ authRouter.post('/auth/login', authRateLimiter, async (req, res, next) => {
     const token = generateToken(safeUser);
     res.json({ user: safeUser, token });
   } catch (err) {
+    if (err.statusCode) return res.status(err.statusCode).json({ error: err.message });
     next(err);
   }
 });
