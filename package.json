@@ -39,7 +39,7 @@
     "dotenv": "^17.2.3",
     "express": "^4.21.2",
     "jsonwebtoken": "^9.0.3",
-    "lucide-react": "^0.546.0",
+    "lucide-react": "^1.77.0",
     "pg": "^8.23.1",
     "razorpay": "^2.9.8",
     "react": "^19.0.1",
